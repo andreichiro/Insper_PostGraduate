@@ -1,0 +1,14 @@
+# macOS cruft
+.DS_Store
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# RStudio / R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Python byte-code
+__pycache__/
+*.py[cod]
