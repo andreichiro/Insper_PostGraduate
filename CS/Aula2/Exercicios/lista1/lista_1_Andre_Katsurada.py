@@ -13,7 +13,7 @@ import math
 from abc import ABC, abstractmethod, ABCMeta      
 from dataclasses import dataclass           
 from pathlib import Path                   
-from typing import ClassVar, Dict, List    
+from typing import ClassVar, Dict, List, Tuple
 import re
 import zipfile
 import requests
@@ -29,14 +29,15 @@ import statsmodels.api as sm
 from statsmodels.stats.diagnostic import het_breuschpagan, het_white, linear_reset
 from statsmodels.stats.stattools import jarque_bera
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
-from statsmodels.sandbox.regression.gmm import IV2SLS 
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler 
 
-from scipy.stats import kendalltau, bootstrap, pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr, kendalltau, bootstrap, permutation_test
+
+import pingouin as pg
 
 #Classe p/ registro de exercícios
 class _RegistroExercicios:
@@ -123,10 +124,10 @@ def _ask_float(prompt: str, *, min_value: float | None = None, max_value: float 
 class Ex01Variaveis(Exercicio):
     """Cria variáveis c/ print """
     numero: ClassVar[int] = 1
-    # arquivos temporários exigidos pelo enunciado (gerar CSV e ler com pandas)
+    #Gerar CSV e ler com pandas)
 
     nome: str = "André Ichiro"
-    idade: int = 28
+    idade: int = 39
 
     def executar(self) -> None:
         print(f"Olá, me chamo {self.nome} e tenho {self.idade} anos.")
@@ -272,85 +273,108 @@ class Ex09IsPrime(Exercicio):
 #Exercício 10 
 class Ex10GeracaoDados(Exercicio):
     """
-    Análise de correlação e regressão entre GDP (PIB agregado) e % de ensino superior.
-    Projetado para dados demo e para migração futura a um dataset real, onde podemos pensar em GDP per capita.
+    Pipeline completo para investigar a relação entre o PIB total (US$) e a
+    percentagem de adultos (25+) com ensino superior concluído.
 
-    Pipeline:
-    10a) Higienização e features (log-transforma GDP/pop/área, valida faixas)
-    10b) Correlações Pearson/Spearman/Kendall + IC bootstrap + p permutação 
-    10c) Regressão OLS com HC3 controlando por log_pop e log_area; betas padronizados; CIs bootstrap
-    10d) Diagnósticos BP/White, RESET, JB, DW, multicolinearidade (VIF) e influência (Cook/leverage)
-    10e) Robustez: regressão quantílica (mediana)
-    10f) Opcional: 2SLS se existir coluna "instrument" no dataset e a implementação estiver disponível
+    O método 'executar':
+        10.1. Faz download de dados do Banco Mundial (ensino superior, PIB per capita, 
+        população total e área terrestre);
+        10.2. Prepara dois conjuntos de dados de demo ('_dados_llm1'/'_dados_llm2')
+        e o dataset real;
+        10.3. Limpa, valida faixas e cria features em log ('log_gdp', 'log_pop', 'log_area')
+        10.4. Para cada conjunto de países ou subconjuntos como top/bottom 3, 10 e 
+        Brasil-EUA-Alemanha), analisa:
+           10.4a) Correlações c/ Pearson, Spearman, Kendall, usando IC bootstrap e p via permutação  
+           10.4b) Correlação parcial controlando 'log_pop' e 'log_area'  
+           10.4c) Regressão OLS c/ HC3 e diagnósticos Breusch-Pagan, White, RESET, Jarque-Bera, Durbin-Watson, VIF, Cook's D
+           10.4d) Regressão quantílica (tao = 0.5) para robustez  
+           10.4e) Geração de gráficos em ex10_figs/
+
+    Observação: trata-se de uma análise estatística exploratória procurando por correlações; não infere causalidade
     """
-
+    
+    @staticmethod
     def download_indicator(indicator_code: str) -> pd.DataFrame:
         """
-        Faz download de um indicador do Banco Mundial e devolve o CSV como DataFrame.
+        Baixa os dados Banco Mundial e devolve o DF 
         """
         url = f"https://api.worldbank.org/v2/en/indicator/{indicator_code}?downloadformat=csv"
         resp = requests.get(url)
         resp.raise_for_status()
-        # lê o ZIP em memória e encontra o arquivo de dados
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             data_file = [name for name in zf.namelist()
                         if name.startswith("API_") and name.endswith(".csv")][0]
             df = pd.read_csv(zf.open(data_file), skiprows=4)
         return df
 
-    # baixa cada indicador
-    edu_raw  = download_indicator("SE.TER.CUAT.BA.ZS")  # % da população 25+ com diploma de bacharel ou equivalente:contentReference[oaicite:0]{index=0}
-    gdp_raw  = download_indicator("NY.GDP.PCAP.CD")     # PIB per capita (US$ correntes):contentReference[oaicite:1]{index=1}
-    pop_raw  = download_indicator("SP.POP.TOTL")        # População total:contentReference[oaicite:2]{index=2}
-    area_raw = download_indicator("AG.LND.TOTL.K2")     # Área terrestre (km²):contentReference[oaicite:3]{index=3}
+    def _build_worldbank_df(self) -> pd.DataFrame:
+        """
+        Baixa os dados do Banco Mundial e retorna um DF
+        """
+        #Lista de anos, customizável
+        years_priority = ["2024","2023","2022","2021","2020","2019","2018"]
 
-    # função auxiliar: retorna o valor mais recente não nulo a partir de uma lista de anos
-    def latest_value(row: pd.Series, years: list[str]):
-        for y in years:
-            v = row.get(y)
-            if pd.notnull(v):
-                return v
-        return None
+        #Variáveis relevantes
+        edu_raw  = self.download_indicator("SE.TER.CUAT.BA.ZS") #% da populacao 25+ com diploma
+        gdp_raw  = self.download_indicator("NY.GDP.PCAP.CD") #pib per capita
+        pop_raw  = self.download_indicator("SP.POP.TOTL") #populacao total
+        area_raw = self.download_indicator("AG.LND.TOTL.K2") #area do pais
 
-    # define a lista de anos a procurar – do mais recente para trás
-    years_priority = ["2024","2023","2022","2021","2020","2019","2018"]
+        #Helper p/ retornar valores recentes/por ano e não nulos
+        def avail_years(row: pd.Series) -> set[str]:
+            return {y for y in years_priority if y in row and pd.notnull(row.get(y))}
 
-    records = []
-    for _, row in gdp_raw.iterrows():
-        iso = row["Country Code"]
-        # procura o valor mais recente de PIB per capita
-        gdp_pc = latest_value(row, years_priority)
-        if gdp_pc is None:
-            continue
-        # procura população, área e percentagem de ensino superior
-        pop_row  = pop_raw[pop_raw["Country Code"] == iso]
-        area_row = area_raw[area_raw["Country Code"] == iso]
-        edu_row  = edu_raw[edu_raw["Country Code"] == iso]
-        if pop_row.empty or area_row.empty or edu_row.empty:
-            continue
-        pop_val  = latest_value(pop_row.iloc[0], years_priority)
-        area_val = latest_value(area_row.iloc[0], years_priority)
-        edu_val  = latest_value(edu_row.iloc[0], years_priority)
-        if pop_val is None or area_val is None or edu_val is None:
-            continue
-        # cria o registro consolidado
-        records.append({
-            "country": row["Country Name"],
-            "iso": iso,
-            "gdp_pc": float(gdp_pc),
-            "population": float(pop_val),
-            "area": float(area_val),
-            "higher_ed_pct": float(edu_val)
-        })
+        #Lista de registros
+        records: list[dict] = []
+        for _, row in gdp_raw.iterrows():
+            iso = row["Country Code"]
 
-    df = pd.DataFrame(records)
-    # calcula o PIB total (PIB per capita × população)
-    df["gdp"] = df["gdp_pc"] * df["population"]
-    # ordena e salva
-    df.to_csv("education_gdp_dataset.csv", index=False)
-    # Removido print de preview do DataFrame para evitar poluição de saída
+            #Filtrar por pais
+            pop_row  = pop_raw[pop_raw["Country Code"] == iso]
+            area_row = area_raw[area_raw["Country Code"] == iso]
+            edu_row  = edu_raw[edu_raw["Country Code"] == iso]
+            if pop_row.empty or area_row.empty or edu_row.empty:
+                continue
 
-    #Aviso p/ tamanhos amostrais muito pequenos
+            #Filtrar por ano
+            yrs_gdp  = avail_years(row)
+            yrs_pop  = avail_years(pop_row.iloc[0])
+            yrs_area = avail_years(area_row.iloc[0])
+            yrs_edu  = avail_years(edu_row.iloc[0])
+
+            common = [y for y in years_priority if (y in yrs_gdp and y in yrs_pop and y in yrs_area and y in yrs_edu)]
+            if not common:
+                continue
+            y = common[0]
+
+            #Valores
+            gdp_pc  = row.get(y)
+            pop_val = pop_row.iloc[0].get(y)
+            area_val= area_row.iloc[0].get(y)
+            edu_val = edu_row.iloc[0].get(y)
+            if pd.isnull(gdp_pc) or pd.isnull(pop_val) or pd.isnull(area_val) or pd.isnull(edu_val):
+                continue
+
+            #Consolidado
+            records.append({
+                "country": row["Country Name"],
+                "iso": iso,
+                "year": int(y),
+                "gdp_pc": float(gdp_pc),
+                "population": float(pop_val),
+                "area": float(area_val),
+                "higher_ed_pct": float(edu_val),
+            })
+
+        #DF
+        df = pd.DataFrame(records)
+
+        if not df.empty:
+            df["gdp"] = df["gdp_pc"] * df["population"]
+            df.to_csv("education_gdp_dataset.csv", index=False)
+        return df
+
+    #Aviso p/ tamanhos amostrais muito pequenos. Valor aparentemente arbitrário, pensar em como estipular algo melhor
     _MIN_N = 8  
 
     numero: ClassVar[int] = 10
@@ -397,9 +421,8 @@ class Ex10GeracaoDados(Exercicio):
 
     def _load_real_dataset(self, source: str | Path | pd.DataFrame) -> pd.DataFrame:
         """
-        Normaliza o dataset REAL para o esquema interno:
-        requer colunas: country, population, area, higher_ed_pct e gdp (ou gdp_pc).
-        Retorna um DataFrame *raw* (pré-clean), com colunas canônicas.
+        Normaliza os dados reais usando as colunas country, population, area, higher_ed_pct e gdp (ou gdp_pc).
+        Retorna um DF
         """
         if isinstance(source, (str, Path)):
             real = pd.read_csv(source)
@@ -409,11 +432,11 @@ class Ex10GeracaoDados(Exercicio):
         req = {"country", "population", "area", "higher_ed_pct"}
         missing = req - set(real.columns)
         if missing:
-            raise ValueError(f"Dataset REAL faltando colunas obrigatórias: {sorted(missing)}")
+            raise ValueError(f"Dataframe não têm as seguintes colunas obrigatórias: {sorted(missing)}")
 
         if "gdp" not in real.columns:
             if "gdp_pc" not in real.columns:
-                raise ValueError("Dataset REAL precisa ter 'gdp' ou 'gdp_pc'.")
+                raise ValueError("Dataframe precisa ter 'gdp' ou 'gdp_pc'.")
             real["gdp"] = pd.to_numeric(real["gdp_pc"], errors="coerce") * pd.to_numeric(real["population"], errors="coerce")
 
         base_cols = ["country", "gdp", "population", "area", "higher_ed_pct"]
@@ -441,9 +464,6 @@ class Ex10GeracaoDados(Exercicio):
         #Educação superior - verificar o nome da coluna no dataset real
         out["higher_ed_pct"] = out["higher_ed_pct"].astype(float)
 
-        # (Opcional futuro) GDP per capita quando escala real estiver definida. Algo assim:
-        # out["gdp_pc"] = out["gdp"] * 1e6 / out["population"]  # ~ mil unidades per capita se GDP ~ trilhões e pop ~ milhões
-
         out.reset_index(drop=True, inplace=True)
         return out
 
@@ -451,54 +471,8 @@ class Ex10GeracaoDados(Exercicio):
     def _print_header(title: str) -> None:
         print(f"\n# {title}") 
 
-    #Helpers p/ estatística
-    @staticmethod
-    def _pearson_ci_fisher(r: float, n: int, alpha: float = 0.05) -> tuple[float, float]:
-        """
-        IC aproximado via transformação de Fisher z (estável para n pequeno).
-        Clipa em [-1, 1].
-        """
-        if n < 4 or not np.isfinite(r):
-            return float("nan"), float("nan")
-        z = np.arctanh(max(min(r, 0.999999999), -0.999999999))
-        se = 1.0 / (n - 3) ** 0.5
-        z_lo = z - 1.96 * se
-        z_hi = z + 1.96 * se
-        return float(np.tanh(z_lo)), float(np.tanh(z_hi))
-
-    @staticmethod
-    def _bootstrap_corr_ci(x, y, B: int = 10_000, seed: int = 123) -> tuple[float, float, bool]:
-        """
-        Bootstrap simples para Pearson r com descarte de reamostras degeneradas.
-        Retorna (low, high, ok_flag). Se ok_flag=False, usar Fisher como fallback.
-        """
-        rng = np.random.default_rng(seed)
-        n = len(x)
-        rs = []
-        for _ in range(B):
-            idx = rng.integers(0, n, n)
-            xv = x[idx]
-            yv = y[idx]
-            #Evita vetores constantes que tornam r indefinido
-            if (xv == xv[0]).all() or (yv == yv[0]).all():
-                continue
-            r, _ = pearsonr(xv, yv)
-            if np.isfinite(r):
-                rs.append(r)
-        if len(rs) < max(100, int(0.1 * B)):  #Instável
-            return float("nan"), float("nan"), False
-        rs = np.sort(np.asarray(rs))
-        lo = float(rs[int(0.025 * len(rs))])
-        hi = float(rs[int(0.975 * len(rs))])
-        #Clip de segurança
-        lo = max(lo, -1.0)
-        hi = min(hi, 1.0)
-        return lo, hi, True
-
     #Análises
     def _correlation_suite(self, df: "pd.DataFrame", y_col: str, x_col: str, label: str) -> None:
-        import numpy as np
-
         y = df[y_col].to_numpy(dtype=float)
         x = df[x_col].to_numpy(dtype=float)
 
@@ -507,54 +481,46 @@ class Ex10GeracaoDados(Exercicio):
         x_const = np.allclose(x, x[0])
         y_const = np.allclose(y, y[0])
 
-        if x_const or y_const:
-            pr, p_pr = (float("nan"), float("nan"))
+        if not (x_const or y_const):
+            res = pg.pairwise_corr(
+                df[[x_col, y_col]], columns=[x_col, y_col], method="pearson"
+            )
+            pr = float(res["r"].iloc[0])
+            if "CI95%" in res.columns:
+                ci_low, ci_high = res["CI95%"].iloc[0]
+            else:
+                # Fallback: Fisher z via Pingouin (95% por padrão deste relatório)
+                ci_low, ci_high = pg.compute_esci(stat=pr, nx=n, ny=n, eftype="r", confidence=0.95)
+            ci_str = f"[{ci_low:.3f}, {ci_high:.3f}] (pg/Fisher)"
         else:
-            pr, p_pr = pearsonr(x, y)
+            pr = float("nan")
+            ci_str = "[NaN, NaN] (n/a)"
 
-        sr, p_sr = spearmanr(x, y)  #Lida melhor c/ empates 
+        #Spearman
+        sr, p_sr = spearmanr(x, y)
         kr, p_kr = kendalltau(x, y)
 
-        #IC para Pearson c/ fallback p/ Fisher se bootstrap ficar instável
-        lo_b, hi_b, ok = self._bootstrap_corr_ci(x, y)
-        if ok:
-            ci_str = f"[{lo_b:.3f}, {hi_b:.3f}] (bootstrap)"
-        else:
-            lo_f, hi_f = self._pearson_ci_fisher(pr, n)
-            ci_str = f"[{lo_f:.3f}, {hi_f:.3f}] (Fisher z)"
-
-        #Permutação (two-sided): exato se n<=9; caso contrário MC 10k
+        #Permutação p-value p/ Pearson
         if not (x_const or y_const):
-            obs = abs(pr)
-            if n <= 9:
-                from itertools import permutations
-                count = 0; total = 0
-                for perm in permutations(y, n):
-                    r_perm, _ = pearsonr(x, np.asarray(perm))
-                    if abs(r_perm) >= obs:
-                        count += 1
-                    total += 1
-                p_perm = count / total
-            else:
-                rng = np.random.default_rng(123)
-                n_perm = 10_000
-                count = 0
-                for _ in range(n_perm):
-                    r_perm, _ = pearsonr(x, rng.permutation(y))
-                    if abs(r_perm) >= obs:
-                        count += 1
-                p_perm = (count + 1) / (n_perm + 1)
+            perm_res = permutation_test(
+                (x, y),
+                statistic=lambda u, v: pearsonr(u, v)[0],
+                alternative="two-sided", 
+                vectorized=False,
+                n_resamples=10_000, 
+                random_state=123
+            )
+            p_perm = float(perm_res.pvalue)
         else:
             p_perm = float("nan")
 
         self._print_header(f"[{label}] Correlações {y_col} ~ {x_col}  (n={n})")
-        print(f"Pearson r = {pr:.3f}  (IC95% {ci_str})  p={p_pr:.4f} | p_perm≈{p_perm:.4f}")
+        print(f"Pearson r = {pr:.3f}  (IC95% {ci_str})  p_perm≈{p_perm:.4f}")
         print(f"Spearman ρ = {sr:.3f}  p={p_sr:.4f}")
-        print(f"Kendall τ = {kr:.3f}   p={p_kr:.4f}")
 
     def _partial_correlation(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> None:
         """
-        Correlação parcial de y~x controlando 'controls' por residualização OLS.
+        Correlação parcial de y~x c/ 'controls' por residualização OLS.
         """
 
         Xc = sm.add_constant(df[controls])
@@ -567,8 +533,9 @@ class Ex10GeracaoDados(Exercicio):
 
     def _ols_with_diagnostics(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> "sm.regression.linear_model.RegressionResultsWrapper":
         """
-        OLS com HC3; diagnósticos: BP/White, RESET, JB, DW; VIF; influência.
-        Retorna o modelo ajustado
+        OLS com HC3; diagnósticos: Breusch–Pagan (heterocedasticidade), RESET, Jarque–Bera,
+        multicolinearidade (VIF) e influência (Cook/leverage).
+        Retorna o modelo ajustado.
         """
 
         #Matriz de regressão
@@ -597,22 +564,10 @@ class Ex10GeracaoDados(Exercicio):
         beta_x = ols_std.params[x]
         print(f"beta padronizado (não-HC3) de {x} = {beta_x:.3f}")
 
-        #CIs bootstrap para coeficiente principal
-        rng = np.random.default_rng(123)
-        B = 5000
-        coefs = np.empty(B)
-        n = len(df)
-        X_np = X.to_numpy(dtype=float)
-        for b in range(B):
-            idx = rng.integers(0, n, n)
-            coefs[b] = sm.OLS(yv[idx], X_np[idx]).fit().params[1]  # posição 1 => coef de x (após const)
-        ci_low, ci_high = np.percentile(coefs, [2.5, 97.5])
-        print(f"IC95% bootstrap para coef de {x}: [{ci_low:.4f}, {ci_high:.4f}]")
-
-        #Heterocedasticidade
+        #Heterocedasticidade (Breusch–Pagan)
         bp_lm, bp_lmp, bp_f, bp_fp = het_breuschpagan(ols.resid, ols.model.exog)
-        w_lm, w_lmp, w_f, w_fp = het_white(ols.resid, ols.model.exog)
-        print(f"Breusch–Pagan: LM p={bp_lmp:.4f} | White: LM p={w_lmp:.4f}")
+        print(f"Breusch–Pagan: LM p={bp_lmp:.4f}")
+
 
         #Não linearidade: RESET de Ramsey, potência 2
         try:
@@ -627,10 +582,6 @@ class Ex10GeracaoDados(Exercicio):
         #Normalidade dos resíduos
         jb_stat, jb_p, _, _ = jarque_bera(ols.resid)
         print(f"Jarque–Bera (normalidade dos resíduos): p={jb_p:.4f}")
-
-        #Autocorrelação
-        dw = sm.stats.stattools.durbin_watson(ols.resid)
-        print(f"Durbin–Watson: {dw:.3f}")
 
         #Multicolinearidade (VIF)
         X_no_const = df[[x] + controls].astype(float)
@@ -696,9 +647,10 @@ class Ex10GeracaoDados(Exercicio):
 
     def _plot_scatter_fit(self, df: "pd.DataFrame", y: str, x: str, label: str, fname: str, max_labels: int = 30, *, label_col: str | None = None,) -> None:
         """Dispersão SEMI-LOG (eixo y em log10) de y~x + OLS (ajuste em ln(y)) + LOWESS.
-        - Linha cheia: E[ln(y)|x] retransformada para y (exp(β0 + β1 x)).
-        - Tracejado: LOWESS em escala original de y.
-        - Rótulos: ISO se disponível; caso contrário, nome curto do país."""
+        Linha cheia: aproxima E[y|x] via Duan smearing (exp(β0 + β1 x) * mean(exp(resid))).
+        Tracejado: LOWESS em escala original de y
+        Labels: ISO/nome curto do país
+        """
         self._ensure_figdir()
 
         #Dados em float
@@ -714,7 +666,10 @@ class Ex10GeracaoDados(Exercicio):
 
         #Curvas para desenhar 
         xs = np.linspace(np.nanmin(xv), np.nanmax(xv), 100, dtype=float)
-        yhat_semilog = np.exp(b0 + b1 * xs)  # back-transform
+
+        #Duan smearing: aproxima a média em y
+        sf = float(np.mean(np.exp(ols_ln.resid)))
+        yhat_semilog = np.exp(b0 + b1 * xs) * sf
 
         #LOWESS no espaço original (ajuda a ver não linearidades)
         frac = float(min(0.8, max(0.4, 6 / max(n, 1))))
@@ -724,14 +679,15 @@ class Ex10GeracaoDados(Exercicio):
         pt_size, alpha = self._point_style(n)
         fig = plt.figure(figsize=(7.8, 4.8))
         ax = plt.gca()
-        ax.set_yscale("log", base=10)  # unifica visões linear/log num gráfico legível
+        ax.set_yscale("log", base=10)  # unifica visões linear/log 
         ax.scatter(xv, yv, label=f"Países (n={n})", s=pt_size, alpha=alpha)
-        ax.plot(xs, yhat_semilog, label="Tendência média (OLS em ln(PIB))", linewidth=1.5)
+        ax.plot(xs, yhat_semilog, label="Tendência média (OLS em ln(PIB) + smearing)", linewidth=1.5)
         ax.plot(lo[:, 0], lo[:, 1], linestyle="--", label="Tendência local (LOWESS)", linewidth=1.2)
 
         #Labels ISO top10 e bottom10
         prefer = label_col if label_col else ("iso" if "iso" in df.columns else "country")
-        # Se poucos pontos (≤15), rotular todos; caso contrário, rotular os maiores resíduos em ln(y)
+        
+        #Se poucos pontos (≤15), rotular todos; caso contrário, rotular os maiores resíduos em ln(y)
         resid_ln = ln_y - ols_ln.predict(X)
         idx_to_label = df.index if n <= 15 else pd.Series(np.abs(resid_ln), index=df.index).nlargest(min(max_labels, n)).index
         for i in idx_to_label:
@@ -763,7 +719,7 @@ class Ex10GeracaoDados(Exercicio):
         #Legenda explicativa 
         caption = (
             "O eixo Y em log melhora a leitura entre países\n"
-            "A linha cheia resume a tendência média (efeito percentual em PIB). A LOWESS revela possíveis não linearidades."
+            "A linha cheia aproxima E[PIB|x] via smearing. A LOWESS revela possíveis não linearidades."
         )
         plt.figtext(0.01, -0.05, caption, ha="left", va="top", fontsize=8)
 
@@ -786,11 +742,11 @@ class Ex10GeracaoDados(Exercicio):
         res_x = sm.OLS(df[x].astype(float), Xc).fit().resid
         res_y = sm.OLS(df[y].astype(float), Xc).fit().resid
 
-        # Ensure Series with names and aligned index
+        #Séries com nomes corretos
         res_x = pd.Series(res_x, index=df.index, name="res_x")
         res_y = pd.Series(res_y, index=df.index, name="res_y")
 
-        # Regress residuals with explicit column names
+        #Resíduos e nomes das colunas
         Xr = pd.DataFrame({"const": 1.0, "res_x": res_x.astype(float).values}, index=df.index)
         ols = sm.OLS(res_y.astype(float), Xr).fit()
         b0 = float(ols.params["const"])
@@ -1165,18 +1121,18 @@ class Ex10GeracaoDados(Exercicio):
         views1 = self._build_views(df1, tag="LLM1")
         views2 = self._build_views(df2, tag="LLM2")
 
-        # Dados reais — roda TODA a análise (mesmo pipeline) e gera gráficos
+        #Análise no dados do WB
         df_real = None
-        if self._REAL_CSV.exists():
-            try:
-                df_real_raw = self._load_real_dataset(self._REAL_CSV)
-                df_real = self._clean_and_feature(df_real_raw)
-                views_real = self._build_views(df_real, tag="REAL")
-                self._run_grouped_pipeline(views_real, controls=controls)
-            except Exception as e:
-                warnings.warn(f"Falha ao carregar/analisar REAL: {e}")
-        else:
-            warnings.warn(f"Arquivo '{self._REAL_CSV}' não encontrado; pulando dataset REAL.")
+        try:
+            if not self._REAL_CSV.exists():
+                self._print_header("Download dos dados do World Bank")
+                _ = self._build_worldbank_df()
+            df_real_raw = self._load_real_dataset(self._REAL_CSV)
+            df_real = self._clean_and_feature(df_real_raw)
+            views_real = self._build_views(df_real, tag="REAL")
+            self._run_grouped_pipeline(views_real, controls=controls)
+        except Exception as e:
+            warnings.warn(f"Falha ao obter/analisar REAL: {e}")
 
         #Discrepâncias entre versões 
         self._print_header("Discrepâncias entre versões (LLM1 vs LLM2)")
