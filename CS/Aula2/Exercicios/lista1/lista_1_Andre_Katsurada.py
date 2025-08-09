@@ -15,6 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path                   
 from typing import ClassVar, Dict, List    
 import re
+import zipfile
+import requests
+import io
+import warnings
+import unicodedata as _ud
 
 import pandas as pd                      
 
@@ -278,7 +283,80 @@ class Ex10GeracaoDados(Exercicio):
     10e) Robustez: regressão quantílica (mediana)
     10f) Opcional: 2SLS se existir coluna "instrument" no dataset e a implementação estiver disponível
     """
+
+    def download_indicator(indicator_code: str) -> pd.DataFrame:
+        """
+        Faz download de um indicador do Banco Mundial e devolve o CSV como DataFrame.
+        """
+        url = f"https://api.worldbank.org/v2/en/indicator/{indicator_code}?downloadformat=csv"
+        resp = requests.get(url)
+        resp.raise_for_status()
+        # lê o ZIP em memória e encontra o arquivo de dados
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            data_file = [name for name in zf.namelist()
+                        if name.startswith("API_") and name.endswith(".csv")][0]
+            df = pd.read_csv(zf.open(data_file), skiprows=4)
+        return df
+
+    # baixa cada indicador
+    edu_raw  = download_indicator("SE.TER.CUAT.BA.ZS")  # % da população 25+ com diploma de bacharel ou equivalente:contentReference[oaicite:0]{index=0}
+    gdp_raw  = download_indicator("NY.GDP.PCAP.CD")     # PIB per capita (US$ correntes):contentReference[oaicite:1]{index=1}
+    pop_raw  = download_indicator("SP.POP.TOTL")        # População total:contentReference[oaicite:2]{index=2}
+    area_raw = download_indicator("AG.LND.TOTL.K2")     # Área terrestre (km²):contentReference[oaicite:3]{index=3}
+
+    # função auxiliar: retorna o valor mais recente não nulo a partir de uma lista de anos
+    def latest_value(row: pd.Series, years: list[str]):
+        for y in years:
+            v = row.get(y)
+            if pd.notnull(v):
+                return v
+        return None
+
+    # define a lista de anos a procurar – do mais recente para trás
+    years_priority = ["2024","2023","2022","2021","2020","2019","2018"]
+
+    records = []
+    for _, row in gdp_raw.iterrows():
+        iso = row["Country Code"]
+        # procura o valor mais recente de PIB per capita
+        gdp_pc = latest_value(row, years_priority)
+        if gdp_pc is None:
+            continue
+        # procura população, área e percentagem de ensino superior
+        pop_row  = pop_raw[pop_raw["Country Code"] == iso]
+        area_row = area_raw[area_raw["Country Code"] == iso]
+        edu_row  = edu_raw[edu_raw["Country Code"] == iso]
+        if pop_row.empty or area_row.empty or edu_row.empty:
+            continue
+        pop_val  = latest_value(pop_row.iloc[0], years_priority)
+        area_val = latest_value(area_row.iloc[0], years_priority)
+        edu_val  = latest_value(edu_row.iloc[0], years_priority)
+        if pop_val is None or area_val is None or edu_val is None:
+            continue
+        # cria o registro consolidado
+        records.append({
+            "country": row["Country Name"],
+            "iso": iso,
+            "gdp_pc": float(gdp_pc),
+            "population": float(pop_val),
+            "area": float(area_val),
+            "higher_ed_pct": float(edu_val)
+        })
+
+    df = pd.DataFrame(records)
+    # calcula o PIB total (PIB per capita × população)
+    df["gdp"] = df["gdp_pc"] * df["population"]
+    # ordena e salva
+    df.to_csv("education_gdp_dataset.csv", index=False)
+    # Removido print de preview do DataFrame para evitar poluição de saída
+
+    #Aviso p/ tamanhos amostrais muito pequenos
+    _MIN_N = 8  
+
     numero: ClassVar[int] = 10
+
+    #Dados reais
+    _REAL_CSV: ClassVar[Path] = Path("education_gdp_dataset.csv")
 
     #Dados p/ demo
     _dados_llm1 = {
@@ -296,28 +374,9 @@ class Ex10GeracaoDados(Exercicio):
         "Superior (%)": [20, 47, 19, 36, 33, 40, 34, 22],
     }
 
-    _saida1: Path = Path("llm1.csv")
-    _saida2: Path = Path("llm2.csv")
-    _AGG_LABELS = {"OCDE", "G20", "América do Sul"}  
-    _MIN_N = 8  #Aviso p/ tamanhos amostrais muito pequenos
-    _REGION_MAP = {
-            "Brasil": "América do Sul",
-            "México": "América do Norte",
-            "EUA": "América do Norte",
-            "Alemanha": "Europa",
-            "França": "Europa",
-        }
     _FIGDIR: Path = Path("ex10_figs")
 
     #Helpers internos 
-    def _gravar_csv(self, dados: dict, destino: Path) -> None:
-        pd.DataFrame(dados).to_csv(destino, index=False, encoding="utf-8")
-
-    @staticmethod
-    def _corr_gdp_superior(caminho: Path) -> float:
-        df = pd.read_csv(caminho)
-        return df["GDP"].corr(df["Superior (%)"])
-
     @staticmethod
     def _to_frame(d: dict | "pd.DataFrame") -> "pd.DataFrame":
         import pandas as pd
@@ -336,6 +395,34 @@ class Ex10GeracaoDados(Exercicio):
             df[c] = pd.to_numeric(df[c], errors="coerce")
         return df
 
+    def _load_real_dataset(self, source: str | Path | pd.DataFrame) -> pd.DataFrame:
+        """
+        Normaliza o dataset REAL para o esquema interno:
+        requer colunas: country, population, area, higher_ed_pct e gdp (ou gdp_pc).
+        Retorna um DataFrame *raw* (pré-clean), com colunas canônicas.
+        """
+        if isinstance(source, (str, Path)):
+            real = pd.read_csv(source)
+        else:
+            real = source.copy()
+
+        req = {"country", "population", "area", "higher_ed_pct"}
+        missing = req - set(real.columns)
+        if missing:
+            raise ValueError(f"Dataset REAL faltando colunas obrigatórias: {sorted(missing)}")
+
+        if "gdp" not in real.columns:
+            if "gdp_pc" not in real.columns:
+                raise ValueError("Dataset REAL precisa ter 'gdp' ou 'gdp_pc'.")
+            real["gdp"] = pd.to_numeric(real["gdp_pc"], errors="coerce") * pd.to_numeric(real["population"], errors="coerce")
+
+        base_cols = ["country", "gdp", "population", "area", "higher_ed_pct"]
+        cols = (["country", "iso"] + base_cols[1:]) if "iso" in real.columns else base_cols
+        real = real[cols].copy()
+        for c in [c for c in cols[1:] if c != "iso"]:
+            real[c] = pd.to_numeric(real[c], errors="coerce")
+        return real
+
     def _clean_and_feature(self, df: "pd.DataFrame") -> "pd.DataFrame":
         out = df.copy()
 
@@ -345,10 +432,6 @@ class Ex10GeracaoDados(Exercicio):
         #Valida faixas
         out = out.loc[(out["higher_ed_pct"] >= 0) & (out["higher_ed_pct"] <= 100)].copy()
         out = out.loc[(out["gdp"] > 0) & (out["population"] > 0) & (out["area"] > 0)].copy()
-
-        #tipo de unidade: país vs agregado (UE, OCDE, G20, América do Sul etc)
-        out["unit_type"] = np.where(out["country"].isin(self._AGG_LABELS),
-                                    "provided_aggregate", "country")
 
         #Fazer log dos valores (escala)
         out["log_gdp"] = np.log(out["gdp"].astype(float))
@@ -368,47 +451,6 @@ class Ex10GeracaoDados(Exercicio):
     def _print_header(title: str) -> None:
         print(f"\n# {title}") 
 
-    #Helper para gerar agregados de regiões 
-    def _compute_region_aggregates(self, df_countries: "pd.DataFrame") -> "pd.DataFrame":
-        """
-        Agrega países -> regiões (calculadas).
-        Preferência: se existir coluna 'region' no df, agrupar por ela.
-        Caso contrário, usar o fallback _REGION_MAP (apenas para demonstração).
-        GDP/área/pop: soma ; higher_ed_pct: média ponderada por população.
-        """
-        if df_countries.empty:
-            return df_countries.copy()
-
-        work = df_countries.copy()
-
-        if "region" in work.columns:
-            work["region_calc"] = work["region"]
-        else:
-            # Fallback apenas para demo — no dataset real, seria uma coluna 'region' ou algo assim
-            work["region_calc"] = work["country"].map(self._REGION_MAP)
-
-        work = work.dropna(subset=["region_calc"])
-        if work.empty:
-            return work
-
-        g = work.groupby("region_calc", as_index=False).apply(
-            lambda gdf: pd.Series({
-                "country": f"{gdf.name} (calc)",  # rótulo diferenciado do agregado “fornecido”
-                "gdp": gdf["gdp"].sum(),
-                "area": gdf["area"].sum(),
-                "population": gdf["population"].sum(),
-                "higher_ed_pct": np.average(gdf["higher_ed_pct"], weights=gdf["population"]),
-            }),
-            include_groups=False
-        ).reset_index(drop=True)
-
-        g["unit_type"] = "computed_aggregate"
-        g["log_gdp"] = np.log(g["gdp"])
-        g["log_pop"] = np.log(g["population"])
-        g["log_area"] = np.log(g["area"])
-        return g[["country", "gdp", "area", "population", "higher_ed_pct",
-                  "log_gdp", "log_pop", "log_area", "unit_type"]]
-
     #Helpers p/ estatística
     @staticmethod
     def _pearson_ci_fisher(r: float, n: int, alpha: float = 0.05) -> tuple[float, float]:
@@ -425,7 +467,7 @@ class Ex10GeracaoDados(Exercicio):
         return float(np.tanh(z_lo)), float(np.tanh(z_hi))
 
     @staticmethod
-    def _bootstrap_corr_ci(x, y, B: int = 10_000, seed: int = 123) -> tuple[float, float] | tuple[float, float, bool]:
+    def _bootstrap_corr_ci(x, y, B: int = 10_000, seed: int = 123) -> tuple[float, float, bool]:
         """
         Bootstrap simples para Pearson r com descarte de reamostras degeneradas.
         Retorna (low, high, ok_flag). Se ok_flag=False, usar Fisher como fallback.
@@ -481,18 +523,27 @@ class Ex10GeracaoDados(Exercicio):
             lo_f, hi_f = self._pearson_ci_fisher(pr, n)
             ci_str = f"[{lo_f:.3f}, {hi_f:.3f}] (Fisher z)"
 
-        #Permutação (two-sided) apenas se não for constante
+        #Permutação (two-sided): exato se n<=9; caso contrário MC 10k
         if not (x_const or y_const):
-            rng = np.random.default_rng(123)
-            obs = pr
-            n_perm = 10_000
-            count = 0
-            for _ in range(n_perm):
-                perm = rng.permutation(y)
-                r_perm, _ = pearsonr(x, perm)
-                if abs(r_perm) >= abs(obs):
-                    count += 1
-            p_perm = (count + 1) / (n_perm + 1)
+            obs = abs(pr)
+            if n <= 9:
+                from itertools import permutations
+                count = 0; total = 0
+                for perm in permutations(y, n):
+                    r_perm, _ = pearsonr(x, np.asarray(perm))
+                    if abs(r_perm) >= obs:
+                        count += 1
+                    total += 1
+                p_perm = count / total
+            else:
+                rng = np.random.default_rng(123)
+                n_perm = 10_000
+                count = 0
+                for _ in range(n_perm):
+                    r_perm, _ = pearsonr(x, rng.permutation(y))
+                    if abs(r_perm) >= obs:
+                        count += 1
+                p_perm = (count + 1) / (n_perm + 1)
         else:
             p_perm = float("nan")
 
@@ -544,7 +595,7 @@ class Ex10GeracaoDados(Exercicio):
         X_std = sm.add_constant(X_std)
         ols_std = sm.OLS((df[y] - df[y].mean()) / df[y].std(ddof=0), X_std).fit()
         beta_x = ols_std.params[x]
-        print(f"β padronizado de {x} = {beta_x:.3f}  (aprox. variação em σ_y por 1 σ_x)")
+        print(f"beta padronizado (não-HC3) de {x} = {beta_x:.3f}")
 
         #CIs bootstrap para coeficiente principal
         rng = np.random.default_rng(123)
@@ -582,13 +633,9 @@ class Ex10GeracaoDados(Exercicio):
         print(f"Durbin–Watson: {dw:.3f}")
 
         #Multicolinearidade (VIF)
-        vif = []
-        X_no_const = df[[x] + controls].copy().astype(float)
-        X_v = sm.add_constant(X_no_const).to_numpy()
-        for i, col in enumerate(["const", x] + controls):
-            if col == "const":
-                continue
-            vif.append((col, variance_inflation_factor(X_v, i)))
+        X_no_const = df[[x] + controls].astype(float)
+        X_v = X_no_const.to_numpy()
+        vif = [(col, variance_inflation_factor(X_v, i)) for i, col in enumerate(X_no_const.columns)]
         print("VIF:")
         for col, val in vif:
             print(f"  {col:>12}: {val:6.3f}")
@@ -619,158 +666,479 @@ class Ex10GeracaoDados(Exercicio):
         self._print_header(f"Regressão Quantílica (τ=0.5): {y} ~ {x} + {controls}")
         print(q.summary().tables[1])
 
-    def _maybe_iv_2sls(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> None:
-        """
-        Se houver coluna 'instrument', tenta 2SLS (só para dados reais com instrumento plausível).
-        """
-        if "instrument" not in df.columns:
-            print("\n[IV-2SLS] Nenhum instrumento fornecido; saltando.")
-            return
-
-        Z = sm.add_constant(df[["instrument"] + controls])
-        X_endog = df[[x]]
-        Y = df[y]
-        try:
-            iv = IV2SLS(Y, X_endog, Z).fit()
-            self._print_header(f"IV-2SLS: {y} ~ {x} (instrumento=instrument) + {controls}")
-            print(iv.summary())
-        except Exception as e:
-            print(f"[IV-2SLS] Falhou ao ajustar: {e}")
-
     #Helpers p/ gráficos 
     def _ensure_figdir(self) -> None:
         self._FIGDIR.mkdir(parents=True, exist_ok=True)
 
-    def _plot_scatter_fit(self, df: "pd.DataFrame", y: str, x: str, label: str, fname: str) -> None:
-        """Dispersion y~x + OLS simples + LOWESS; anota países/agregados."""
+    @staticmethod
+    def _point_style(n: int) -> tuple[int, float]:
+        """
+        Define tamanho e transparência dos pontos em função de n.
+        Retorna (size, alpha)
+        """
+        if n < 100:
+            return 20, 0.8
+        if n < 300:
+            return 10, 0.6
+        return 6, 0.4
 
+    #Rótulo compacto de país
+    @staticmethod
+    def _country_label(row: pd.Series, prefer: str = "iso") -> str:
+        """
+        Retorna um rótulo curto e legível para anotar o ponto.
+        Prioriza 'iso' (3 letras); fallback para nome truncado.
+        """
+        if prefer in row and pd.notna(row[prefer]) and str(row[prefer]).strip():
+            return str(row[prefer]).upper()
+        nm = str(row.get("country", ""))
+        return (nm[:12] + "…") if len(nm) > 13 else nm
+
+    def _plot_scatter_fit(self, df: "pd.DataFrame", y: str, x: str, label: str, fname: str, max_labels: int = 30, *, label_col: str | None = None,) -> None:
+        """Dispersão SEMI-LOG (eixo y em log10) de y~x + OLS (ajuste em ln(y)) + LOWESS.
+        - Linha cheia: E[ln(y)|x] retransformada para y (exp(β0 + β1 x)).
+        - Tracejado: LOWESS em escala original de y.
+        - Rótulos: ISO se disponível; caso contrário, nome curto do país."""
         self._ensure_figdir()
-        X = sm.add_constant(df[x].astype(float))
-        yv = df[y].astype(float)
-        ols = sm.OLS(yv, X).fit()
-        xs = np.linspace(df[x].min(), df[x].max(), 100)
-        ys = ols.params["const"] + ols.params[x] * xs
-        lo = lowess(yv, df[x], frac=0.8, return_sorted=True)
 
-        # Figura de dispersão com duas linhas de tendência
-        plt.figure(figsize=(6, 4))
-        plt.scatter(df[x], df[y], color="black", label="Observações")
-        plt.plot(xs, ys, color="tab:blue", label="Ajuste OLS")
-        plt.plot(lo[:, 0], lo[:, 1], color="tab:orange", linestyle="--", label="Curva LOWESS")
+        #Dados em float
+        xv = df[x].astype(float).to_numpy()
+        yv = df[y].astype(float).to_numpy()
+        n = len(df)
 
-        for _, r in df.iterrows():
-            plt.annotate(r["country"], (r[x], r[y]), xytext=(3, 3), textcoords="offset points", fontsize=8)
+        #Ajuste OLS em ln(y) ~ x 
+        X = pd.DataFrame({"const": 1.0, x: xv}, index=df.index)
+        ln_y = np.log(yv)  # seguro porque y>0 após limpeza
+        ols_ln = sm.OLS(ln_y, X).fit()
+        b0 = float(ols_ln.params["const"]); b1 = float(ols_ln.params[x])
 
-        plt.xlabel(x)
-        plt.ylabel(y)
-        plt.title(f"{label}: {y} vs {x}")
-        plt.legend(loc="best", fontsize=8)
-        plt.grid(True, linestyle="--", alpha=0.3)
+        #Curvas para desenhar 
+        xs = np.linspace(np.nanmin(xv), np.nanmax(xv), 100, dtype=float)
+        yhat_semilog = np.exp(b0 + b1 * xs)  # back-transform
+
+        #LOWESS no espaço original (ajuda a ver não linearidades)
+        frac = float(min(0.8, max(0.4, 6 / max(n, 1))))
+        lo = lowess(yv, xv, frac=frac, return_sorted=True)
+
+        #Aparência dos gráficos 
+        pt_size, alpha = self._point_style(n)
+        fig = plt.figure(figsize=(7.8, 4.8))
+        ax = plt.gca()
+        ax.set_yscale("log", base=10)  # unifica visões linear/log num gráfico legível
+        ax.scatter(xv, yv, label=f"Países (n={n})", s=pt_size, alpha=alpha)
+        ax.plot(xs, yhat_semilog, label="Tendência média (OLS em ln(PIB))", linewidth=1.5)
+        ax.plot(lo[:, 0], lo[:, 1], linestyle="--", label="Tendência local (LOWESS)", linewidth=1.2)
+
+        #Labels ISO top10 e bottom10
+        prefer = label_col if label_col else ("iso" if "iso" in df.columns else "country")
+        # Se poucos pontos (≤15), rotular todos; caso contrário, rotular os maiores resíduos em ln(y)
+        resid_ln = ln_y - ols_ln.predict(X)
+        idx_to_label = df.index if n <= 15 else pd.Series(np.abs(resid_ln), index=df.index).nlargest(min(max_labels, n)).index
+        for i in idx_to_label:
+            r = df.loc[i]
+            txt = self._country_label(r, prefer=prefer)
+            ax.annotate(txt, (r[x], r[y]), xytext=(3, 3), textcoords="offset points", fontsize=7)
+
+        #Labels pros gráficos
+        ax.set_xlabel("Educação superior (% de adultos 25+)")
+        ax.set_ylabel("PIB total (US$, eixo log)")
+        ax.set_title(f"{label}: PIB vs educação (países selecionados)")
+        ax.legend(loc="best", fontsize=8)
+        ax.grid(True, linestyle="--", alpha=0.3)
+
+        #Legenda ISO -> nome
+        if "iso" in df.columns and prefer == "iso":
+
+            #Se muitos pontos, mostra só os rotulados; caso contrário, todos .
+            if n <= 15:
+                map_df = df[["iso", "country"]].dropna().drop_duplicates().sort_values("iso")
+            else:
+                map_df = df.loc[idx_to_label, ["iso", "country"]].dropna().drop_duplicates().sort_values("iso")
+            if not map_df.empty:
+                fig.subplots_adjust(right=0.78)  # reserva espaço p/ painel lateral
+                mapping_text = "ISO -> País\n" + "\n".join(f"{r.iso}: {r.country}" for r in map_df.itertuples(index=False))
+                ax.text(1.01, 0.98, mapping_text, transform=ax.transAxes, va="top", ha="left", fontsize=7,
+                        bbox=dict(boxstyle="round", alpha=0.4))  # caixa leve; sem cores específicas
+
+        #Legenda explicativa 
+        caption = (
+            "O eixo Y em log melhora a leitura entre países\n"
+            "A linha cheia resume a tendência média (efeito percentual em PIB). A LOWESS revela possíveis não linearidades."
+        )
+        plt.figtext(0.01, -0.05, caption, ha="left", va="top", fontsize=8)
+
+
 
         out = self._FIGDIR / fname
         plt.tight_layout()
-        plt.savefig(out, dpi=200)
+        plt.savefig(out, dpi=200, bbox_inches="tight")
         plt.close()
-        print(f"[Plot] {out} — Interpretação: OLS (linear) vs LOWESS (padrões não lineares).")
+        print(f"[Plot] {out} — semi-log (unificada) com OLS(back‑transform) e LOWESS.")
 
-    def _plot_partial_reg(self, df: "pd.DataFrame", y: str, x: str, controls: list[str], label: str, fname: str) -> None:
-        """Gráfico de regressão parcial (residualização)."""
+    def _plot_partial_corr_residuals(
+        self, df: "pd.DataFrame", y: str, x: str, controls: list[str],
+        label: str, fname: str, max_labels: int = 30
+    ) -> None:
+        """Correlação parcial: gráfico de resíduos (y|controls) vs (x|controls) + linha OLS."""
+
         self._ensure_figdir()
-        Xc = sm.add_constant(df[controls])
-        ry = sm.OLS(df[y], Xc).fit().resid
-        rx = sm.OLS(df[x], Xc).fit().resid
+        Xc = sm.add_constant(df[controls].astype(float))
+        res_x = sm.OLS(df[x].astype(float), Xc).fit().resid
+        res_y = sm.OLS(df[y].astype(float), Xc).fit().resid
 
-        rx = pd.Series(rx, name=x)
-        X = sm.add_constant(rx)
-        fit = sm.OLS(ry, X).fit()
-        xs = np.linspace(rx.min(), rx.max(), 100)
-        ys = fit.params["const"] + fit.params[x] * xs
+        # Ensure Series with names and aligned index
+        res_x = pd.Series(res_x, index=df.index, name="res_x")
+        res_y = pd.Series(res_y, index=df.index, name="res_y")
+
+        # Regress residuals with explicit column names
+        Xr = pd.DataFrame({"const": 1.0, "res_x": res_x.astype(float).values}, index=df.index)
+        ols = sm.OLS(res_y.astype(float), Xr).fit()
+        b0 = float(ols.params["const"])
+        b1 = float(ols.params["res_x"])
+
+        xs = np.linspace(res_x.min(), res_x.max(), 100, dtype=float)
+        ys = b0 + b1 * xs
+
+        r, p = pearsonr(res_x, res_y)
+        n = len(res_x)
+        pt_size = 20 if n < 100 else 10 if n < 300 else 6
+        alpha = 0.8 if n < 100 else 0.6 if n < 300 else 0.4
 
         plt.figure(figsize=(6, 4))
-        plt.scatter(rx, ry, color="black", label="Resíduos")
-        plt.plot(xs, ys, color="tab:blue", label="Linha de regressão")
-        plt.axhline(0, color="grey", linestyle="--", lw=0.7)
-        plt.axvline(0, color="grey", linestyle="--", lw=0.7)
-        plt.xlabel(f"{x} (residualizado)")
-        plt.ylabel(f"{y} (residualizado)")
-        plt.title(f"{label}: regressão parcial")
-        plt.legend(loc="best", fontsize=8)
-        plt.grid(True, linestyle="--", alpha=0.3)
+        plt.scatter(res_x, res_y, s=pt_size, alpha=alpha, label=f"Observações (resíduos; n={n})")
+        plt.plot(xs, ys, label=f"Tendência média (r={r:.2f})")
+
+        resid_abs = (res_y - ols.predict(Xr)).abs()
+        for i in resid_abs.nlargest(min(max_labels, n)).index:
+            plt.annotate(df.loc[i, "country"], (res_x.loc[i], res_y.loc[i]), xytext=(3, 3), textcoords="offset points", fontsize=7)
+
+        plt.axhline(0, ls="--", alpha=0.4)
+
+        plt.xlabel(f"Educação (%) após controls {', '.join(controls)}")
+        plt.ylabel(f"PIB (log) após controls {', '.join(controls)}")
+        plt.title(f"{label}: Relação após controles de tamanho e área")
+        plt.legend(fontsize=8); plt.grid(True, linestyle="--", alpha=0.3)
+
+        #Legenda explicativa
+        plt.figtext(0.01, -0.05,
+                    "Mostra a associação entre educação e PIB descontando população e área. "
+                    "Se a linha sobe, há relação além do efeito de tamanho",
+                    ha="left", va="top", fontsize=8)
 
         out = self._FIGDIR / fname
-        plt.tight_layout()
-        plt.savefig(out, dpi=200)
-        plt.close()
-        print(f"[Plot] {out} — Interpretação: inclinação ≈ efeito de {x} após controles.")
+        plt.tight_layout(); plt.savefig(out, dpi=200, bbox_inches="tight"); plt.close()
+        print(f"[Plot] {out} — parcial (resíduos) com OLS.")
 
-    def _plot_residuals_and_qq(self, model, label: str, basefname: str) -> None:
-        """Resíduos vs ajustados e QQ-plot."""
+    def _plot_ols_diagnostics(
+        self,
+        ols: "sm.regression.linear_model.RegressionResultsWrapper",
+        df: "pd.DataFrame",
+        y: str,
+        x: str,
+        controls: list[str],
+        label: str,
+        slug_prefix: str,
+        max_labels: int = 30,
+    ) -> None:
+        """
+        Diagnóstico gráfico: apenas Influência (leverage × resíduo studentizado; tamanho ∝ Cook's D).
+        QQ/resíduos-ajustados e VIF em gráfico foram removidos por baixa utilidade/legibilidade.
+        """
         self._ensure_figdir()
-        # Resíduos vs ajustados
-        plt.figure(figsize=(6, 4))
-        plt.scatter(model.fittedvalues, model.resid, color="black")
-        plt.axhline(0, color="grey", linestyle="--", lw=0.7)
-        plt.xlabel("Ajustados")
-        plt.ylabel("Resíduos")
-        plt.title(f"{label}: Resíduos vs Ajustados")
-        plt.grid(True, linestyle="--", alpha=0.3)
-        out1 = self._FIGDIR / f"{basefname}_resid_fitted.png"
-        plt.tight_layout()
-        plt.savefig(out1, dpi=150)
-        plt.close()
-        print(f"[Plot] {out1} — Interpretação: padrões sugerem hetero/não linearidade se presentes.")
+        idx = df.index
 
-        # QQ plot
-        fig = sm.qqplot(model.resid, line="45")
-        fig.suptitle(f"{label}: QQ-plot dos resíduos")
-        out2 = self._FIGDIR / f"{basefname}_qq.png"
-        fig.savefig(out2, dpi=150)
-        print(f"[Plot] {out2} — Interpretação: desvios indicam não-normalidade residual.")
-        plt.close(fig)
+        infl = OLSInfluence(ols)
+        lev   = pd.Series(infl.hat_matrix_diag,            index=idx)
+        stud  = pd.Series(infl.resid_studentized_external, index=idx)
+        cooks = pd.Series(infl.cooks_distance[0],          index=idx)
+
+        n = len(stud)
+        pt_size, alpha = self._point_style(n)
+        size = (200 * (cooks / cooks.replace(0, np.nan).max()).clip(lower=0.0).fillna(0.0)) + 10
+
+        fig = plt.figure(figsize=(6, 4))
+        ax = plt.gca()
+        ax.scatter(lev, stud, s=size, alpha=alpha)
+
+        #Identificar os mais influentes
+        top_idx = cooks.nlargest(min(max_labels, n)).index
+        for i in top_idx:
+            txt = self._country_label(df.loc[i])  # ISO preferível
+            ax.annotate(txt, (lev.loc[i], stud.loc[i]), xytext=(3, 3), textcoords="offset points", fontsize=7)
+        ax.axhline(0, ls="--", alpha=0.5)
+        ax.set_xlabel("Alavancagem (leverage)")
+        ax.set_ylabel("Resíduo studentizado")
+        ax.set_title(f"{label}: Observações influentes (Cook's D)")
+
+        #Se ISO foi usado para rótulos, mostre Iso -> Nome
+        if "iso" in df.columns:
+            map_df = df.loc[top_idx, ["iso", "country"]].dropna().drop_duplicates().sort_values("iso")
+            if not map_df.empty:
+                fig.subplots_adjust(right=0.78)
+                mapping_text = "ISO -> País\n" + "\n".join(f"{r.iso}: {r.country}" for r in map_df.itertuples(index=False))
+                ax.text(1.01, 0.98, mapping_text, transform=ax.transAxes, va="top", ha="left", fontsize=7,
+                        bbox=dict(boxstyle="round", alpha=0.4))
+
+        #Legendas explicativas
+        plt.figtext(0.01, -0.05,
+                    "Circulos maiores indicam alto Cook's D (alto impacto no ajuste). "
+                    "Pontos com alta leverage e resíduo alto talvez indiquem questões de qualidade dos dados",
+                    ha="left", va="top", fontsize=8)
+        
+
+
+        out = self._FIGDIR / f"{slug_prefix}_ols_influence.png"
+        plt.tight_layout(); plt.savefig(out, dpi=200, bbox_inches="tight"); plt.close()
+        print(f"[Plot] {out} — alavancagem vs resíduos (Cook's D).")
+
+    def _plot_qr_vs_ols_residualized(
+        self, df: "pd.DataFrame", y: str, x: str, controls: list[str],
+        label: str, fname: str, quantile: float = 0.5, max_labels: int = 30
+    ) -> None:
+        """Compara QR(τ) e OLS no espaço residualizado (controls aplicados)."""
+        self._ensure_figdir()
+        Xc = sm.add_constant(df[controls].astype(float))
+        res_x = sm.OLS(df[x].astype(float), Xc).fit().resid
+        res_y = sm.OLS(df[y].astype(float), Xc).fit().resid
+
+        res_x = pd.Series(res_x, index=df.index, name="res_x")
+        res_y = pd.Series(res_y, index=df.index, name="res_y")
+
+        Xr = pd.DataFrame({"const": 1.0, "res_x": res_x.astype(float).values}, index=df.index)
+        ols = sm.OLS(res_y.astype(float), Xr).fit()
+        qreg = sm.QuantReg(res_y.astype(float), Xr).fit(q=quantile)
+
+        xs = np.linspace(res_x.min(), res_x.max(), 100, dtype=float)
+        Xgrid = pd.DataFrame({"const": 1.0, "res_x": xs})
+        y_ols = ols.predict(Xgrid)
+        y_qr  = qreg.predict(Xgrid)
+
+        n = len(res_x)
+        pt_size = 20 if n < 100 else 10 if n < 300 else 6
+        alpha = 0.8 if n < 100 else 0.6 if n < 300 else 0.4
+
+        plt.figure(figsize=(6, 4))
+
+        plt.scatter(res_x, res_y, s=pt_size, alpha=alpha, label="Observações (resíduos)")
+        plt.plot(xs, y_ols, label=f"Média (OLS, Beta={ols.params['res_x']:.3f})")
+        plt.plot(xs, y_qr, linestyle="--", label=f"Mediana (QR τ={quantile:.1f}, Beta={qreg.params['res_x']:.3f})")
+
+        resid_abs = (res_y - ols.predict(Xr)).abs()
+        for i in resid_abs.nlargest(min(max_labels, n)).index:
+            plt.annotate(df.loc[i, "country"], (res_x.loc[i], res_y.loc[i]), xytext=(3, 3), textcoords="offset points", fontsize=7)
+
+        plt.axhline(0, ls="--", alpha=0.5)
+
+        plt.xlabel(f"Educação (%) após controle")
+        plt.ylabel(f"PIB (log) após controle")
+        plt.title(f"{label}: Mediana vs média após controle (robustez)")
+        plt.legend(fontsize=8); plt.grid(True, linestyle="--", alpha=0.3)
+        plt.figtext(0.01, -0.05,
+                    "Compara efeitos na média (OLS) e na mediana (QR). "
+                    "Diferenças relevantes sugerem sensibilidade a outliers/assimetria.",
+                    ha="left", va="top", fontsize=8)
+
+        out = self._FIGDIR / fname
+        plt.tight_layout(); plt.savefig(out, dpi=200); plt.close()
+        print(f"[Plot] {out} — OLS vs QR em espaço residualizado.")
+
     #Helpers para pipeline 
     def _safe_slug(self, s: str) -> str:
         return re.sub(r"[^a-z0-9_]+", "_", s.lower()).strip("_")
 
+    def _select_country_subsets(
+        self,
+        df: pd.DataFrame,
+        *,
+        metric: str = "higher_ed_pct",
+        n_small: int = 3,
+        n_large: int = 10,
+    ) -> dict[str, pd.DataFrame]:
+        """
+        Create smaller, readable subsets for plotting on REAL data only.
+        Subsets:
+          - top3 / mid3 / bottom3     (by `metric`; mid3 = nearest to median excluding top/bottom)
+          - br_usa_de                 (Brazil, USA, Germany; robust to common aliases)
+          - top10 / bottom10          (by `metric`)
+        Notes:
+          - Only returns subsets with at least 2 rows (plots/correlations need ≥2).
+          - `metric` defaults to 'higher_ed_pct' so subsets are aligned to education share.
+        """
+        if metric not in df.columns:
+            raise ValueError(f"Subset metric '{metric}' not found in columns: {list(df.columns)}")
+
+        #Sem NA
+        d = df.dropna(subset=[metric]).copy()
+        if d.empty:
+            return {}
+
+        #Sort ascendente
+        d_sorted = d.sort_values(by=metric, ascending=True).reset_index(drop=True)
+
+        #Head e tail
+        def take_head(tbl: pd.DataFrame, k: int) -> pd.DataFrame:
+            return tbl.head(min(k, len(tbl)))
+
+        def take_tail(tbl: pd.DataFrame, k: int) -> pd.DataFrame:
+            return tbl.tail(min(k, len(tbl)))
+
+        #Bottom/top 
+        bottom_k = take_head(d_sorted, n_small)
+        top_k    = take_tail(d_sorted, n_small)
+        bottom10 = take_head(d_sorted, n_large)
+        top10    = take_tail(d_sorted, n_large)
+
+        #Pertos da mediana
+        exclude_idx = set(bottom_k.index.tolist() + top_k.index.tolist())
+        mid_pool = d_sorted.loc[~d_sorted.index.isin(exclude_idx)].copy()
+        if not mid_pool.empty:
+            med_val = float(mid_pool[metric].median())
+            mid_pool["__dist__"] = (mid_pool[metric] - med_val).abs()
+            mid3 = mid_pool.sort_values("__dist__").drop(columns="__dist__").head(min(n_small, len(mid_pool)))
+        else:
+            mid3 = pd.DataFrame(columns=d_sorted.columns)
+
+        #BR‑USA‑DE 
+        def _norm(s: str) -> str:
+            x = str(s).strip().casefold()
+            return "".join(ch for ch in _ud.normalize("NFKD", x) if not _ud.combining(ch))
+        aliases_raw = {
+            "brazil": {"brazil", "brasil"},
+            "united states": {"united states", "usa", "us", "u.s.", "u.s.a.", "eua", "united states of america", "estados unidos"},
+            "germany": {"germany", "alemanha", "alemania", "deutschland"},
+        }
+        aliases = {k: {_norm(v) for v in vals} for k, vals in aliases_raw.items()}
+        def name_matches(nm: str, targets: set[str]) -> bool:
+            return _norm(nm) in targets
+
+        mask_br = df["country"].apply(lambda s: name_matches(s, aliases["brazil"]))
+        mask_us = df["country"].apply(lambda s: name_matches(s, aliases["united states"]))
+        mask_de = df["country"].apply(lambda s: name_matches(s, aliases["germany"]))
+        br_usa_de = df.loc[mask_br | mask_us | mask_de].copy()
+
+        subsets: dict[str, pd.DataFrame] = {}
+
+        def add_if_ok(key: str, tbl: pd.DataFrame) -> None:
+            if len(tbl) >= 2:
+                subsets[key] = tbl.reset_index(drop=True)
+
+        add_if_ok("countries_bottom3", bottom_k)
+        add_if_ok("countries_mid3",    mid3)
+        add_if_ok("countries_top3",    top_k)
+        add_if_ok("countries_br_usa_de", br_usa_de)
+        add_if_ok("countries_bottom10", bottom10)
+        add_if_ok("countries_top10",    top10)
+
+        return subsets
+
+    def _analyze_fake_data(self, df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+        """
+        Provide a compact comparison between the two demo datasets and
+        analyze the higher_ed_pct ↔ GDP relationship for each.
+        Reuses existing correlation suite for consistency.
+        """
+        self._print_header("LLM1: relação educação superior × PIB")
+        if len(df1) >= 2:
+            self._correlation_suite(df1, y_col="log_gdp", x_col="higher_ed_pct", label="LLM1")
+        else:
+            print("Amostra LLM1 insuficiente para correlação.")
+
+        self._print_header("LLM2: relação educação superior × PIB")
+        if len(df2) >= 2:
+            self._correlation_suite(df2, y_col="log_gdp", x_col="higher_ed_pct", label="LLM2")
+        else:
+            print("Amostra LLM2 insuficiente para correlação.")
+
+        # Simple, interpretable comparison of central tendencies and spreads.
+        self._print_header("Comparação simples LLM1 vs LLM2")
+        def stats(tbl: pd.DataFrame, col: str) -> tuple[float, float]:
+            v = pd.to_numeric(tbl[col], errors="coerce")
+            return float(v.mean()), float(v.std(ddof=1)) if len(v) > 1 else float("nan")
+
+        m1, s1 = stats(df1, "gdp")
+        m2, s2 = stats(df2, "gdp")
+        e1, e2 = float(df1["higher_ed_pct"].mean()), float(df2["higher_ed_pct"].mean())
+        print(f"PIB (nível): média LLM1={m1:.3g} ± {s1:.3g} | LLM2={m2:.3g} ± {s2:.3g}")
+        print(f"Educação superior (%): média LLM1={e1:.2f} | LLM2={e2:.2f}")
+        print("Observação: estes dados são de demonstração; resultados não inferem causalidade.")
+
     def _build_views(self, df: pd.DataFrame, tag: str) -> dict[str, tuple[pd.DataFrame, str]]:
         """
-        Retorna 'views' canônicas p/ análise:
-        - countries: somente países
-        - provagg: agregados fornecidos (OCDE/G20/etc.)
-        - regcalc: agregados calculados a partir de países (dinâmico por 'region' quando disponível)
+        Returns canonical 'views' for analysis.
+
+        For DEMO (LLM1/LLM2): keep a single 'countries' view (small and readable already).
+        For REAL: restrict to smaller, readable subsets only:
+          - bottom3 / mid3 / top3  (by higher_ed_pct)
+          - BR+USA+DE
+          - bottom10 / top10       (by higher_ed_pct)
         """
-        countries = df.loc[df["unit_type"] == "country"].copy()
-        provagg   = df.loc[df["unit_type"] == "provided_aggregate"].copy()
-        regcalc   = self._compute_region_aggregates(countries)
-        return {
-            "countries": (countries, f"{tag} (países)"),
-            "provagg":   (provagg,   f"{tag} (agregados fornecidos)"),
-            "regcalc":   (regcalc,   f"{tag} (regiões calculadas)"),
+        # DEMO datasets remain a single compact view.
+        if str(tag).upper() != "REAL":
+            countries = df.copy()
+            return {"countries": (countries, f"{tag}")}
+
+        # REAL dataset: generate targeted subsets by education (%).
+        subsets = self._select_country_subsets(df, metric="higher_ed_pct")
+
+        # Label each subset clearly (used in file names and plot titles).
+        labeled: dict[str, tuple[pd.DataFrame, str]] = {}
+        labels_human = {
+            "countries_bottom3":  "REAL – 3 piores (educação superior %)",
+            "countries_mid3":     "REAL – 3 medianos (educação superior %)",
+            "countries_top3":     "REAL – 3 melhores (educação superior %)",
+            "countries_br_usa_de":"REAL – Brasil, USA e Alemanha",
+            "countries_bottom10": "REAL – bottom 10 (educação superior %)",
+            "countries_top10":    "REAL – top 10 (educação superior %)",
         }
+        for k, dsub in subsets.items():
+            labeled[k] = (dsub, labels_human.get(k, f"REAL – {k}"))
+
+        return labeled
 
     def _run_grouped_pipeline(self, views: dict[str, tuple[pd.DataFrame, str]], controls: list[str]) -> None:
-        import warnings as _warnings
 
         for gkey, (d, label) in views.items():
             n = len(d)
             if n < self._MIN_N:
-                _warnings.warn(f"{label}: amostra pequena (n={n}). Resultados exploratórios.")
+                warnings.warn(f"{label}: amostra pequena (n={n}). Resultados exploratórios.")
 
             # (A) Correlações (sempre que houver ≥2 pontos)
             if n >= 2:
-                self._correlation_suite(d, y_col="gdp",     x_col="higher_ed_pct", label=label)
-                self._correlation_suite(d, y_col="log_gdp", x_col="higher_ed_pct", label=label)
-                self._plot_scatter_fit(d, y="log_gdp", x="higher_ed_pct",
-                                       label=label, fname=f"{self._safe_slug(label)}_{gkey}_scatter.png")
+                slug = self._safe_slug(label)
 
-            # (B) Modelagem (somente países, n≥4)
-            if gkey == "countries" and n >= 4:
+                # (ÚNICA) correlação principal em ln(PIB) ~ educação%; gráfico semi‑log unificado
+                self._correlation_suite(d, y_col="log_gdp", x_col="higher_ed_pct", label=label)
+                self._plot_scatter_fit(
+                    d, y="gdp", x="higher_ed_pct", label=label,
+                    fname=f"{slug}_{gkey}_scatter_semilog.png",
+                    max_labels=12,
+                    label_col=("iso" if "iso" in d.columns else "country"),  # ISO melhora legibilidade em top/bottom10
+                )
+
+            # (B) Modelagem (qualquer subset countries, n≥4)
+            if gkey.startswith("countries") and n >= 4:
+                slug = self._safe_slug(label)
+
+                # 3) PARCIAL — imprime e gera gráfico (resíduos)
                 self._partial_correlation(d, y="log_gdp", x="higher_ed_pct", controls=controls)
+                self._plot_partial_corr_residuals(
+                    d, y="log_gdp", x="higher_ed_pct", controls=controls,
+                    label=label, fname=f"{slug}_{gkey}_partial_residuals.png"
+                )
+
+                # 4) OLS + DIAGNÓSTICOS — imprime e gera 4 gráficos
                 ols = self._ols_with_diagnostics(d, y="log_gdp", x="higher_ed_pct", controls=controls)
+                self._plot_ols_diagnostics(
+                    ols, d, y="log_gdp", x="higher_ed_pct", controls=controls,
+                    label=label, slug_prefix=f"{slug}_{gkey}"
+                )
+
+                # 5) QUANTÍLICA — imprime e gera gráfico vs OLS em base residualizada
                 self._quantile_regression(d, y="log_gdp", x="higher_ed_pct", controls=controls)
-                self._plot_partial_reg(d, y="log_gdp", x="higher_ed_pct",
-                                       controls=controls, label=label, fname=f"{self._safe_slug(label)}_{gkey}_partial.png")
-                self._plot_residuals_and_qq(ols, label=label, basefname=f"{self._safe_slug(label)}_{gkey}_diag")
-                self._maybe_iv_2sls(d, y="log_gdp", x="higher_ed_pct", controls=controls)
+                self._plot_qr_vs_ols_residualized(
+                    d, y="log_gdp", x="higher_ed_pct", controls=controls,
+                    label=label, fname=f"{slug}_{gkey}_qr_vs_ols.png", quantile=0.5
+                )
 
     #Execução principal - poderíamos pensar em tests
     def executar(self) -> None:
@@ -784,6 +1152,9 @@ class Ex10GeracaoDados(Exercicio):
         df1 = self._clean_and_feature(df1_raw)
         df2 = self._clean_and_feature(df2_raw)
 
+        #Análise dos dados de demo
+        self._analyze_fake_data(df1, df2)
+
         #Sanity checks
         if len(df1) < self._MIN_N or len(df2) < self._MIN_N:
             warnings.warn(f"Amostras muito pequenas após limpeza (n1={len(df1)}, n2={len(df2)}). "
@@ -794,27 +1165,35 @@ class Ex10GeracaoDados(Exercicio):
         views1 = self._build_views(df1, tag="LLM1")
         views2 = self._build_views(df2, tag="LLM2")
 
-        self._run_grouped_pipeline(views1, controls=controls)
-        self._run_grouped_pipeline(views2, controls=controls)
+        # Dados reais — roda TODA a análise (mesmo pipeline) e gera gráficos
+        df_real = None
+        if self._REAL_CSV.exists():
+            try:
+                df_real_raw = self._load_real_dataset(self._REAL_CSV)
+                df_real = self._clean_and_feature(df_real_raw)
+                views_real = self._build_views(df_real, tag="REAL")
+                self._run_grouped_pipeline(views_real, controls=controls)
+            except Exception as e:
+                warnings.warn(f"Falha ao carregar/analisar REAL: {e}")
+        else:
+            warnings.warn(f"Arquivo '{self._REAL_CSV}' não encontrado; pulando dataset REAL.")
 
         #Discrepâncias entre versões 
         self._print_header("Discrepâncias entre versões (LLM1 vs LLM2)")
         merged = pd.merge(df1_raw, df2_raw, on="country", suffixes=("_1", "_2"))
-        discrep = (merged["gdp_2"] - merged["gdp_1"]).abs() / merged["gdp_1"].replace(0, pd.NA)
+
+        denom = merged["gdp_1"].replace(0, np.nan)
+        discrep = (merged["gdp_2"] - merged["gdp_1"]).abs() / denom
+
         pct = float((discrep > 0.10).mean() * 100)
         print("Métrica: fração de unidades (países/agregados) com |GDP₂ − GDP₁| / GDP₁ > 10%")
         print(f"Unidades avaliadas: {len(merged)} | % com discrepância > 10%: {pct:.1f}%")
 
-        #Nota sobre os agregados
-        self._print_header("Nota: países vs agregados")
-        print("Agregados (p.ex., OCDE, G20) combinam múltiplos países e podem mascarar heterogeneidade.")
-        print("Resultados para agregados são analisados separadamente e, quando possível, com regiões calculadas a partir de países.")
-
         #7) Prints diversos 
-        self._print_header("Observação sobre causalidade")
-        print("Com dados de corte transversal e sem instrumento exógeno válido, não inferimos causalidade.")
+        self._print_header("Observações")
+        print("Não inferimos causalidade")
         print("O que fizemos: controle de confundidores (log_pop, log_area), correlação parcial, diagnósticos,")
-        print("OLS robusto e quantílica. Para causalidade, será necessário painel temporal, eventos/quase-experimentos")
+        print("OLS robusto e quantílica. Para causalidade, seria necessário painel temporal, eventos/quase-experimentos")
         print("ou IV com instrumento plausível (ex.: reformas educacionais exógenas).")
 
 #Main
