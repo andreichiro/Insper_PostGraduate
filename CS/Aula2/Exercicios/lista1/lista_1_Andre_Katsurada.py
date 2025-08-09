@@ -284,11 +284,12 @@ class Ex10GeracaoDados(Exercicio):
         10.3. Limpa, valida faixas e cria features em log ('log_gdp', 'log_pop', 'log_area')
         10.4. Para cada conjunto de países ou subconjuntos como top/bottom 3, 10 e 
         Brasil-EUA-Alemanha), analisa:
-           10.4a) Correlações c/ Pearson, Spearman, Kendall, usando IC bootstrap e p via permutação  
+           10.4a) Correlações c/ Pearson (IC95% via Fisher z) e Spearman; p via permutação 
            10.4b) Correlação parcial controlando 'log_pop' e 'log_area'  
-           10.4c) Regressão OLS c/ HC3 e diagnósticos Breusch-Pagan, White, RESET, Jarque-Bera, Durbin-Watson, VIF, Cook's D
-           10.4d) Regressão quantílica (tao = 0.5) para robustez  
+           10.4c) Regressão OLS c/ HC3 e diagnósticos Breusch-Pagan, RESET, Jarque-Bera, VIF, Cook's D
+           10.4d) Regressão quantílica (tau = 0.5) para robustez  
            10.4e) Geração de gráficos em ex10_figs/
+
 
     Observação: trata-se de uma análise estatística exploratória procurando por correlações; não infere causalidade
     """
@@ -498,7 +499,6 @@ class Ex10GeracaoDados(Exercicio):
 
         #Spearman
         sr, p_sr = spearmanr(x, y)
-        kr, p_kr = kendalltau(x, y)
 
         #Permutação p-value p/ Pearson
         if not (x_const or y_const):
@@ -556,13 +556,9 @@ class Ex10GeracaoDados(Exercicio):
 
         print(f"R² adj = {ols.rsquared_adj:.3f} | F-pvalue = {ols.f_pvalue:.4f} | n = {int(ols.nobs)}")
 
-        #Betas padronizados (z scale)
-        scaler = StandardScaler()
-        X_std = pd.DataFrame(scaler.fit_transform(df[[x] + controls]), columns=[x] + controls)
-        X_std = sm.add_constant(X_std)
-        ols_std = sm.OLS((df[y] - df[y].mean()) / df[y].std(ddof=0), X_std).fit()
-        beta_x = ols_std.params[x]
-        print(f"beta padronizado (não-HC3) de {x} = {beta_x:.3f}")
+        #Beta padronizado 
+        beta_x = float(ols.params[x]) * float(df[x].std(ddof=0)) / float(df[y].std(ddof=0))
+        print(f"beta padronizado (aprox.) de {x} = {beta_x:.3f}")
 
         #Heterocedasticidade (Breusch–Pagan)
         bp_lm, bp_lmp, bp_f, bp_fp = het_breuschpagan(ols.resid, ols.model.exog)
@@ -757,8 +753,7 @@ class Ex10GeracaoDados(Exercicio):
 
         r, p = pearsonr(res_x, res_y)
         n = len(res_x)
-        pt_size = 20 if n < 100 else 10 if n < 300 else 6
-        alpha = 0.8 if n < 100 else 0.6 if n < 300 else 0.4
+        pt_size, alpha = self._point_style(n)
 
         plt.figure(figsize=(6, 4))
         plt.scatter(res_x, res_y, s=pt_size, alpha=alpha, label=f"Observações (resíduos; n={n})")
@@ -870,8 +865,7 @@ class Ex10GeracaoDados(Exercicio):
         y_qr  = qreg.predict(Xgrid)
 
         n = len(res_x)
-        pt_size = 20 if n < 100 else 10 if n < 300 else 6
-        alpha = 0.8 if n < 100 else 0.6 if n < 300 else 0.4
+        pt_size, alpha = self._point_style(n)
 
         plt.figure(figsize=(6, 4))
 
@@ -1118,8 +1112,6 @@ class Ex10GeracaoDados(Exercicio):
 
         #Pipeline 
         controls = ["log_pop", "log_area"]
-        views1 = self._build_views(df1, tag="LLM1")
-        views2 = self._build_views(df2, tag="LLM2")
 
         #Análise no dados do WB
         df_real = None
