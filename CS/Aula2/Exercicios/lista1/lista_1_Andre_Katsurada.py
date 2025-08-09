@@ -273,8 +273,7 @@ class Ex09IsPrime(Exercicio):
 #Exercício 10 
 class Ex10GeracaoDados(Exercicio):
     """
-    Pipeline completo para investigar a relação entre o PIB total (US$) e a
-    percentagem de adultos (25+) com ensino superior concluído.
+    Ver se países com maior % de adultos (25+) com ensino superior tendem a ter PIB maior.
 
     O método 'executar':
         10.1. Faz download de dados do Banco Mundial (ensino superior, PIB per capita, 
@@ -284,12 +283,11 @@ class Ex10GeracaoDados(Exercicio):
         10.3. Limpa, valida faixas e cria features em log ('log_gdp', 'log_pop', 'log_area')
         10.4. Para cada conjunto de países ou subconjuntos como top/bottom 3, 10 e 
         Brasil-EUA-Alemanha), analisa:
-           10.4a) Correlações c/ Pearson (IC95% via Fisher z) e Spearman; p via permutação 
-           10.4b) Correlação parcial controlando 'log_pop' e 'log_area'  
-           10.4c) Regressão OLS c/ HC3 e diagnósticos Breusch-Pagan, RESET, Jarque-Bera, VIF, Cook's D
-           10.4d) Regressão quantílica (tau = 0.5) para robustez  
+           10.4a) Correlações Pearson/Spearman (IC95% via Fisher z) c/ p via permutação 
+           10.4b) Correlação parcial controlando 'log_pop'  
+           10.4c) Regressão linear (OLS) com erros HC3 e checagens básicas (heterocedasticidade, não linearidade, normalidade, colinearidade e pontos influentes)
+           10.4d) Regressão quantílica (tao = 0.5) para robustez  
            10.4e) Geração de gráficos em ex10_figs/
-
 
     Observação: trata-se de uma análise estatística exploratória procurando por correlações; não infere causalidade
     """
@@ -317,7 +315,7 @@ class Ex10GeracaoDados(Exercicio):
 
         #Variáveis relevantes
         edu_raw  = self.download_indicator("SE.TER.CUAT.BA.ZS") #% da populacao 25+ com diploma
-        gdp_raw  = self.download_indicator("NY.GDP.PCAP.CD") #pib per capita
+        gdp_raw  = self.download_indicator("NY.GDP.MKTP.CD") #PIB total (US$ correntes)
         pop_raw  = self.download_indicator("SP.POP.TOTL") #populacao total
         area_raw = self.download_indicator("AG.LND.TOTL.K2") #area do pais
 
@@ -349,11 +347,11 @@ class Ex10GeracaoDados(Exercicio):
             y = common[0]
 
             #Valores
-            gdp_pc  = row.get(y)
+            gdp_val = row.get(y)
             pop_val = pop_row.iloc[0].get(y)
-            area_val= area_row.iloc[0].get(y)
-            edu_val = edu_row.iloc[0].get(y)
-            if pd.isnull(gdp_pc) or pd.isnull(pop_val) or pd.isnull(area_val) or pd.isnull(edu_val):
+            area_val = area_row.iloc[0].get(y)
+            edu_val  = edu_row.iloc[0].get(y)
+            if pd.isnull(gdp_val) or pd.isnull(pop_val) or pd.isnull(area_val) or pd.isnull(edu_val):
                 continue
 
             #Consolidado
@@ -361,22 +359,22 @@ class Ex10GeracaoDados(Exercicio):
                 "country": row["Country Name"],
                 "iso": iso,
                 "year": int(y),
-                "gdp_pc": float(gdp_pc),
+                "gdp": float(gdp_val),
                 "population": float(pop_val),
                 "area": float(area_val),
                 "higher_ed_pct": float(edu_val),
             })
 
+
         #DF
         df = pd.DataFrame(records)
 
         if not df.empty:
-            df["gdp"] = df["gdp_pc"] * df["population"]
-            df.to_csv("education_gdp_dataset.csv", index=False)
+           df.to_csv("education_gdp_dataset.csv", index=False)
         return df
 
     #Aviso p/ tamanhos amostrais muito pequenos. Valor aparentemente arbitrário, pensar em como estipular algo melhor
-    _MIN_N = 8  
+    _MIN_N = 4
 
     numero: ClassVar[int] = 10
 
@@ -520,7 +518,7 @@ class Ex10GeracaoDados(Exercicio):
 
     def _partial_correlation(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> None:
         """
-        Correlação parcial de y~x c/ 'controls' por residualização OLS.
+        Mede a relação entre y e x depois de reduzir o efeito dos controls (no caso, populacao em log)
         """
 
         Xc = sm.add_constant(df[controls])
@@ -533,9 +531,12 @@ class Ex10GeracaoDados(Exercicio):
 
     def _ols_with_diagnostics(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> "sm.regression.linear_model.RegressionResultsWrapper":
         """
-        OLS com HC3; diagnósticos: Breusch–Pagan (heterocedasticidade), RESET, Jarque–Bera,
-        multicolinearidade (VIF) e influência (Cook/leverage).
-        Retorna o modelo ajustado.
+        Regressão linear c/ HC3 e faz checagens p/:
+        Breusch–Pagan: vê se a variância do erro muda com o nível das variáveis (heterocedasticidade);
+        RESET: sinaliza possível curvatura que o modelo linear não captou;
+        Jarque–Bera: verifica se os resíduos lembram uma distribuição normal;
+        VIF: mede se as variáveis explicativas "se parecem demais" (colinearidade);
+        Cook’s D / alavancagem: observa pontos que puxam muito o ajuste
         """
 
         #Matriz de regressão
@@ -591,13 +592,14 @@ class Ex10GeracaoDados(Exercicio):
         infl = OLSInfluence(ols)
         cooks_d = infl.cooks_distance[0]
         leverage = infl.hat_matrix_diag
-        thresh = 4 / ols.nobs
-        flagged = [(i, cooks_d[i], leverage[i], df.loc[i, "country"])
-                   for i in range(len(df)) if cooks_d[i] > thresh]
+
+        idx_sorted = np.argsort(cooks_d)[::-1]
+        top_k = int(min(5, len(df)))
+        flagged = [(int(i), float(cooks_d[i]), float(leverage[i]), df.loc[int(i), "country"])
+                for i in idx_sorted[:top_k]]
         if flagged:
-            print(f"Pontos influentes (Cook's D > {thresh:.3f}):")
-            for i, cd, lev, name in flagged:
-                print(f"  idx={i:02d}  CookD={cd:.3f}  leverage={lev:.3f}  país={name}")
+            print(f"Pontos mais influentes (top {top_k} por Cook's D):")
+
         else:
             print("Nenhum ponto influente significativo por Cook's D.")
 
@@ -606,6 +608,7 @@ class Ex10GeracaoDados(Exercicio):
     def _quantile_regression(self, df: "pd.DataFrame", y: str, x: str, controls: list[str]) -> None:
         """
         Regressão quantílica (mediana, 0.5) p/ a outliers na dependente.
+        Útil quando há valores muito fora da curva
         """
         X = sm.add_constant(df[[x] + controls])
         yv = df[y].astype(float)
@@ -623,18 +626,14 @@ class Ex10GeracaoDados(Exercicio):
         Define tamanho e transparência dos pontos em função de n.
         Retorna (size, alpha)
         """
-        if n < 100:
-            return 20, 0.8
-        if n < 300:
-            return 10, 0.6
-        return 6, 0.4
+        return 18, 0.7
 
     #Rótulo compacto de país
     @staticmethod
     def _country_label(row: pd.Series, prefer: str = "iso") -> str:
         """
-        Retorna um rótulo curto e legível para anotar o ponto.
-        Prioriza 'iso' (3 letras); fallback para nome truncado.
+        Retorna o label 
+        Prioriza 'iso' (3 letras); fallback para nome truncado
         """
         if prefer in row and pd.notna(row[prefer]) and str(row[prefer]).strip():
             return str(row[prefer]).upper()
@@ -642,10 +641,10 @@ class Ex10GeracaoDados(Exercicio):
         return (nm[:12] + "…") if len(nm) > 13 else nm
 
     def _plot_scatter_fit(self, df: "pd.DataFrame", y: str, x: str, label: str, fname: str, max_labels: int = 30, *, label_col: str | None = None,) -> None:
-        """Dispersão SEMI-LOG (eixo y em log10) de y~x + OLS (ajuste em ln(y)) + LOWESS.
-        Linha cheia: aproxima E[y|x] via Duan smearing (exp(β0 + β1 x) * mean(exp(resid))).
-        Tracejado: LOWESS em escala original de y
-        Labels: ISO/nome curto do país
+        """Gráfico de dispersão com Y em escala log (y~x) e duas linhas de tendência:
+        Linha cheia: média prevista por um modelo simples em log c/ correção de viés (smearing)
+        Linha tracejada (LOWESS): tendência local que mostra curvaturas sem impor forma fixa
+        Labels: código ISO do país & nome 
         """
         self._ensure_figdir()
 
@@ -668,7 +667,7 @@ class Ex10GeracaoDados(Exercicio):
         yhat_semilog = np.exp(b0 + b1 * xs) * sf
 
         #LOWESS no espaço original (ajuda a ver não linearidades)
-        frac = float(min(0.8, max(0.4, 6 / max(n, 1))))
+        frac = 0.6
         lo = lowess(yv, xv, frac=frac, return_sorted=True)
 
         #Aparência dos gráficos 
@@ -731,7 +730,8 @@ class Ex10GeracaoDados(Exercicio):
         self, df: "pd.DataFrame", y: str, x: str, controls: list[str],
         label: str, fname: str, max_labels: int = 30
     ) -> None:
-        """Correlação parcial: gráfico de resíduos (y|controls) vs (x|controls) + linha OLS."""
+        """Mostra a relação entre y e x depois de descontar controls: 
+        plota resíduos y contra os resíduos de x e adiciona a linha média (OLS)"""
 
         self._ensure_figdir()
         Xc = sm.add_constant(df[controls].astype(float))
@@ -767,12 +767,12 @@ class Ex10GeracaoDados(Exercicio):
 
         plt.xlabel(f"Educação (%) após controls {', '.join(controls)}")
         plt.ylabel(f"PIB (log) após controls {', '.join(controls)}")
-        plt.title(f"{label}: Relação após controles de tamanho e área")
+        plt.title(f"{label}: Relação após controles: {', '.join(controls)}")
         plt.legend(fontsize=8); plt.grid(True, linestyle="--", alpha=0.3)
 
         #Legenda explicativa
         plt.figtext(0.01, -0.05,
-                    "Mostra a associação entre educação e PIB descontando população e área. "
+                   f"Associação entre educação e PIB descontando controles ({', '.join(controls)}). "
                     "Se a linha sobe, há relação além do efeito de tamanho",
                     ha="left", va="top", fontsize=8)
 
@@ -792,8 +792,11 @@ class Ex10GeracaoDados(Exercicio):
         max_labels: int = 30,
     ) -> None:
         """
-        Diagnóstico gráfico: apenas Influência (leverage × resíduo studentizado; tamanho ∝ Cook's D).
-        QQ/resíduos-ajustados e VIF em gráfico foram removidos por baixa utilidade/legibilidade.
+        Influência:
+        eixo X = alavancagem (quão "isolado" o país está nas variáveis explicativas)
+        eixo Y = resíduo padronizado (o quão distante ficou da linha)
+        tamanho do ponto = impacto no ajuste (Cook’s D)
+        Ou seja, ajuda a entender países que podem gerar distorções nos resultados
         """
         self._ensure_figdir()
         idx = df.index
@@ -842,56 +845,6 @@ class Ex10GeracaoDados(Exercicio):
         plt.tight_layout(); plt.savefig(out, dpi=200, bbox_inches="tight"); plt.close()
         print(f"[Plot] {out} — alavancagem vs resíduos (Cook's D).")
 
-    def _plot_qr_vs_ols_residualized(
-        self, df: "pd.DataFrame", y: str, x: str, controls: list[str],
-        label: str, fname: str, quantile: float = 0.5, max_labels: int = 30
-    ) -> None:
-        """Compara QR(τ) e OLS no espaço residualizado (controls aplicados)."""
-        self._ensure_figdir()
-        Xc = sm.add_constant(df[controls].astype(float))
-        res_x = sm.OLS(df[x].astype(float), Xc).fit().resid
-        res_y = sm.OLS(df[y].astype(float), Xc).fit().resid
-
-        res_x = pd.Series(res_x, index=df.index, name="res_x")
-        res_y = pd.Series(res_y, index=df.index, name="res_y")
-
-        Xr = pd.DataFrame({"const": 1.0, "res_x": res_x.astype(float).values}, index=df.index)
-        ols = sm.OLS(res_y.astype(float), Xr).fit()
-        qreg = sm.QuantReg(res_y.astype(float), Xr).fit(q=quantile)
-
-        xs = np.linspace(res_x.min(), res_x.max(), 100, dtype=float)
-        Xgrid = pd.DataFrame({"const": 1.0, "res_x": xs})
-        y_ols = ols.predict(Xgrid)
-        y_qr  = qreg.predict(Xgrid)
-
-        n = len(res_x)
-        pt_size, alpha = self._point_style(n)
-
-        plt.figure(figsize=(6, 4))
-
-        plt.scatter(res_x, res_y, s=pt_size, alpha=alpha, label="Observações (resíduos)")
-        plt.plot(xs, y_ols, label=f"Média (OLS, Beta={ols.params['res_x']:.3f})")
-        plt.plot(xs, y_qr, linestyle="--", label=f"Mediana (QR τ={quantile:.1f}, Beta={qreg.params['res_x']:.3f})")
-
-        resid_abs = (res_y - ols.predict(Xr)).abs()
-        for i in resid_abs.nlargest(min(max_labels, n)).index:
-            plt.annotate(df.loc[i, "country"], (res_x.loc[i], res_y.loc[i]), xytext=(3, 3), textcoords="offset points", fontsize=7)
-
-        plt.axhline(0, ls="--", alpha=0.5)
-
-        plt.xlabel(f"Educação (%) após controle")
-        plt.ylabel(f"PIB (log) após controle")
-        plt.title(f"{label}: Mediana vs média após controle (robustez)")
-        plt.legend(fontsize=8); plt.grid(True, linestyle="--", alpha=0.3)
-        plt.figtext(0.01, -0.05,
-                    "Compara efeitos na média (OLS) e na mediana (QR). "
-                    "Diferenças relevantes sugerem sensibilidade a outliers/assimetria.",
-                    ha="left", va="top", fontsize=8)
-
-        out = self._FIGDIR / fname
-        plt.tight_layout(); plt.savefig(out, dpi=200); plt.close()
-        print(f"[Plot] {out} — OLS vs QR em espaço residualizado.")
-
     #Helpers para pipeline 
     def _safe_slug(self, s: str) -> str:
         return re.sub(r"[^a-z0-9_]+", "_", s.lower()).strip("_")
@@ -905,14 +858,11 @@ class Ex10GeracaoDados(Exercicio):
         n_large: int = 10,
     ) -> dict[str, pd.DataFrame]:
         """
-        Create smaller, readable subsets for plotting on REAL data only.
-        Subsets:
-          - top3 / mid3 / bottom3     (by `metric`; mid3 = nearest to median excluding top/bottom)
-          - br_usa_de                 (Brazil, USA, Germany; robust to common aliases)
-          - top10 / bottom10          (by `metric`)
-        Notes:
-          - Only returns subsets with at least 2 rows (plots/correlations need ≥2).
-          - `metric` defaults to 'higher_ed_pct' so subsets are aligned to education share.
+        Seleciona subconjuntos de países da seguinte forma:
+        ordena por 'metric' (padrão: 'higher_ed_pct', % com ensino superior);
+        pega bottom3, 3 próximos da mediana e top3
+        pega bottom10 e top10
+        inclui Brasil, EUA e Alemanha 
         """
         if metric not in df.columns:
             raise ValueError(f"Subset metric '{metric}' not found in columns: {list(df.columns)}")
@@ -983,9 +933,10 @@ class Ex10GeracaoDados(Exercicio):
 
     def _analyze_fake_data(self, df1: pd.DataFrame, df2: pd.DataFrame) -> None:
         """
-        Provide a compact comparison between the two demo datasets and
-        analyze the higher_ed_pct ↔ GDP relationship for each.
-        Reuses existing correlation suite for consistency.
+        Compara os dois conjuntos de demo (LLM1 e LLM2) da seguinte maneira:
+        calcula a correlação entre % com ensino superior e log do PIB de maneira simples
+        mostra médias e dispersão de PIB e de educação
+        Esse seria o exercício original
         """
         self._print_header("LLM1: relação educação superior × PIB")
         if len(df1) >= 2:
@@ -999,7 +950,7 @@ class Ex10GeracaoDados(Exercicio):
         else:
             print("Amostra LLM2 insuficiente para correlação.")
 
-        # Simple, interpretable comparison of central tendencies and spreads.
+        #Comparação simples de médias e variação (para ter noção de nível e dispersão).
         self._print_header("Comparação simples LLM1 vs LLM2")
         def stats(tbl: pd.DataFrame, col: str) -> tuple[float, float]:
             v = pd.to_numeric(tbl[col], errors="coerce")
@@ -1014,31 +965,28 @@ class Ex10GeracaoDados(Exercicio):
 
     def _build_views(self, df: pd.DataFrame, tag: str) -> dict[str, tuple[pd.DataFrame, str]]:
         """
-        Returns canonical 'views' for analysis.
-
-        For DEMO (LLM1/LLM2): keep a single 'countries' view (small and readable already).
-        For REAL: restrict to smaller, readable subsets only:
-          - bottom3 / mid3 / top3  (by higher_ed_pct)
-          - BR+USA+DE
-          - bottom10 / top10       (by higher_ed_pct)
+        Facilita as análises
+        DEMO (LLM1/LLM2): usa apenas 'countries'
+        Dados reais: usa subconjuntos 
+        Retorna um dict: {nome_da_visão: (DF, rótulo)}.
         """
-        # DEMO datasets remain a single compact view.
+        #DEMO
         if str(tag).upper() != "REAL":
             countries = df.copy()
             return {"countries": (countries, f"{tag}")}
 
-        # REAL dataset: generate targeted subsets by education (%).
+        #Dados reais
         subsets = self._select_country_subsets(df, metric="higher_ed_pct")
 
-        # Label each subset clearly (used in file names and plot titles).
+        #Rótulos
         labeled: dict[str, tuple[pd.DataFrame, str]] = {}
         labels_human = {
-            "countries_bottom3":  "REAL – 3 piores (educação superior %)",
-            "countries_mid3":     "REAL – 3 medianos (educação superior %)",
-            "countries_top3":     "REAL – 3 melhores (educação superior %)",
-            "countries_br_usa_de":"REAL – Brasil, USA e Alemanha",
-            "countries_bottom10": "REAL – bottom 10 (educação superior %)",
-            "countries_top10":    "REAL – top 10 (educação superior %)",
+            "countries_bottom3":  "WB – 3 piores (educação superior %)",
+            "countries_mid3":     "WB – 3 medianos (educação superior %)",
+            "countries_top3":     "WB – 3 melhores (educação superior %)",
+            "countries_br_usa_de":"WB – Brasil, USA e Alemanha",
+            "countries_bottom10": "WB – bottom 10 (educação superior %)",
+            "countries_top10":    "WB – top 10 (educação superior %)",
         }
         for k, dsub in subsets.items():
             labeled[k] = (dsub, labels_human.get(k, f"REAL – {k}"))
@@ -1083,12 +1031,8 @@ class Ex10GeracaoDados(Exercicio):
                     label=label, slug_prefix=f"{slug}_{gkey}"
                 )
 
-                # 5) QUANTÍLICA — imprime e gera gráfico vs OLS em base residualizada
+                #5) Regressão por quantis
                 self._quantile_regression(d, y="log_gdp", x="higher_ed_pct", controls=controls)
-                self._plot_qr_vs_ols_residualized(
-                    d, y="log_gdp", x="higher_ed_pct", controls=controls,
-                    label=label, fname=f"{slug}_{gkey}_qr_vs_ols.png", quantile=0.5
-                )
 
     #Execução principal - poderíamos pensar em tests
     def executar(self) -> None:
@@ -1111,7 +1055,7 @@ class Ex10GeracaoDados(Exercicio):
                           "Resultados têm baixa potência; trate como exploração.")
 
         #Pipeline 
-        controls = ["log_pop", "log_area"]
+        controls = ["log_pop"]
 
         #Análise no dados do WB
         df_real = None
@@ -1134,13 +1078,13 @@ class Ex10GeracaoDados(Exercicio):
         discrep = (merged["gdp_2"] - merged["gdp_1"]).abs() / denom
 
         pct = float((discrep > 0.10).mean() * 100)
-        print("Métrica: fração de unidades (países/agregados) com |GDP₂ − GDP₁| / GDP₁ > 10%")
+        print("Métrica: fração de unidades (países/agregados) c/ PIB2 − PIB1| / PIB1 > 10%")
         print(f"Unidades avaliadas: {len(merged)} | % com discrepância > 10%: {pct:.1f}%")
 
         #7) Prints diversos 
         self._print_header("Observações")
         print("Não inferimos causalidade")
-        print("O que fizemos: controle de confundidores (log_pop, log_area), correlação parcial, diagnósticos,")
+        print("O que fizemos: controle de confundidor (log_pop), correlação parcial, diagnósticos,")
         print("OLS robusto e quantílica. Para causalidade, seria necessário painel temporal, eventos/quase-experimentos")
         print("ou IV com instrumento plausível (ex.: reformas educacionais exógenas).")
 
