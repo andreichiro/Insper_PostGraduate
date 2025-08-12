@@ -624,7 +624,7 @@ class Ex10GeracaoDados(Exercicio):
         RESET: sinaliza possível curvatura que o modelo linear não captou;
         Jarque–Bera: verifica se os resíduos lembram uma distribuição normal;
         VIF: mede se as variáveis explicativas "se parecem demais" (colinearidade);
-        Cook’s D / alavancagem: observa pontos que puxam muito o ajuste
+        Cook's D / alavancagem: observa pontos que puxam muito o ajuste
         """
 
         #Matriz de regressão
@@ -691,7 +691,7 @@ class Ex10GeracaoDados(Exercicio):
 
         #Influência: Cook D e leverage
         #Doc: https://www.statsmodels.org/dev/generated/statsmodels.stats.outliers_influence.OLSInfluence.html
-        #Conferir se faz sentido usar esse 'Cook’s distance and leverage values' aqui
+        #Conferir se faz sentido usar esse 'Cook's distance and leverage values' aqui
         #Quando usar? Quando não usar?
         infl = OLSInfluence(ols)
         cooks_d = infl.cooks_distance[0]
@@ -965,7 +965,7 @@ class Ex10GeracaoDados(Exercicio):
         Influência:
         eixo X = alavancagem (quão "isolado" o país está nas variáveis explicativas)
         eixo Y = resíduo padronizado (o quão distante ficou da linha)
-        tamanho do ponto = impacto no ajuste (Cook’s D)
+        tamanho do ponto = impacto no ajuste (Cook's D)
         Ou seja, ajuda a entender países que podem gerar distorções nos resultados
         """
         self._ensure_figdir()
@@ -982,19 +982,39 @@ class Ex10GeracaoDados(Exercicio):
         den = float(den) if (den is not None and np.isfinite(den) and den > 0) else 1.0
         size = (200 * (cooks / den).clip(lower=0.0).fillna(0.0)) + 10
 
-        fig = plt.figure(figsize=(6, 4))
+        fig = plt.figure(figsize=(8, 6))
         ax = plt.gca()
-        ax.scatter(lev, stud, s=size, alpha=alpha)
+        fig.subplots_adjust(bottom=0.28)
+        sc = ax.scatter(lev, stud, s=size, alpha=alpha)
+
+        #Adiciona linhas de referência para pontos potencialmente influentes
+        p = max(len(ols.params) - 1, 1)  # número de variáveis explicativas
+        lev_thr = 2 * (p + 1) / n  #limite
+        ax.axvline(lev_thr, color="red", ls="--", lw=1)
+        ax.axhline( 2, color="red", ls="--", lw=1)
+        ax.axhline(-2, color="red", ls="--", lw=1)
+
+        #Sombreia regiões de alto risco (alta leverage & resíduo grande)
+        x_lim = ax.get_xlim(); y_lim = ax.get_ylim()
+        ax.axvspan(lev_thr, x_lim[1], color="red", alpha=0.05)
+        ax.axhspan( 2, y_lim[1], color="red", alpha=0.05)
+        ax.axhspan(y_lim[0], -2,        color="red", alpha=0.05)
 
         #Identificar os mais influentes
         top_idx = cooks.nlargest(min(max_labels, n)).index
         for i in top_idx:
-            txt = self._country_label(df.loc[i])  # ISO preferível
+            txt = self._country_label(df.loc[i])  # ISO 
             ax.annotate(txt, (lev.loc[i], stud.loc[i]), xytext=(3, 3), textcoords="offset points", fontsize=7)
         ax.axhline(0, ls="--", alpha=0.5)
         ax.set_xlabel("Alavancagem (leverage)")
         ax.set_ylabel("Resíduo studentizado")
         ax.set_title(f"{label}: Observações influentes (Cook's D)")
+
+        #Legenda de escala dos círculos (Cook's D)
+        for s_ in (200, 600, 1000):
+            ax.scatter([], [], s=s_, color="grey", alpha=0.4,
+                       label=f"Cook's D ≈ {((s_-10)/200)*den:.2e}")
+        ax.legend(fontsize=7, frameon=False, scatterpoints=1, loc="best", title="Escala Cook's D")
 
         #Se ISO foi usado para rótulos, mostre Iso -> Nome
         if "iso" in df.columns:
@@ -1005,11 +1025,18 @@ class Ex10GeracaoDados(Exercicio):
                 ax.text(1.01, 0.98, mapping_text, transform=ax.transAxes, va="top", ha="left", fontsize=7,
                         bbox=dict(boxstyle="round", alpha=0.4))
 
-        #Legendas explicativas
-        plt.figtext(0.01, -0.05,
-                    "Circulos maiores indicam alto Cook's D (alto impacto no ajuste). "
-                    "Pontos com alta leverage e resíduo alto talvez indiquem questões de qualidade dos dados",
-                    ha="left", va="top", fontsize=8)
+        #Legendas explicativas detalhadas
+        plt.figtext(
+            0.01,
+            -0.1,
+            "Alavancagem: quão extremo o país é nas variáveis explicativas.\n"
+            "Resíduo studentizado: desvio padronizado em relação à reta de regressão.\n"
+            "Cook's D (tamanho do círculo): impacto do ponto sobre o ajuste.\n"
+            "Faixas vermelhas/sombreadas: zona de atenção (|resíduo| > 2 ou leverage alto).",
+            ha="left",
+            va="top",
+            fontsize=8,
+        )
         
         out = self._FIGDIR / f"{slug_prefix}_ols_influence.png"
         plt.tight_layout(); plt.savefig(out, dpi=200, bbox_inches="tight"); plt.close()
@@ -1205,7 +1232,7 @@ class Ex10GeracaoDados(Exercicio):
         ax.set_xticks(x[::step])
         ax.set_xticklabels(idx[::step], rotation=45, ha="right")
         ax.set_ylabel("Efeito fixo de país α̂ᵢ")
-        ax.set_title("Efeitos fixos de país (FE), com BR/USA/DE destacados")
+        ax.set_title("Efeitos fixos de país (FE)")
         ax.grid(True, axis="y", linestyle="--", alpha=0.3)
 
         out = self._FIGDIR / "country_fixed_effects_bars.png"
@@ -1596,11 +1623,9 @@ class Ex10GeracaoDados(Exercicio):
         print("Métrica: fração de unidades (países/agregados) c/ PIB2 − PIB1| / PIB1 > 10%")
         print(f"Unidades avaliadas: {len(merged)} | % com discrepância > 10%: {pct:.1f}%")
 
-        #7) Prints diversos 
+        #7) OBS finais 
         self._print_header("Observações")
-        print("Este ex10 não infere causalidade. Rodamos correlações, OLS (HC3), regressão quantílica e, com dados do WB em painel (30 anos), efeitos dos países e de ano com erros-padrão clusterizados por país.")
-        print("Para causalidade, seriam necessários delineamentos experimentais ou quase‑experimentais.")
-        print("De qualquer forma, fizemos uma análise extra, usando dados reais.")
+        print("Construímos um painel de 30 anos com dados do World Bank, procurando correlações entre GDP per capita e % de educação superior testando diversas técnicas de análise consultando as documentações, além de diversas tentativas e erros")
 
 #Main
 def main() -> None:
