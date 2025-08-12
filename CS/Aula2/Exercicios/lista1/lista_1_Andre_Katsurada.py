@@ -959,7 +959,7 @@ class Ex10GeracaoDados(Exercicio):
         controls: list[str],
         label: str,
         slug_prefix: str,
-        max_labels: int = 30,
+        max_labels: int = 10,
     ) -> None:
         """
         Influência:
@@ -984,7 +984,7 @@ class Ex10GeracaoDados(Exercicio):
 
         fig = plt.figure(figsize=(8, 6))
         ax = plt.gca()
-        fig.subplots_adjust(bottom=0.28)
+        fig.subplots_adjust(bottom=0.34)
         sc = ax.scatter(lev, stud, s=size, alpha=alpha)
 
         #Adiciona linhas de referência para pontos potencialmente influentes
@@ -1028,14 +1028,15 @@ class Ex10GeracaoDados(Exercicio):
         #Legendas explicativas detalhadas
         plt.figtext(
             0.01,
-            -0.1,
-            "Alavancagem: quão extremo o país é nas variáveis explicativas.\n"
-            "Resíduo studentizado: desvio padronizado em relação à reta de regressão.\n"
-            "Cook's D (tamanho do círculo): impacto do ponto sobre o ajuste.\n"
-            "Faixas vermelhas/sombreadas: zona de atenção (|resíduo| > 2 ou leverage alto).",
+            -0.12,
+            "• Alavancagem: quão \"diferente\" o país é nas variáveis usadas. Quanto maior, mais a linha de regressão depende dele.\n"
+            "• Resíduo padronizado: diferença entre PIB observado e PIB previsto. Valores acima de 2 (ou abaixo de –2) indicam que o país foge muito da média.\n"
+            "• Cook's D (tamanho do círculo): mede o impacto de remover o país; círculos maiores mudariam mais a regressão.\n"
+            "• Área vermelha: zona de atenção — países que \n  (1) são muito diferentes (alta alavancagem) e \n  (2) ficam bem acima/abaixo da linha (+/–2).",
             ha="left",
             va="top",
             fontsize=8,
+            linespacing=1.4,
         )
         
         out = self._FIGDIR / f"{slug_prefix}_ols_influence.png"
