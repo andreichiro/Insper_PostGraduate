@@ -1,0 +1,2 @@
+Melhor modelo (2012): HistGBR | RMSE=124.1 | MAE=89.5 | R2=0.647 | MAPE~48.5%
+Peak vs Off-peak (cnt médio): 332 vs 142

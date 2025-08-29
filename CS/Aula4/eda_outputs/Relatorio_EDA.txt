@@ -1,0 +1,116 @@
+Pergunta: Quantas linhas e colunas existem? E quais os tipos?
+Resposta: linhas=24919, colunas=120
+Resposta: variáveis numéricas modeláveis=69, categóricas=24
+Resposta: Tipos de variáveis (contagem):
+Resposta: float64    65
+int64      31
+object     24
+Resposta: Uso de memória (aprox.): memory usage: 47.3 MB
+
+Pergunta: Há dados duplicados?
+Resposta: linhas duplicadas=0
+
+Pergunta: Qual a porcentagem de valores ausentes?
+Resposta: % faltantes (máximo)=100.0%
+Resposta: Top colunas com faltantes:
+Resposta: - ESTABDESCR: 100.0%
+Resposta: - CB_PRE: 100.0%
+Resposta: - OBSERV: 100.0%
+Resposta: - MUNSINON: 100.0%
+Resposta: - MUNSINONDV: 100.0%
+Resposta: - NUDIASINF: 100.0%
+Resposta: - CAUSAMAT: 100.0%
+Resposta: - NUDIASOBIN: 100.0%
+Resposta: - ANOEXT: 100.0%
+Resposta: - FONTESINF: 100.0%
+
+Pergunta: Qual o tipo de distribuição das variáveis?
+Resposta: variáveis numéricas modeláveis=69
+Resposta: Top variáveis por |assimetria (skew)|:
+Resposta: - NATURAL: skew=-44.37, curtose=2016.68
+Resposta: - MORTEPARTO: skew=11.25, curtose=195.30
+
+Pergunta: Resumo de variáveis categóricas?
+Resposta: Exibindo top categorias para 'CID10'.
+
+Pergunta: Há outliers presentes?
+Resposta: Top variáveis com mais outliers (IQR):
+Resposta: - LATITUDE: 7262
+Resposta: - DIFDATA: 3745
+Resposta: - ESC: 3595
+Resposta: - ESC2010: 3590
+Resposta: - ASSISTMED: 3176
+Resposta: Alternativa automática (z-score |z|>3):
+Resposta: - ANOINST: 830 (|z|>3)
+Resposta: - ASSISTMED: 774 (|z|>3)
+Resposta: - AREA: 578 (|z|>3)
+Resposta: - LONGITUDE: 443 (|z|>3)
+Resposta: - NECROPSIA: 365 (|z|>3)
+
+Pergunta: Imputação (cópia): o que foi feito e qual o impacto?
+Resposta: Imputação em cópia aplicada (numéricas→mediana, categóricas→moda).
+Resposta: Faltantes antes=1297753, depois=378832 (no DataFrame imputado).
+Resposta: Células imputadas: numéricas=1024606, categóricas=118586.
+Resposta: Impacto relevante nas médias (amostra):
+Resposta: - RACACOR: mudança média≈3.0%
+Resposta: - ESTCIV: mudança média≈6.9%
+Resposta: - ESC: mudança média≈4.4%
+
+Pergunta: Valores mais prováveis (modelos Bayes/Florestas/KNN/RF-Reg):
+Resposta: - ESTABDESCR (RF-Reg): dados insuficientes para validação (n<200).
+Resposta: - CB_PRE (RF-Reg): dados insuficientes para validação (n<200).
+Resposta: - OBSERV (RF-Reg): dados insuficientes para validação (n<200).
+Resposta: - FONTES (RF-Cla): dados insuficientes para treinar (n<100).
+Resposta: - TPNIVELINV (RF-Cla): dados insuficientes para treinar (n<100).
+
+Pergunta: Suavização/Anomalias: quais resultados?
+Resposta: Winsorização (relato de impacto, 1%-99%):
+Resposta: - NATURAL: redução do desvio-padrão≈93.0% (winsor 1%-99%)
+Resposta: Anomalias detectadas (IsolationForest): 484.
+
+Pergunta: Qual a correlação existente entre as variáveis?
+Resposta: variáveis avaliadas (numéricas modeláveis)=69
+Resposta: Pares com alta correlação (|r|>=0.80):
+Resposta: - EXAME ~ LONGITUDE: r=1.00
+Resposta: - CIRURGIA ~ LONGITUDE: r=1.00
+Resposta: - EXAME ~ LATITUDE: r=1.00
+Resposta: - EXAME ~ ALTITUDE: r=1.00
+Resposta: - EXAME ~ AREA: r=1.00
+
+Pergunta: Qual o resumo estatístico das variáveis numéricas?
+Resposta: Principais métricas (amostra de até 10 variáveis):
+Resposta: - ORIGEM: média=1.00, desvio=0.00, Q1=1.00, Q3=1.00
+Resposta: - TIPOBITO: média=2.00, desvio=0.00, Q1=2.00, Q3=2.00
+Resposta: - DTOBITO: média=15915076.10, desvio=8789349.97, Q1=8092021.00, Q3=23112021.00
+Resposta: - HORAOBITO: média=1198.32, desvio=667.94, Q1=630.00, Q3=1800.00
+Resposta: - NATURAL: média=826.65, desvio=15.91, Q1=827.00, Q3=827.00
+Resposta: - DTNASC: média=15205321.33, desvio=8514413.44, Q1=8081928.00, Q3=22091965.25
+Resposta: - SEXO: média=1.45, desvio=0.50, Q1=1.00, Q3=2.00
+Resposta: - RACACOR: média=3.21, desvio=1.28, Q1=2.00, Q3=4.00
+Resposta: - ESTCIV: média=2.94, desvio=2.42, Q1=1.00, Q3=3.00
+Resposta: - ESC: média=3.62, desvio=2.88, Q1=1.00, Q3=4.00
+
+Pergunta: Diagnóstico de qualidade de dados: inconsistências detectadas?
+Resposta: Colunas constantes:
+Resposta: ORIGEM, TIPOBITO, ESTABDESCR, CB_PRE, CAUSAMAT, STDOEPIDEM, STDONOVA, NUDIASOBIN, NUDIASINF, FONTESINF, SITUACAO, OBSERV, MUNSINON, MUNSINONDV, AMAZONIA ...
+Resposta: Colunas categóricas com alta cardinalidade:
+Resposta: ATESTADO
+Resposta: Valores negativos em colunas numéricas:
+Resposta: - LATITUDE: 24919 valores negativos
+Resposta: - LONGITUDE: 24919 valores negativos
+Resposta: Possíveis problemas de datas:
+Resposta: - CID10: alta taxa de datas inválidas/parse falho
+Resposta: - DESCR: alta taxa de datas inválidas/parse falho
+Resposta: - LINHAA: alta taxa de datas inválidas/parse falho
+Resposta: - LINHAB: alta taxa de datas inválidas/parse falho
+Resposta: - LINHAC: alta taxa de datas inválidas/parse falho
+Resposta: - LINHAD: alta taxa de datas inválidas/parse falho
+Resposta: - LINHAII: alta taxa de datas inválidas/parse falho
+Resposta: - CAUSABAS: alta taxa de datas inválidas/parse falho
+Resposta: - TPPOS: alta taxa de datas inválidas/parse falho
+Resposta: - CAUSABAS_O: alta taxa de datas inválidas/parse falho
+
+Pergunta: A EDA está completa? O que falta?
+Resposta: Coberto: Forma e tipos (shape/dtypes); Duplicados; Faltantes (com missingno); Distribuições (skew/curtose + gráficos focados); Outliers (IQR e alternativa z-score); Correlação (mapa de calor e dispersões); Resumo estatístico (métricas-chave); Imputação em cópia (mediana/moda) e impacto; Modelos (Bayes/Florestas) para valores prováveis; Winsorização & IsolationForest (relato); Diagnóstico de qualidade de dados
+Resposta: Próximos passos sugeridos: Normalização fina de tipos (datas, booleanos, categorias); Associações categóricas (Cramér's V) e numérico-categóricas; Testes de normalidade/robustez (quando aplicável); Análise de importância/seleção de variáveis (dependendo do objetivo)
+

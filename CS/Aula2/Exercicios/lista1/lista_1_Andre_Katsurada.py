@@ -3,7 +3,7 @@
 Lista 1 — Exercícios de 1-10
 Autor: André Ichiro Katsurada
 Data: 12/08/25
-Curso: Aprendizagem Estatística de Máquina I — INSPER
+Curso: Programa Avançado em Data Science e Decisão, Computação para a Ciência de Dados, INSPER
 """
 
 from __future__ import annotations

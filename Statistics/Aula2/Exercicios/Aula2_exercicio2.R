@@ -2,7 +2,7 @@
 #' @description Ver se o cliente compra ou não um produto com base em índices de satisfação e engajamento
 #' @author André Katsurada
 #' @date 30/ago/25
-#' @course APRENDIZAGEM ESTATÍSTICA DE MÁQUINA I
+#' @course Programa Avançado em Data Science e Decisão, APRENDIZAGEM ESTATÍSTICA DE MÁQUINA I
 
 #Pacotes 
 pkg_list <- c("tidyverse", "class", "janitor", "glue", "png", "grid")

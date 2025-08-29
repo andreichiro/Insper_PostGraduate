@@ -2,7 +2,7 @@
 #' @description Valores preditos para x = 0.5, 2.1 e 4 usando KNN
 #' @author André Katsurada
 #' @date 06/ago/25
-#' @course APRENDIZAGEM ESTATÍSTICA DE MÁQUINA I
+#' @course Programa Avançado em Data Science e Decisão, APRENDIZAGEM ESTATÍSTICA DE MÁQUINA I
 
 suppressPackageStartupMessages({
   pkgs <- c("R6", "tibble", "dplyr")

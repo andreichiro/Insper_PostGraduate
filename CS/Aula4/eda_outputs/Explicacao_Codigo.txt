@@ -1,0 +1,1737 @@
+==== Explicação didática do código (linha a linha) ====
+L001: # =============================================
+Explicação: Comentário descritivo; não executa.
+L002: # Script: Análise Exploratória de Dados (EDA)
+Explicação: Comentário descritivo; não executa.
+L003: # Objetivo: Ler uma planilha Excel de mortalidade, responder às
+Explicação: Comentário descritivo; não executa.
+L004: #           perguntas principais da EDA e salvar um relatório com
+Explicação: Comentário descritivo; não executa.
+L005: #           Perguntas e Respostas (Q&A) e poucos gráficos úteis.
+Explicação: Comentário descritivo; não executa.
+L006: # Público: Explicações didáticas em português, voltadas a usuários não técnicos.
+Explicação: Comentário descritivo; não executa.
+L007: # =============================================
+Explicação: Comentário descritivo; não executa.
+L008: 
+Explicação: Linha em branco para organização visual.
+L009: import os
+Explicação: Importa um módulo para uso no script.
+L010: import io
+Explicação: Importa um módulo para uso no script.
+L011: import warnings
+Explicação: Importa um módulo para uso no script.
+L012: from dataclasses import dataclass
+Explicação: Importa símbolos específicos de um módulo.
+L013: from typing import List, Dict, Optional, Tuple
+Explicação: Importa símbolos específicos de um módulo.
+L014: 
+Explicação: Linha em branco para organização visual.
+L015: # Bibliotecas numéricas e de análise de dados
+Explicação: Comentário descritivo; não executa.
+L016: import numpy as np
+Explicação: Importa um módulo para uso no script.
+L017: import pandas as pd
+Explicação: Importa um módulo para uso no script.
+L018: 
+Explicação: Linha em branco para organização visual.
+L019: # Bibliotecas de visualização de gráficos
+Explicação: Comentário descritivo; não executa.
+L020: import seaborn as sns
+Explicação: Importa um módulo para uso no script.
+L021: import matplotlib
+Explicação: Importa um módulo para uso no script.
+L022: matplotlib.use("Agg")  # Usa backend "sem tela" para salvar gráficos em arquivos
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L023: import matplotlib.pyplot as plt
+Explicação: Importa um módulo para uso no script.
+L024: 
+Explicação: Linha em branco para organização visual.
+L025: # Biblioteca para visualizar faltantes (se disponível)
+Explicação: Comentário descritivo; não executa.
+L026: try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L027:     import missingno as msno
+Explicação: Importa um módulo para uso no script.
+L028:     HAS_MISSINGNO = True
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L029: except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L030:     HAS_MISSINGNO = False
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L031: 
+Explicação: Linha em branco para organização visual.
+L032: # Métodos estatísticos adicionais (z-score)
+Explicação: Comentário descritivo; não executa.
+L033: try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L034:     from scipy.stats import zscore
+Explicação: Importa símbolos específicos de um módulo.
+L035:     HAS_SCIPY = True
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L036: except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L037:     HAS_SCIPY = False
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L038: 
+Explicação: Linha em branco para organização visual.
+L039: # Algoritmos de modelagem para valores mais prováveis
+Explicação: Comentário descritivo; não executa.
+L040: try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L041:     # IterativeImputer (BayesianRidge) e RandomForest
+Explicação: Comentário descritivo; não executa.
+L042:     from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+Explicação: Importa símbolos específicos de um módulo.
+L043:     from sklearn.impute import IterativeImputer, KNNImputer
+Explicação: Importa símbolos específicos de um módulo.
+L044:     from sklearn.linear_model import BayesianRidge
+Explicação: Importa símbolos específicos de um módulo.
+L045:     from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, IsolationForest
+Explicação: Importa símbolos específicos de um módulo.
+L046:     from sklearn.model_selection import train_test_split
+Explicação: Importa símbolos específicos de um módulo.
+L047:     from sklearn.metrics import r2_score, accuracy_score, mean_absolute_error
+Explicação: Importa símbolos específicos de um módulo.
+L048:     HAS_SKLEARN = True
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L049: except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L050:     try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L051:         from sklearn.ensemble import IsolationForest  # pode existir mesmo sem os demais
+Explicação: Importa símbolos específicos de um módulo.
+L052:         HAS_SKLEARN = True
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L053:     except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L054:         HAS_SKLEARN = False
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L055: 
+Explicação: Linha em branco para organização visual.
+L056: # Desativa relatórios de profiling pesados (para manter saídas mínimas)
+Explicação: Comentário descritivo; não executa.
+L057: HAS_PROFILING = False
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L058: 
+Explicação: Linha em branco para organização visual.
+L059: # Configurações gerais de visual
+Explicação: Comentário descritivo; não executa.
+L060: warnings.filterwarnings("ignore")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L061: sns.set(style="whitegrid", context="notebook")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L062: 
+Explicação: Linha em branco para organização visual.
+L063: 
+Explicação: Linha em branco para organização visual.
+L064: @dataclass(frozen=True)
+Explicação: Decorator que transforma a classe em uma dataclass (gera métodos úteis automaticamente).
+L065: class EDAConfig:
+Explicação: Declaração de classe que agrupa dados e/ou comportamentos.
+L066:     """Configuração da EDA (parâmetros de execução e limites).
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L067: 
+Explicação: Linha em branco para organização visual.
+L068:     - data_path: caminho do arquivo Excel de entrada
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L069:     - output_dir: pasta onde os resultados serão salvos
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L070:     - corr_threshold: limite para considerar correlação alta
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L071:     - max_hist_cols: quantos histogramas (variáveis) salvar
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L072:     - max_outlier_cols: quantos boxplots (top outliers) salvar
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L073:     - max_scatter_pairs: quantos gráficos de dispersão salvar
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L074:     - max_heatmap_vars: máximo de variáveis no mapa de calor
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L075:     - clean_output_dir: limpar a pasta de saída antes de salvar
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L076:     - report_filename: nome do arquivo de relatório (Q&A)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L077:     """
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L078:     data_path: str
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L079:     output_dir: str
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L080:     corr_threshold: float = 0.8
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L081:     max_hist_cols: int = 2
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L082:     max_outlier_cols: int = 2
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L083:     max_scatter_pairs: int = 2
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L084:     max_heatmap_vars: int = 8
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L085:     clean_output_dir: bool = True
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L086:     report_filename: str = 'Relatorio_EDA.txt'
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L087: 
+Explicação: Linha em branco para organização visual.
+L088: 
+Explicação: Linha em branco para organização visual.
+L089: class FileWriter:
+Explicação: Declaração de classe que agrupa dados e/ou comportamentos.
+L090:     def __init__(self, output_dir: str) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L091:         self.output_dir = os.path.abspath(output_dir)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L092:         os.makedirs(self.output_dir, exist_ok=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L093: 
+Explicação: Linha em branco para organização visual.
+L094:     def clean_dir(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L095:         try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L096:             for name in os.listdir(self.output_dir):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L097:                 path = os.path.join(self.output_dir, name)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L098:                 if os.path.isfile(path) and (name.endswith(('.png', '.csv', '.txt', '.html'))):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L099:                     os.remove(path)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L100:         except FileNotFoundError:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L101:             os.makedirs(self.output_dir, exist_ok=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L102: 
+Explicação: Linha em branco para organização visual.
+L103:     def savefig(self, filename: str) -> str:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L104:         path = os.path.join(self.output_dir, filename)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L105:         # >>> NOVO: revalida a cada salvamento
+Explicação: Comentário descritivo; não executa.
+L106:         os.makedirs(os.path.dirname(path), exist_ok=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L107:         plt.tight_layout()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L108:         plt.savefig(path, dpi=150, bbox_inches="tight")
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L109:         plt.close()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L110:         return path
+Explicação: Retorna um valor do escopo da função/método.
+L111: 
+Explicação: Linha em branco para organização visual.
+L112:     def write_report(self, filename: str, lines: List[str]) -> str:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L113:         # Escreve uma lista de linhas em um arquivo .txt
+Explicação: Comentário descritivo; não executa.
+L114:         path = os.path.join(self.output_dir, filename)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L115:         with open(path, 'w', encoding='utf-8') as f:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L116:             f.write("\n".join(lines) + "\n")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L117:         return path
+Explicação: Retorna um valor do escopo da função/método.
+L118: 
+Explicação: Linha em branco para organização visual.
+L119: 
+Explicação: Linha em branco para organização visual.
+L120: class EDAReport:
+Explicação: Declaração de classe que agrupa dados e/ou comportamentos.
+L121:     """Orquestra a EDA respondendo a cada pergunta com Q&A e gráficos mínimos.
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L122: 
+Explicação: Linha em branco para organização visual.
+L123:     Esta classe concentra as etapas da EDA em métodos separados que
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L124:     respondem a perguntas específicas. Assim, o fluxo fica claro e
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L125:     fácil de adaptar.
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L126:     """
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L127:     def __init__(self, df: pd.DataFrame, config: EDAConfig) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L128:         # Cria uma cópia do DataFrame para evitar alterar o original
+Explicação: Comentário descritivo; não executa.
+L129:         self.df = df.copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L130:         # Guarda a configuração
+Explicação: Comentário descritivo; não executa.
+L131:         self.config = config
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L132:         # Cria um utilitário para salvar arquivos/figuras
+Explicação: Comentário descritivo; não executa.
+L133:         self.writer = FileWriter(config.output_dir)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L134:         # Limpa a pasta de saída se estiver habilitado
+Explicação: Comentário descritivo; não executa.
+L135:         if self.config.clean_output_dir:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L136:             self.writer.clean_dir()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L137:         # Identifica colunas numéricas e categóricas
+Explicação: Comentário descritivo; não executa.
+L138:         self.numeric_cols: List[str] = self.df.select_dtypes(include=[np.number]).columns.tolist()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L139:         self.categorical_cols: List[str] = self.df.select_dtypes(include=['object', 'category']).columns.tolist()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L140:         # Filtra colunas numéricas que parecem IDs (não servem para análise estatística)
+Explicação: Comentário descritivo; não executa.
+L141:         self.numeric_cols_model: List[str] = self._filter_id_like_numeric(self.numeric_cols)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L142:         # Acumula linhas do relatório de perguntas e respostas
+Explicação: Comentário descritivo; não executa.
+L143:         self.report_lines: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L144: 
+Explicação: Linha em branco para organização visual.
+L145:     def _filter_id_like_numeric(self, cols: List[str]) -> List[str]:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L146:         """Heurística: remove colunas numéricas provavelmente identificadores (ex.: ID, COD...).
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L147: 
+Explicação: Linha em branco para organização visual.
+L148:         Ideia: se o nome parece conter "ID", "COD", "MUN" etc. ou se a coluna
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L149:         inteira é quase só valores únicos inteiros, tratamos como identificador.
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L150:         """
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L151:         keep: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L152:         for col in cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L153:             s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L154:             name_u = str(col).upper()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L155:             # Sinalização por nome (ex.: ID, COD, MUN etc.)
+Explicação: Comentário descritivo; não executa.
+L156:             if any(tok in name_u for tok in ['ID', 'COD', 'CODE', 'MUN', 'CEP', 'CPF', 'CNPJ', 'NUM', 'NR']):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L157:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L158:             # Remove valores ausentes para analisar a distribuição
+Explicação: Comentário descritivo; não executa.
+L159:             s_nonnull = s.dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L160:             if s_nonnull.empty:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L161:                 keep.append(col)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L162:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L163:             # Taxa de valores únicos: muito alta pode ser "identificador"
+Explicação: Comentário descritivo; não executa.
+L164:             unique_ratio = s_nonnull.nunique() / len(s_nonnull)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L165:             if pd.api.types.is_integer_dtype(s.dtype) and unique_ratio > 0.9:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L166:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L167:             keep.append(col)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L168:         # Se tudo foi filtrado, devolve a lista original para não perder análise
+Explicação: Comentário descritivo; não executa.
+L169:         return keep if keep else cols
+Explicação: Retorna um valor do escopo da função/método.
+L170: 
+Explicação: Linha em branco para organização visual.
+L171:     def _print_qa(self, pergunta: str, respostas: List[str]) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L172:         """Imprime e acumula Q&A para o relatório final.
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L173: 
+Explicação: Linha em branco para organização visual.
+L174:         Também garante que o relatório tenha a mesma estrutura mostrada no console.
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L175:         """
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L176:         print(f"Pergunta: {pergunta}")
+Explicação: Envia mensagem ao console (saída padrão).
+L177:         for linha in respostas:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L178:             print(f"Resposta: {linha}")
+Explicação: Envia mensagem ao console (saída padrão).
+L179:         self.report_lines.append(f"Pergunta: {pergunta}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L180:         self.report_lines.extend([f"Resposta: {linha}" for linha in respostas])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L181:         self.report_lines.append("")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L182: 
+Explicação: Linha em branco para organização visual.
+L183:     # PERGUNTA 1: Quantidade de linhas/colunas e tipos de dados
+Explicação: Comentário descritivo; não executa.
+L184:     def summarize_shape_and_types(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L185:         # Obtém número de linhas e colunas
+Explicação: Comentário descritivo; não executa.
+L186:         n_rows, n_cols = self.df.shape
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L187:         # Conta quantas colunas de cada tipo existem (int, float, object...)
+Explicação: Comentário descritivo; não executa.
+L188:         dtypes_summary = self.df.dtypes.value_counts().to_string()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L189:         # Complementa com uso de info(memory_usage) da própria biblioteca
+Explicação: Comentário descritivo; não executa.
+L190:         info_buf = io.StringIO()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L191:         self.df.info(buf=info_buf, memory_usage='deep')  # uso automático da lib
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L192:         mem_line = [ln for ln in info_buf.getvalue().splitlines() if 'memory usage' in ln.lower()]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L193:         mem_text = mem_line[0] if mem_line else ""
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L194:         # Monta respostas claras
+Explicação: Comentário descritivo; não executa.
+L195:         answer = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L196:             f"linhas={n_rows}, colunas={n_cols}",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L197:             f"variáveis numéricas modeláveis={len(self.numeric_cols_model)}, categóricas={len(self.categorical_cols)}",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L198:             "Tipos de variáveis (contagem):",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L199:             dtypes_summary,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L200:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L201:         if mem_text:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L202:             answer.append(f"Uso de memória (aprox.): {mem_text}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L203:         # Registra pergunta e respostas
+Explicação: Comentário descritivo; não executa.
+L204:         self._print_qa("Quantas linhas e colunas existem? E quais os tipos?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L205: 
+Explicação: Linha em branco para organização visual.
+L206:     # PERGUNTA 2: Linhas duplicadas
+Explicação: Comentário descritivo; não executa.
+L207:     def analyze_duplicates(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L208:         # Conta quantas linhas são cópias de outras
+Explicação: Comentário descritivo; não executa.
+L209:         num_dup = int(self.df.duplicated().sum())
+Explicação: Calcula máscara/quantidade de linhas duplicadas.
+L210:         answer = [f"linhas duplicadas={num_dup}"]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L211:         if num_dup > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L212:             answer.append("Sugestão: avaliar remoção com df.drop_duplicates().")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L213:         self._print_qa("Há dados duplicados?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L214: 
+Explicação: Linha em branco para organização visual.
+L215:     # PERGUNTA 3: Valores faltantes (ausentes)
+Explicação: Comentário descritivo; não executa.
+L216:     def analyze_missingness(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L217:         # Calcula percentual de faltantes por coluna e ordena do maior para o menor
+Explicação: Comentário descritivo; não executa.
+L218:         missing_pct = (self.df.isna().mean() * 100.0).sort_values(ascending=False)
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L219:         # Seleciona as 10 colunas com maiores faltantes para exibição
+Explicação: Comentário descritivo; não executa.
+L220:         top_missing = missing_pct.head(10)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L221:         # Verifica se existe ao menos uma coluna com faltantes
+Explicação: Comentário descritivo; não executa.
+L222:         has_missing = float(missing_pct.max()) > 0.0
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L223:         # Prepara respostas em linguagem simples
+Explicação: Comentário descritivo; não executa.
+L224:         answer = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L225:             f"% faltantes (máximo)={missing_pct.max():.1f}%",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L226:             "Top colunas com faltantes:" if has_missing else "Sem valores faltantes detectados."
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L227:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L228:         if has_missing:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L229:             # Lista as colunas com maior percentual de faltantes
+Explicação: Comentário descritivo; não executa.
+L230:             answer.extend([f"- {c}: {v:.1f}%" for c, v in top_missing.items()])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L231:         # Registra pergunta e respostas
+Explicação: Comentário descritivo; não executa.
+L232:         self._print_qa("Qual a porcentagem de valores ausentes?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L233: 
+Explicação: Linha em branco para organização visual.
+L234:         # Visualizações usando missingno (automático) e um barplot simples
+Explicação: Comentário descritivo; não executa.
+L235:         if has_missing:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L236:             # missingno matrix: visão geral dos NA por linha/coluna
+Explicação: Comentário descritivo; não executa.
+L237:             if HAS_MISSINGNO:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L238:                 plt.figure(figsize=(10, 6))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L239:                 msno.matrix(self.df, fontsize=8)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L240:                 self.writer.savefig('faltantes_missingno_matrix.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L241: 
+Explicação: Linha em branco para organização visual.
+L242:                 plt.figure(figsize=(10, 6))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L243:                 msno.bar(self.df, fontsize=8)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L244:                 self.writer.savefig('faltantes_missingno_bar.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L245: 
+Explicação: Linha em branco para organização visual.
+L246:             # Barplot manual focando nas top colunas com NA
+Explicação: Comentário descritivo; não executa.
+L247:             top_plot = missing_pct.head(20)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L248:             plt.figure(figsize=(10, 6))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L249:             sns.barplot(x=top_plot.values, y=top_plot.index, orient='h')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L250:             plt.xlabel('% faltantes')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L251:             plt.title('Top colunas por faltantes')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L252:             self.writer.savefig('faltantes_top_colunas.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L253: 
+Explicação: Linha em branco para organização visual.
+L254:     # PERGUNTA 4: Distribuições das variáveis numéricas
+Explicação: Comentário descritivo; não executa.
+L255:     def analyze_distributions(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L256:         # Se não há numéricas úteis, informa e retorna
+Explicação: Comentário descritivo; não executa.
+L257:         if not self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L258:             self._print_qa("Qual o tipo de distribuição das variáveis?", ["Sem variáveis numéricas modeláveis."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L259:             return
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L260: 
+Explicação: Linha em branco para organização visual.
+L261:         # Cria um resumo estatístico e calcula assimetria e curtose
+Explicação: Comentário descritivo; não executa.
+L262:         desc = self.df[self.numeric_cols_model].describe().T
+Explicação: Resumo estatístico das variáveis (contagem, média, quartis, etc.).
+L263:         desc['skew'] = self.df[self.numeric_cols_model].skew(numeric_only=True)
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L264:         desc['kurtosis'] = self.df[self.numeric_cols_model].kurtosis(numeric_only=True)
+Explicação: Calcula a curtose (achatamento) de distribuições numéricas.
+L265:         # Ordena colunas por maior assimetria para identificar distribuições "tortas"
+Explicação: Comentário descritivo; não executa.
+L266:         high_skew = desc['skew'].abs().sort_values(ascending=False)
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L267:         # Escolhe poucas variáveis para salvar gráficos (para manter a pasta limpa)
+Explicação: Comentário descritivo; não executa.
+L268:         top_skew_cols = [c for c in high_skew.index if self.df[c].dropna().nunique() > 1][: self.config.max_hist_cols]
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L269: 
+Explicação: Linha em branco para organização visual.
+L270:         # Escreve de forma simples as variáveis mais assimétricas
+Explicação: Comentário descritivo; não executa.
+L271:         answer = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L272:             f"variáveis numéricas modeláveis={len(self.numeric_cols_model)}",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L273:             "Top variáveis por |assimetria (skew)|:" if len(top_skew_cols) else "Distribuições parecem pouco assimétricas.",
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L274:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L275:         answer.extend([f"- {c}: skew={desc.loc[c, 'skew']:.2f}, curtose={desc.loc[c, 'kurtosis']:.2f}" for c in top_skew_cols])
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L276:         self._print_qa("Qual o tipo de distribuição das variáveis?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L277: 
+Explicação: Linha em branco para organização visual.
+L278:         # Para cada variável escolhida, salva 1 ou 2 gráficos (normal e log1p se fizer sentido)
+Explicação: Comentário descritivo; não executa.
+L279:         for col in top_skew_cols:
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L280:             data = self.df[col].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L281:             # Exige quantidade mínima de dados e mais de 1 valor distinto
+Explicação: Comentário descritivo; não executa.
+L282:             if data.size < 20 or data.nunique() < 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L283:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L284:             # Histograma padrão com curva de densidade
+Explicação: Comentário descritivo; não executa.
+L285:             plt.figure(figsize=(8, 5))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L286:             sns.histplot(data=data, kde=True, bins=30)
+Explicação: Plota histograma com densidade (KDE) para visualizar distribuição.
+L287:             plt.title(f'Distribuição: {col} (skew={float(data.skew()):.2f})')
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L288:             self.writer.savefig(f'distribuicao_{col}.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L289: 
+Explicação: Linha em branco para organização visual.
+L290:             # Se todos os valores são positivos e a assimetria é alta, tenta log1p
+Explicação: Comentário descritivo; não executa.
+L291:             if (data > 0).all() and abs(float(data.skew())) > 1.0:
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L292:                 plt.figure(figsize=(8, 5))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L293:                 sns.histplot(data=np.log1p(data), kde=True, bins=30)
+Explicação: Plota histograma com densidade (KDE) para visualizar distribuição.
+L294:                 plt.title(f'Distribuição log1p: {col}')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L295:                 self.writer.savefig(f'distribuicao_log1p_{col}.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L296: 
+Explicação: Linha em branco para organização visual.
+L297:         # Para dados categóricos, mostra um gráfico simples das categorias mais comuns
+Explicação: Comentário descritivo; não executa.
+L298:         if self.categorical_cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L299:             # Escolhe a coluna categórica com mais valores preenchidos
+Explicação: Comentário descritivo; não executa.
+L300:             cat = max(self.categorical_cols, key=lambda c: self.df[c].notna().sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L301:             vc = self.df[cat].astype(str).value_counts(dropna=False).head(10)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L302:             self._print_qa("Resumo de variáveis categóricas?", [f"Exibindo top categorias para '{cat}'."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L303:             if vc.size > 1:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L304:                 plt.figure(figsize=(10, 6))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L305:                 sns.barplot(x=vc.values, y=vc.index, orient='h')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L306:                 plt.title(f'Top categorias: {cat}')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L307:                 self.writer.savefig(f'top_categorias_{cat}.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L308: 
+Explicação: Linha em branco para organização visual.
+L309:     # PERGUNTA 5: Outliers (valores muito fora do padrão)
+Explicação: Comentário descritivo; não executa.
+L310:     def analyze_outliers(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L311:         # Se não há numéricas úteis, informa e retorna
+Explicação: Comentário descritivo; não executa.
+L312:         if not self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L313:             self._print_qa("Há outliers presentes?", ["Sem variáveis numéricas modeláveis."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L314:             return
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L315:         # Método manual (IQR) já implementado
+Explicação: Comentário descritivo; não executa.
+L316:         outlier_counts: List[Tuple[str, int]] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L317:         for col in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L318:             series = self.df[col].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L319:             # Se a variável não tem variedade de valores, não há outliers definíveis
+Explicação: Comentário descritivo; não executa.
+L320:             if series.nunique() < 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L321:                 outlier_counts.append((col, 0))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L322:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L323:             # Quartil 1 e Quartil 3 + Intervalo Interquartil (IQR)
+Explicação: Comentário descritivo; não executa.
+L324:             q1 = series.quantile(0.25)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L325:             q3 = series.quantile(0.75)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L326:             iqr = q3 - q1
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L327:             # Limites "esperados" (IQR*1.5)
+Explicação: Comentário descritivo; não executa.
+L328:             lower = q1 - 1.5 * iqr
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L329:             upper = q3 + 1.5 * iqr
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L330:             # Conta quantos pontos estão abaixo do limite inferior ou acima do superior
+Explicação: Comentário descritivo; não executa.
+L331:             num_outliers = int(((series < lower) | (series > upper)).sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L332:             outlier_counts.append((col, num_outliers))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L333:         outlier_counts.sort(key=lambda x: x[1], reverse=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L334: 
+Explicação: Linha em branco para organização visual.
+L335:         # Adiciona alternativa automática baseada em z-score (se scipy disponível)
+Explicação: Comentário descritivo; não executa.
+L336:         zscore_summary: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L337:         if HAS_SCIPY and self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L338:             # Calcula z-score coluna a coluna e conta valores com |z|>3
+Explicação: Comentário descritivo; não executa.
+L339:             z_out = {}
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L340:             for col in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L341:                 s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L342:                 if s.dropna().nunique() < 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L343:                     z_out[col] = 0
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L344:                     continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L345:                 z = zscore(s.dropna())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L346:                 # Alinhar de volta aos índices originais com NaN para ausentes
+Explicação: Comentário descritivo; não executa.
+L347:                 z_full = pd.Series(index=s.index, dtype=float)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L348:                 z_full.loc[s.dropna().index] = z
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L349:                 z_out[col] = int((z_full.abs() > 3).sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L350:             # Pega top variáveis por z-outliers
+Explicação: Comentário descritivo; não executa.
+L351:             z_top = sorted(z_out.items(), key=lambda kv: kv[1], reverse=True)[:5]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L352:             for col, cnt in z_top:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L353:                 if cnt > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L354:                     zscore_summary.append(f"- {col}: {cnt} (|z|>3)")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L355: 
+Explicação: Linha em branco para organização visual.
+L356:         # Monta respostas em linguagem simples
+Explicação: Comentário descritivo; não executa.
+L357:         top_outliers = [f"- {c}: {n}" for c, n in outlier_counts[:5] if n > 0]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L358:         answer = ["Sem outliers relevantes detectados." if not top_outliers else "Top variáveis com mais outliers (IQR):"]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L359:         answer.extend(top_outliers)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L360:         if zscore_summary:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L361:             answer.append("Alternativa automática (z-score |z|>3):")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L362:             answer.extend(zscore_summary)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L363:         self._print_qa("Há outliers presentes?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L364: 
+Explicação: Linha em branco para organização visual.
+L365:         # Salva um número pequeno de boxplots das variáveis com mais outliers
+Explicação: Comentário descritivo; não executa.
+L366:         for col, n in outlier_counts[: self.config.max_outlier_cols]:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L367:             if n <= 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L368:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L369:             series = self.df[col].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L370:             if series.nunique() < 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L371:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L372:             plt.figure(figsize=(8, 3))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L373:             sns.boxplot(x=series, orient='h')
+Explicação: Plota boxplot para inspecionar dispersão e outliers.
+L374:             plt.title(f'Boxplot: {col} (outliers={n})')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L375:             self.writer.savefig(f'boxplot_{col}.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L376: 
+Explicação: Linha em branco para organização visual.
+L377:     # ETAPA OPCIONAL: Imputação em cópia (mediana/moda) e comparação de impacto
+Explicação: Comentário descritivo; não executa.
+L378:     def impute_copy_and_compare(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L379:         # Cria uma cópia para imputar sem alterar o DataFrame original
+Explicação: Comentário descritivo; não executa.
+L380:         df_imp = self.df.copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L381:         # Imputa numéricas com mediana
+Explicação: Comentário descritivo; não executa.
+L382:         num_imputed, cat_imputed = 0, 0
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L383:         for col in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L384:             median_val = df_imp[col].median()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L385:             before_na = int(df_imp[col].isna().sum())
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L386:             if before_na > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L387:                 df_imp[col] = df_imp[col].fillna(median_val)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L388:                 num_imputed += before_na
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L389:         # Imputa categóricas com moda (mais frequente) ou marcador "MISSING"
+Explicação: Comentário descritivo; não executa.
+L390:         for col in self.categorical_cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L391:             mode_vals = df_imp[col].mode(dropna=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L392:             fill_val = (mode_vals.iloc[0] if len(mode_vals) > 0 else 'MISSING')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L393:             before_na = int(df_imp[col].isna().sum())
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L394:             if before_na > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L395:                 df_imp[col] = df_imp[col].fillna(fill_val)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L396:                 cat_imputed += before_na
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L397:         # Compara faltantes totais antes/depois
+Explicação: Comentário descritivo; não executa.
+L398:         before_total_na = int(self.df.isna().sum().sum())
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L399:         after_total_na = int(df_imp.isna().sum().sum())
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L400:         # Compara impacto em médias de numéricas (variação percentual)
+Explicação: Comentário descritivo; não executa.
+L401:         impact_lines: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L402:         for col in self.numeric_cols_model[:10]:  # limita a 10 para relatório enxuto
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L403:             orig_mean = self.df[col].mean()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L404:             imp_mean = df_imp[col].mean()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L405:             if pd.isna(orig_mean) or pd.isna(imp_mean):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L406:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L407:             if orig_mean == 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L408:                 delta = abs(imp_mean - orig_mean)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L409:                 if delta > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L410:                     impact_lines.append(f"- {col}: mudança absoluta média={delta:.4f}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L411:             else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L412:                 rel = abs(imp_mean - orig_mean) / abs(orig_mean)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L413:                 if rel >= 0.01:  # >= 1%
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L414:                     impact_lines.append(f"- {col}: mudança média≈{rel*100:.1f}%")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L415:         # Q&A da imputação
+Explicação: Comentário descritivo; não executa.
+L416:         ans = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L417:             f"Imputação em cópia aplicada (numéricas→mediana, categóricas→moda).",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L418:             f"Faltantes antes={before_total_na}, depois={after_total_na} (no DataFrame imputado).",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L419:             f"Células imputadas: numéricas={num_imputed}, categóricas={cat_imputed}.",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L420:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L421:         if impact_lines:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L422:             ans.append("Impacto relevante nas médias (amostra):")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L423:             ans.extend(impact_lines)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L424:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L425:             ans.append("Impacto nas médias: baixo/negligenciável na amostra avaliada.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L426:         self._print_qa("Imputação (cópia): o que foi feito e qual o impacto?", ans)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L427: 
+Explicação: Linha em branco para organização visual.
+L428:     # ETAPA OPCIONAL: Modelos para valores mais prováveis (Bayes + Florestas)
+Explicação: Comentário descritivo; não executa.
+L429:     def model_based_most_probable_values(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L430:         if not HAS_SKLEARN:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L431:             self._print_qa("Valores mais prováveis por modelos?", ["Biblioteca de modelagem indisponível (sklearn)."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L432:             return
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L433:         # Seleciona colunas com mais faltantes (numéricas e categóricas)
+Explicação: Comentário descritivo; não executa.
+L434:         missing_ratio = self.df.isna().mean().sort_values(ascending=False)
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L435:         numeric_targets = [c for c in missing_ratio.index if c in self.numeric_cols_model][:3]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L436:         categorical_targets = [c for c in missing_ratio.index if c in self.categorical_cols][:2]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L437:         lines: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L438:         suggestions_rows: List[Dict[str, object]] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L439: 
+Explicação: Linha em branco para organização visual.
+L440:         # Base numérica de features
+Explicação: Comentário descritivo; não executa.
+L441:         X_num_full = self.df[self.numeric_cols_model].copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L442:         for c in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L443:             X_num_full[c] = X_num_full[c].fillna(X_num_full[c].median())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L444: 
+Explicação: Linha em branco para organização visual.
+L445:         # Predição para numéricas com IterativeImputer (BayesianRidge) e KNNImputer baseline; RFRegressor com validação
+Explicação: Comentário descritivo; não executa.
+L446:         if numeric_targets:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L447:             # Iterative/BayesianRidge para imputação por cópia (sugestão)
+Explicação: Comentário descritivo; não executa.
+L448:             try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L449:                 imp = IterativeImputer(estimator=BayesianRidge(), random_state=42, max_iter=20, sample_posterior=False)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L450:                 X_imp = pd.DataFrame(imp.fit_transform(self.df[self.numeric_cols_model]), columns=self.numeric_cols_model, index=self.df.index)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L451:             except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L452:                 X_imp = None
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L453:             # KNNImputer baseline
+Explicação: Comentário descritivo; não executa.
+L454:             try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L455:                 knn = KNNImputer(n_neighbors=5, weights='distance')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L456:                 X_knn = pd.DataFrame(knn.fit_transform(self.df[self.numeric_cols_model]), columns=self.numeric_cols_model, index=self.df.index)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L457:             except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L458:                 X_knn = None
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L459: 
+Explicação: Linha em branco para organização visual.
+L460:             for col in numeric_targets:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L461:                 mask_missing = self.df[col].isna()
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L462:                 nmiss = int(mask_missing.sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L463:                 if nmiss == 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L464:                     continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L465:                 # Sugestões Bayes/KNN 
+Explicação: Comentário descritivo; não executa.
+L466:                 if X_imp is not None:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L467:                     preds_bayes = X_imp.loc[mask_missing, col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L468:                     lines.append(f"- {col} (Bayes): sugeridos {nmiss} valores; média prev≈{preds_bayes.mean():.2f}, mediana≈{preds_bayes.median():.2f}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L469:                     for idx, val in preds_bayes.head(10).items():
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L470:                         suggestions_rows.append({"coluna": col, "linha": int(idx), "metodo": "Bayes", "sugerido": float(val)})
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L471:                 if X_knn is not None:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L472:                     preds_knn = X_knn.loc[mask_missing, col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L473:                     lines.append(f"- {col} (KNN): média prev≈{preds_knn.mean():.2f}, mediana≈{preds_knn.median():.2f}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L474:                     for idx, val in preds_knn.head(10).items():
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L475:                         suggestions_rows.append({"coluna": col, "linha": int(idx), "metodo": "KNN", "sugerido": float(val)})
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L476:                 # RandomForestRegressor com validação (R2/MAE em dados não faltantes)
+Explicação: Comentário descritivo; não executa.
+L477:                 try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L478:                     df_nonnull = self.df[self.numeric_cols_model + [col]].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L479:                     if df_nonnull.shape[0] >= 200:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L480:                         X = df_nonnull[self.numeric_cols_model].copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L481:                         for c in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L482:                             X[c] = X[c].fillna(X[c].median())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L483:                         y = df_nonnull[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L484:                         Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L485:                         rfr = RandomForestRegressor(n_estimators=300, random_state=42, n_jobs=-1)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L486:                         rfr.fit(Xtr, ytr)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L487:                         yhat = rfr.predict(Xte)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L488:                         r2 = r2_score(yte, yhat)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L489:                         mae = mean_absolute_error(yte, yhat)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L490:                         lines.append(f"- {col} (RF-Reg): R2≈{r2:.2f}, MAE≈{mae:.2f}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L491:                         if nmiss > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L492:                             Xmiss = X_num_full.loc[mask_missing, :]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L493:                             preds_rf = rfr.predict(Xmiss)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L494:                             for idx, val in zip(Xmiss.index[:10], preds_rf[:10]):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L495:                                 suggestions_rows.append({"coluna": col, "linha": int(idx), "metodo": "RF-Reg", "sugerido": float(val)})
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L496:                     else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L497:                         lines.append(f"- {col} (RF-Reg): dados insuficientes para validação (n<200).")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L498:                 except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L499:                     lines.append(f"- {col} (RF-Reg): não foi possível treinar/validar.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L500: 
+Explicação: Linha em branco para organização visual.
+L501:         # Predição para categóricas com RandomForestClassifier
+Explicação: Comentário descritivo; não executa.
+L502:         if categorical_targets and len(self.numeric_cols_model) >= 1:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L503:             for col in categorical_targets:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L504:                 try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L505:                     df_nonnull = self.df[self.numeric_cols_model + [col]].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L506:                     if df_nonnull.shape[0] < 100:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L507:                         lines.append(f"- {col} (RF-Cla): dados insuficientes para treinar (n<{100}).")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L508:                         continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L509:                     X = df_nonnull[self.numeric_cols_model].copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L510:                     for c in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L511:                         X[c] = X[c].fillna(X[c].median())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L512:                     y = df_nonnull[col].astype(str)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L513:                     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y if y.nunique()>1 else None)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L514:                     rf = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L515:                     rf.fit(Xtr, ytr)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L516:                     acc = accuracy_score(yte, rf.predict(Xte)) if yte.size>0 else np.nan
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L517:                     mask_missing = self.df[col].isna()
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L518:                     nmiss = int(mask_missing.sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L519:                     if nmiss > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L520:                         Xmiss = X_num_full.loc[mask_missing, :]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L521:                         preds = pd.Series(rf.predict(Xmiss))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L522:                         top_pred = preds.value_counts().head(1)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L523:                         if not top_pred.empty:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L524:                             cls, cnt = top_pred.index[0], int(top_pred.iloc[0])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L525:                             lines.append(f"- {col} (RF-Cla): acc≈{acc:.2f}; mais provável='{cls}' (~{cnt}/{nmiss}).")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L526:                             for idx, val in preds.head(10).items():
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L527:                                 suggestions_rows.append({"coluna": col, "linha": int(idx), "metodo": "RF-Cla", "sugerido": str(val)})
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L528:                         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L529:                             lines.append(f"- {col} (RF-Cla): acc≈{acc:.2f}; sem predições significativas.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L530:                     else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L531:                         lines.append(f"- {col} (RF-Cla): sem faltantes para prever.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L532:                 except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L533:                     lines.append(f"- {col} (RF-Cla): não foi possível treinar/prever.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L534: 
+Explicação: Linha em branco para organização visual.
+L535:         # Persistência de sugestões (CSV pequeno)
+Explicação: Comentário descritivo; não executa.
+L536:         if suggestions_rows:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L537:             sugg_df = pd.DataFrame(suggestions_rows)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L538:             out_path = os.path.join(self.config.output_dir, 'sugestoes_valores_provaveis.csv')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L539:             try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L540:                 sugg_df.to_csv(out_path, index=False)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L541:                 lines.append(f"Sugestões salvas em: {out_path}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L542:             except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L543:                 lines.append("Não foi possível salvar o CSV de sugestões.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L544: 
+Explicação: Linha em branco para organização visual.
+L545:         if not lines:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L546:             lines = ["Sem colunas com faltantes suficientes para modelagem ou pré-requisitos ausentes."]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L547:         self._print_qa("Valores mais prováveis (modelos Bayes/Florestas/KNN/RF-Reg):", lines)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L548: 
+Explicação: Linha em branco para organização visual.
+L549:     # ETAPA OPCIONAL: Relato de suavização (winsorização) e anomalias (IsolationForest)
+Explicação: Comentário descritivo; não executa.
+L550:     def outlier_smoothing_and_iforest_report(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L551:         # Winsorização (clipping em quantis) apenas para medir impacto (não persiste)
+Explicação: Comentário descritivo; não executa.
+L552:         wins_impacts: List[str] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L553:         for col in self.numeric_cols_model[:10]:  # limita para não poluir
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L554:             s = self.df[col].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L555:             if s.size < 20:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L556:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L557:             q01, q99 = s.quantile(0.01), s.quantile(0.99)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L558:             s_w = s.clip(lower=q01, upper=q99)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L559:             std_orig = s.std()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L560:             std_w = s_w.std()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L561:             if std_orig and std_w:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L562:                 red = (std_orig - std_w) / std_orig
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L563:                 if red >= 0.05:  # redução >=5%
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L564:                     wins_impacts.append(f"- {col}: redução do desvio-padrão≈{red*100:.1f}% (winsor 1%-99%)")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L565:         # IsolationForest: conta anomalias, sem alterar dados
+Explicação: Comentário descritivo; não executa.
+L566:         iforest_line = ""
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L567:         if HAS_SKLEARN and len(self.numeric_cols_model) >= 2 and self.df.shape[0] >= 200:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L568:             X = self.df[self.numeric_cols_model].copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L569:             # Imputa temporariamente NA só para o modelo (mediana)
+Explicação: Comentário descritivo; não executa.
+L570:             for c in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L571:                 X[c] = X[c].fillna(X[c].median())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L572:             try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L573:                 clf = IsolationForest(random_state=42, contamination='auto')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L574:                 y_pred = clf.fit_predict(X.values)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L575:                 anomalies = int((y_pred == -1).sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L576:                 iforest_line = f"Anomalias detectadas (IsolationForest): {anomalies}."
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L577:             except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L578:                 iforest_line = "IsolationForest indisponível/não convergiu para estes dados."
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L579:         # Q&A
+Explicação: Comentário descritivo; não executa.
+L580:         ans = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L581:         if wins_impacts:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L582:             ans.append("Winsorização (relato de impacto, 1%-99%):")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L583:             ans.extend(wins_impacts)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L584:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L585:             ans.append("Winsorização: sem impacto relevante nas amostras avaliadas.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L586:         if iforest_line:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L587:             ans.append(iforest_line)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L588:         self._print_qa("Suavização/Anomalias: quais resultados?", ans)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L589: 
+Explicação: Linha em branco para organização visual.
+L590:     # PERGUNTA 6: Correlações entre variáveis numéricas
+Explicação: Comentário descritivo; não executa.
+L591:     def analyze_correlations(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L592:         # Se não há numéricas suficientes, informa e retorna
+Explicação: Comentário descritivo; não executa.
+L593:         if len(self.numeric_cols_model) < 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L594:             self._print_qa("Qual a correlação existente entre as variáveis?", ["Menos de duas variáveis numéricas modeláveis."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L595:             return
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L596:         # Considera apenas as colunas numéricas úteis
+Explicação: Comentário descritivo; não executa.
+L597:         df_num = self.df[self.numeric_cols_model].copy()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L598:         # Calcula correlação de Pearson (relacionamento linear)
+Explicação: Comentário descritivo; não executa.
+L599:         pearson = df_num.corr(method='pearson')
+Explicação: Calcula a matriz de correlação entre variáveis numéricas.
+L600:         # Alternativa automática: matriz empilhada (longa) para inspeção programática
+Explicação: Comentário descritivo; não executa.
+L601:         corr_long = pearson.where(~np.triu(np.ones(pearson.shape), k=0).astype(bool))\
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L602:                            .stack()\
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L603:                            .abs()\
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L604:                            .sort_values(ascending=False)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L605:         # Seleciona variáveis com maior variância para um mapa de calor mais legível
+Explicação: Comentário descritivo; não executa.
+L606:         var_rank = df_num.var().sort_values(ascending=False)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L607:         heat_cols = var_rank.head(self.config.max_heatmap_vars).index.tolist()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L608:         heat = df_num[heat_cols].corr(method='pearson')
+Explicação: Calcula a matriz de correlação entre variáveis numéricas.
+L609: 
+Explicação: Linha em branco para organização visual.
+L610:         # Procura os pares com maior correlação absoluta (com limiar)
+Explicação: Comentário descritivo; não executa.
+L611:         pairs: List[Tuple[str, str, float]] = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L612:         cols = pearson.columns
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L613:         for i in range(len(cols)):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L614:             for j in range(i + 1, len(cols)):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L615:                 val = float(abs(pearson.iloc[i, j]))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L616:                 if val >= self.config.corr_threshold:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L617:                     pairs.append((cols[i], cols[j], val))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L618:         # Ordena do mais correlacionado para o menos e limita
+Explicação: Comentário descritivo; não executa.
+L619:         pairs.sort(key=lambda t: t[2], reverse=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L620:         high_pairs = pairs[:5]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L621:         # Escreve respostas simples e diretas
+Explicação: Comentário descritivo; não executa.
+L622:         answer = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L623:             f"variáveis avaliadas (numéricas modeláveis)={len(self.numeric_cols_model)}",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L624:             "Pares com alta correlação (|r|>=%.2f):" % self.config.corr_threshold if high_pairs else "Sem pares com alta correlação acima do limiar.",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L625:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L626:         answer.extend([f"- {a} ~ {b}: r={v:.2f}" for a, b, v in high_pairs])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L627:         self._print_qa("Qual a correlação existente entre as variáveis?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L628: 
+Explicação: Linha em branco para organização visual.
+L629:         # Salva um mapa de calor e poucos gráficos de dispersão para ilustrar
+Explicação: Comentário descritivo; não executa.
+L630:         if len(heat_cols) >= 2:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L631:             plt.figure(figsize=(min(12, 1.1 * len(heat_cols)), min(10, 1.0 * len(heat_cols))))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L632:             sns.heatmap(heat, cmap='vlag', center=0, square=True)
+Explicação: Plota um mapa de calor, útil para visualizar correlações.
+L633:             plt.title('Mapa de Calor de Correlação (maior variância)')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L634:             self.writer.savefig('mapa_calor_correlacao.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L635:         for a, b, v in high_pairs[: self.config.max_scatter_pairs]:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L636:             sub = df_num[[a, b]].dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L637:             # Evita gráfico com muito poucos pontos
+Explicação: Comentário descritivo; não executa.
+L638:             if sub.shape[0] < 30:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L639:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L640:             plt.figure(figsize=(6, 5))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L641:             sns.regplot(x=sub[a], y=sub[b], scatter_kws={'s': 12, 'alpha': 0.6}, line_kws={'color': 'red'})
+Explicação: Plota diagrama de dispersão com linha de regressão (tendência).
+L642:             plt.title(f'{a} vs {b} (r={v:.2f})')
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L643:             self.writer.savefig(f'dispersao_{a}_vs_{b}.png')
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L644: 
+Explicação: Linha em branco para organização visual.
+L645:     # PERGUNTA 7: Resumo numérico global (métricas chave)
+Explicação: Comentário descritivo; não executa.
+L646:     def summarize_numeric_brief(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L647:         # Se não há numéricas úteis, informa e retorna
+Explicação: Comentário descritivo; não executa.
+L648:         if not self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L649:             self._print_qa("Qual o resumo estatístico das variáveis numéricas?", ["Sem variáveis numéricas modeláveis."])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L650:             return
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L651:         # Calcula medidas básicas: média, desvio, quartis
+Explicação: Comentário descritivo; não executa.
+L652:         desc = self.df[self.numeric_cols_model].describe().T
+Explicação: Resumo estatístico das variáveis (contagem, média, quartis, etc.).
+L653:         metrics = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L654:         # Limita a listagem a 10 variáveis para o relatório ficar curto
+Explicação: Comentário descritivo; não executa.
+L655:         for col in desc.index[:10]:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L656:             mean = desc.loc[col, 'mean']
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L657:             std = desc.loc[col, 'std']
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L658:             q1 = desc.loc[col, '25%']
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L659:             q3 = desc.loc[col, '75%']
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L660:             metrics.append(f"- {col}: média={mean:.2f}, desvio={std:.2f}, Q1={q1:.2f}, Q3={q3:.2f}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L661:         answer = ["Principais métricas (amostra de até 10 variáveis):"] + metrics
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L662:         self._print_qa("Qual o resumo estatístico das variáveis numéricas?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L663: 
+Explicação: Linha em branco para organização visual.
+L664:     # BLOCO: Diagnóstico de qualidade de dados (inconsistências)
+Explicação: Comentário descritivo; não executa.
+L665:     def data_quality_diagnostics(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L666:         const_cols = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L667:         high_card = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L668:         negative_cols = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L669:         date_issues = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L670:         # Colunas constantes e alta cardinalidade categórica
+Explicação: Comentário descritivo; não executa.
+L671:         for col in self.df.columns:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L672:             s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L673:             nunq = s.nunique(dropna=False)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L674:             if nunq <= 1:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L675:                 const_cols.append(col)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L676:         for col in self.categorical_cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L677:             s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L678:             nonnull = s.dropna()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L679:             if len(nonnull) == 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L680:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L681:             ratio = nonnull.nunique() / len(nonnull)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L682:             if ratio > 0.5 and nonnull.nunique() >= 50:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L683:                 high_card.append(col)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L684:         # Negativos em numéricas (apenas sinaliza; não sabemos a semântica)
+Explicação: Comentário descritivo; não executa.
+L685:         for col in self.numeric_cols_model:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L686:             s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L687:             neg_count = int((s < 0).sum())
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L688:             if neg_count > 0:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L689:                 negative_cols.append(f"- {col}: {neg_count} valores negativos")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L690:         # Datas inválidas: tenta analisar objetos como datas
+Explicação: Comentário descritivo; não executa.
+L691:         for col in self.df.select_dtypes(include=['object']).columns:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L692:             s = self.df[col]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L693:             try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L694:                 parsed = pd.to_datetime(s, errors='coerce', infer_datetime_format=True)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L695:                 nonnull = s.notna().sum()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L696:                 invalid = parsed.isna().sum()
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L697:                 if nonnull > 0 and invalid / max(nonnull, 1) > 0.3:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L698:                     date_issues.append(f"- {col}: alta taxa de datas inválidas/parse falho")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L699:             except Exception:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L700:                 continue
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L701:         # Monta Q&A
+Explicação: Comentário descritivo; não executa.
+L702:         ans = []
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L703:         if const_cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L704:             ans.append("Colunas constantes:")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L705:             ans.append(", ".join(const_cols[:15]) + (" ..." if len(const_cols) > 15 else ""))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L706:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L707:             ans.append("Colunas constantes: nenhuma encontrada.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L708:         if high_card:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L709:             ans.append("Colunas categóricas com alta cardinalidade:")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L710:             ans.append(", ".join(high_card[:15]) + (" ..." if len(high_card) > 15 else ""))
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L711:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L712:             ans.append("Alta cardinalidade categórica: não relevante nas top colunas.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L713:         if negative_cols:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L714:             ans.append("Valores negativos em colunas numéricas:")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L715:             ans.extend(negative_cols[:10])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L716:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L717:             ans.append("Negativos: não encontrados nas colunas analisadas.")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L718:         if date_issues:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L719:             ans.append("Possíveis problemas de datas:")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L720:             ans.extend(date_issues[:10])
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L721:         else:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L722:             ans.append("Datas inválidas: não foram detectados problemas relevantes (parse).")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L723:         self._print_qa("Diagnóstico de qualidade de dados: inconsistências detectadas?", ans)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L724: 
+Explicação: Linha em branco para organização visual.
+L725:     # PERGUNTA 8: Esta EDA está completa?
+Explicação: Comentário descritivo; não executa.
+L726:     def summarize_eda_completeness(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L727:         # Resumo final com checagem de itens cobertos e próximos passos sugeridos
+Explicação: Comentário descritivo; não executa.
+L728:         covered = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L729:             "Forma e tipos (shape/dtypes)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L730:             "Duplicados",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L731:             "Faltantes (com missingno)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L732:             "Distribuições (skew/curtose + gráficos focados)",
+Explicação: Calcula a assimetria (skewness) de distribuições numéricas.
+L733:             "Outliers (IQR e alternativa z-score)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L734:             "Correlação (mapa de calor e dispersões)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L735:             "Resumo estatístico (métricas-chave)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L736:             "Imputação em cópia (mediana/moda) e impacto",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L737:             "Modelos (Bayes/Florestas) para valores prováveis",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L738:             "Winsorização & IsolationForest (relato)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L739:             "Diagnóstico de qualidade de dados",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L740:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L741:         next_steps = [
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L742:             "Normalização fina de tipos (datas, booleanos, categorias)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L743:             "Associações categóricas (Cramér's V) e numérico-categóricas",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L744:             "Testes de normalidade/robustez (quando aplicável)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L745:             "Análise de importância/seleção de variáveis (dependendo do objetivo)",
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L746:         ]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L747:         answer = ["Coberto: " + "; ".join(covered), "Próximos passos sugeridos: " + "; ".join(next_steps)]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L748:         self._print_qa("A EDA está completa? O que falta?", answer)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L749: 
+Explicação: Linha em branco para organização visual.
+L750:     def save_report(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L751:         # Escreve o relatório final de Q&A na pasta de saída
+Explicação: Comentário descritivo; não executa.
+L752:         self.writer.write_report(self.config.report_filename, self.report_lines)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L753: 
+Explicação: Linha em branco para organização visual.
+L754:     # (Opcional) Gera um arquivo separado com explicações linha a linha do código
+Explicação: Comentário descritivo; não executa.
+L755:     def _explain_line_portuguese(self, line: str) -> str:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L756:         s = line.strip()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L757:         if s == '':
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L758:             return 'Linha em branco para organização visual.'
+Explicação: Retorna um valor do escopo da função/método.
+L759:         if s.startswith('#'):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L760:             return 'Comentário descritivo; não executa.'
+Explicação: Retorna um valor do escopo da função/método.
+L761:         if s.startswith('import '):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L762:             return 'Importa um módulo para uso no script.'
+Explicação: Retorna um valor do escopo da função/método.
+L763:         if s.startswith('from ') and ' import ' in s:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L764:             return 'Importa símbolos específicos de um módulo.'
+Explicação: Retorna um valor do escopo da função/método.
+L765:         if s.startswith('@dataclass'):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L766:             return 'Decorator que transforma a classe em uma dataclass (gera métodos úteis automaticamente).'
+Explicação: Retorna um valor do escopo da função/método.
+L767:         if s.startswith('class '):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L768:             return 'Declaração de classe que agrupa dados e/ou comportamentos.'
+Explicação: Retorna um valor do escopo da função/método.
+L769:         if s.startswith('def '):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L770:             return 'Declaração de função/método com uma responsabilidade específica.'
+Explicação: Retorna um valor do escopo da função/método.
+L771:         if s.startswith('return '):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L772:             return 'Retorna um valor do escopo da função/método.'
+Explicação: Retorna um valor do escopo da função/método.
+L773:         if s.startswith('if __name__'):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L774:             return 'Ponto de entrada do script quando executado diretamente.'
+Explicação: Retorna um valor do escopo da função/método.
+L775:         if 'read_excel' in s:
+Explicação: Carrega dados de uma planilha Excel em um DataFrame pandas.
+L776:             return 'Carrega dados de uma planilha Excel em um DataFrame pandas.'
+Explicação: Retorna um valor do escopo da função/método.
+L777:         if 'duplicated()' in s:
+Explicação: Calcula máscara/quantidade de linhas duplicadas.
+L778:             return 'Calcula máscara/quantidade de linhas duplicadas.'
+Explicação: Retorna um valor do escopo da função/método.
+L779:         if '.isna()' in s or '.isnull()' in s:
+Explicação: Avalia valores ausentes (NaN) no DataFrame.
+L780:             return 'Avalia valores ausentes (NaN) no DataFrame.'
+Explicação: Retorna um valor do escopo da função/método.
+L781:         if 'describe()' in s:
+Explicação: Resumo estatístico das variáveis (contagem, média, quartis, etc.).
+L782:             return 'Resumo estatístico das variáveis (contagem, média, quartis, etc.).'
+Explicação: Retorna um valor do escopo da função/método.
+L783:         if 'skew' in s and 'sns.' not in s:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L784:             return 'Calcula a assimetria (skewness) de distribuições numéricas.'
+Explicação: Retorna um valor do escopo da função/método.
+L785:         if 'kurtosis' in s:
+Explicação: Calcula a curtose (achatamento) de distribuições numéricas.
+L786:             return 'Calcula a curtose (achatamento) de distribuições numéricas.'
+Explicação: Retorna um valor do escopo da função/método.
+L787:         if 'corr(' in s:
+Explicação: Calcula a matriz de correlação entre variáveis numéricas.
+L788:             return 'Calcula a matriz de correlação entre variáveis numéricas.'
+Explicação: Retorna um valor do escopo da função/método.
+L789:         if 'sns.histplot' in s:
+Explicação: Plota histograma com densidade (KDE) para visualizar distribuição.
+L790:             return 'Plota histograma com densidade (KDE) para visualizar distribuição.'
+Explicação: Retorna um valor do escopo da função/método.
+L791:         if 'sns.boxplot' in s:
+Explicação: Plota boxplot para inspecionar dispersão e outliers.
+L792:             return 'Plota boxplot para inspecionar dispersão e outliers.'
+Explicação: Retorna um valor do escopo da função/método.
+L793:         if 'sns.heatmap' in s:
+Explicação: Plota um mapa de calor, útil para visualizar correlações.
+L794:             return 'Plota um mapa de calor, útil para visualizar correlações.'
+Explicação: Retorna um valor do escopo da função/método.
+L795:         if 'sns.regplot' in s:
+Explicação: Plota diagrama de dispersão com linha de regressão (tendência).
+L796:             return 'Plota diagrama de dispersão com linha de regressão (tendência).'
+Explicação: Retorna um valor do escopo da função/método.
+L797:         if 'print(' in s:
+Explicação: Envia mensagem ao console (saída padrão).
+L798:             return 'Envia mensagem ao console (saída padrão).'
+Explicação: Retorna um valor do escopo da função/método.
+L799:         if 'plt.title' in s or 'plt.xlabel' in s or 'plt.ylabel' in s:
+Explicação: Configura elementos textuais do gráfico (título/legendas).
+L800:             return 'Configura elementos textuais do gráfico (título/legendas).'
+Explicação: Retorna um valor do escopo da função/método.
+L801:         if 'plt.savefig' in s or 'writer.savefig' in s:
+Explicação: Exporta o gráfico para arquivo de imagem (.png).
+L802:             return 'Exporta o gráfico para arquivo de imagem (.png).'
+Explicação: Retorna um valor do escopo da função/método.
+L803:         return 'Linha de lógica/controle de fluxo ou manipulação de dados.'
+Explicação: Retorna um valor do escopo da função/método.
+L804: 
+Explicação: Linha em branco para organização visual.
+L805:     def write_code_explanation_file(self) -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L806:         # Cria um arquivo separado com explicação linha a linha do código
+Explicação: Comentário descritivo; não executa.
+L807:         lines_out: List[str] = ["==== Explicação didática do código (linha a linha) ===="]
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L808:         try:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L809:             source_path = os.path.abspath(__file__)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L810:             with open(source_path, 'r', encoding='utf-8') as f:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L811:                 lines = f.readlines()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L812:             for idx, raw in enumerate(lines, start=1):
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L813:                 line = raw.rstrip('\n')
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L814:                 explain = self._explain_line_portuguese(line)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L815:                 lines_out.append(f"L{idx:03d}: {line}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L816:                 lines_out.append(f"Explicação: {explain}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L817:         except Exception as e:
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L818:             lines_out.append(f"Não foi possível carregar o código-fonte: {e}")
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L819:         self.writer.write_report('Explicacao_Codigo.txt', lines_out)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L820: 
+Explicação: Linha em branco para organização visual.
+L821: 
+Explicação: Linha em branco para organização visual.
+L822: def main() -> None:
+Explicação: Declaração de função/método com uma responsabilidade específica.
+L823:     # Monta a configuração com caminhos e limites de gráficos
+Explicação: Comentário descritivo; não executa.
+L824:     config = EDAConfig(
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L825:         data_path='/Users/akatsurada/Documents/INSPER/CS/Aula4/lab4/Mortalidade_Geral_2021_comUF_CID10.xlsx',
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L826:         output_dir='/Users/akatsurada/Documents/INSPER/CS/Aula4/eda_outputs',
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L827:         corr_threshold=0.8,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L828:         max_hist_cols=2,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L829:         max_outlier_cols=2,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L830:         max_scatter_pairs=2,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L831:         max_heatmap_vars=8,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L832:         clean_output_dir=True,
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L833:         report_filename='Relatorio_EDA.txt',
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L834:     )
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L835: 
+Explicação: Linha em branco para organização visual.
+L836:     # Lê a planilha Excel em um DataFrame (tabela de dados em memória)
+Explicação: Comentário descritivo; não executa.
+L837:     df = pd.read_excel(config.data_path)
+Explicação: Carrega dados de uma planilha Excel em um DataFrame pandas.
+L838: 
+Explicação: Linha em branco para organização visual.
+L839:     # Cria o orquestrador da EDA com os dados e a configuração
+Explicação: Comentário descritivo; não executa.
+L840:     report = EDAReport(df=df, config=config)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L841: 
+Explicação: Linha em branco para organização visual.
+L842:     # Chama, em ordem, as etapas que respondem cada pergunta da EDA
+Explicação: Comentário descritivo; não executa.
+L843:     report.summarize_shape_and_types()           # P1: Linhas/colunas e tipos
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L844:     report.analyze_duplicates()                  # P2: Duplicados
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L845:     report.analyze_missingness()                 # P3: Faltantes (com missingno)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L846:     report.analyze_distributions()               # P4: Distribuições
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L847:     report.analyze_outliers()                    # P5: Outliers (IQR + z-score)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L848:     report.impute_copy_and_compare()             # Extra: Imputação em cópia e impacto
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L849:     report.model_based_most_probable_values()    # Extra: Modelos (Bayes/Floresta) para valores prováveis
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L850:     report.outlier_smoothing_and_iforest_report()# Extra: Winsor & IsolationForest (relato)
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L851:     report.analyze_correlations()                # P6: Correlações
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L852:     report.summarize_numeric_brief()             # P7: Resumo estatístico
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L853:     report.data_quality_diagnostics()            # Extra: Diagnóstico de qualidade de dados
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L854:     report.summarize_eda_completeness()          # P8: Avaliação de completude
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L855: 
+Explicação: Linha em branco para organização visual.
+L856:     # Salva o relatório final de Q&A
+Explicação: Comentário descritivo; não executa.
+L857:     report.save_report()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L858: 
+Explicação: Linha em branco para organização visual.
+L859:     # (Opcional) Gera um arquivo à parte com explicação didática do código
+Explicação: Comentário descritivo; não executa.
+L860:     report.write_code_explanation_file()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
+L861: 
+Explicação: Linha em branco para organização visual.
+L862:     # Mensagem final orientando onde estão os resultados
+Explicação: Comentário descritivo; não executa.
+L863:     print(f"Relatório consolidado e gráficos mínimos salvos em: {config.output_dir}")
+Explicação: Envia mensagem ao console (saída padrão).
+L864: 
+Explicação: Linha em branco para organização visual.
+L865: 
+Explicação: Linha em branco para organização visual.
+L866: if __name__ == '__main__':
+Explicação: Ponto de entrada do script quando executado diretamente.
+L867:     # Ponto de entrada do script: executa a função principal
+Explicação: Comentário descritivo; não executa.
+L868:     main()
+Explicação: Linha de lógica/controle de fluxo ou manipulação de dados.
