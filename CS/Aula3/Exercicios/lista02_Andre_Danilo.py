@@ -17,11 +17,29 @@ from pathlib import Path
 # Exercício em dupla PI
 sns.set_theme(style="ticks")
  
+import pandas as pd
+ 
+hospital_df = pd.read_csv('https://raw.githubusercontent.com/amkaris/EDA/master/cms_hospital_readmissions.csv')
+ 
+num_cols = [
+    "Number of Readmissions",
+    "Number of Discharges",
+    "Expected Readmission Rate",
+    "Predicted Readmission Rate",
+    "Excess Readmission Ratio",
+]
+for c in num_cols:
+    if c in hospital_df.columns:
+        hospital_df[c] = pd.to_numeric(hospital_df[c], errors="coerce")
+ 
+hospital_df["True Admission Rate"] = hospital_df["Number of Readmissions"] / hospital_df["Number of Discharges"].replace(0, pd.NA)
+
 hospital_df['True Admission Rate'] = pd.to_numeric(hospital_df['True Admission Rate'], errors='coerce')
  
 hospital_df2 = hospital_df.nlargest(5, 'True Admission Rate')
+
 g = sns.jointplot(
-    data=hospital_df2,
+    data=hospital_df,
     x="Number of Discharges", y="True Admission Rate", hue="State",
     kind="scatter",
 )
