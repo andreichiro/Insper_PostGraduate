@@ -1,5 +1,0 @@
-model,threshold
-GLM Stepwise,0.05
-Lasso,0.25
-Ridge,0.28
-Elastic Net,0.25

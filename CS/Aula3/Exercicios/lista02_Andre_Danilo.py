@@ -18,7 +18,11 @@ from pathlib import Path
 sns.set_theme(style="ticks")
  
 import pandas as pd
- 
+
+#Interpretação:
+# Estamos estabelecendo uma relação entre o Number of Discharges com o True Admission Rate para os 5 maiores estados com o número de True Admission Rate.
+# Podemos observar que o estado de OK possui um alto número de altas com um baixo número de admissões, distanciando dos demais estados que possui uma relação com a média da taxa de admissão mas com baixo número de alta.
+
 hospital_df = pd.read_csv('https://raw.githubusercontent.com/amkaris/EDA/master/cms_hospital_readmissions.csv')
  
 num_cols = [
