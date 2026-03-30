@@ -1,0 +1,409 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Mercado de Vagas em IA/ML – Relatório Final</title><style>
+      :root{--fg:#222;--muted:#555;--line:#e6e6e6;--bg:#fff;--note:#f9fbff;--note-b:#9bbcff;--warn:#fff9f0;--warn-b:#ffb155}
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px;color:var(--fg);background:var(--bg)}
+      h1,h2,h3{margin:1.0em 0 .5em}
+      p{margin:.6em 0;line-height:1.45}
+      table{border-collapse:collapse;width:100%;margin:8px 0 16px}
+      th,td{border:1px solid var(--line);padding:6px 8px}
+      th{text-align:left;background:#f7f7f7;position:sticky;top:0}
+      td.num{text-align:right;font-variant-numeric:tabular-nums}
+      tbody tr:nth-child(even){background:#fbfbfb}
+      .small{color:var(--muted);font-size:.9em}
+      .note{background:var(--note);border-left:4px solid var(--note-b);padding:.6em .8em;margin:.6em 0}
+      .warn{background:var(--warn);border-left:4px solid var(--warn-b);padding:.6em .8em;margin:.6em 0}
+      img{max-width:100%;height:auto;border:1px solid #eee;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+      ul{margin:.2em 0 .8em 1.2em}
+      .pill{display:inline-block;background:#eef;border:1px solid #dde;padding:2px 8px;border-radius:999px;margin:2px}
+      .kpi{display:inline-block;margin:.2em .6em .2em 0;padding:.2em .6em;background:#f5f7ff;border:1px solid #dfe6ff;border-radius:6px}
+      .hr{height:1px;background:var(--line);margin:16px 0}
+    </style></head><body>
+<h1>Mercado de trabalho em IA/ML – Relatório final</h1>
+<h2>1. Introdução e contexto</h2>
+<p> Este trabalho utiliza um conjunto de dados de vagas para o mercado de Inteligência Artificial e Machine Learning, obtido via Kaggle (<a href='https://www.kaggle.com/datasets/abhishekjaiswal4896/ai-job-market-trends/data' target='_blank' rel='noopener'>AI Job Market Trends</a>). Cada linha representa uma vaga identificada por <code>job_id</code>, com informações de cargo, empresa, localização, nível de experiência, tipo de vínculo, setor, habilidades e ferramentas, além de uma faixa salarial anual em dólares. </p>
+<h3>1.1 Objetivos do projeto</h3>
+<ul> <li>Predizer o salário anual da vaga (métodos supervisionados) com variáveis estruturadas e texto.</li><li>Construir perfis de vagas/profissionais (métodos não supervisionados) para segmentar o mercado por stack, senioridade e faixa salarial.</li><li>Recomendação content-based: perfil → vagas, e vaga → vagas similares, com filtros de negócio.</li> </ul>
+<p class='note'> Como o salário é assimétrico, o alvo do supervisionado é <code>salary_log = log(salary_mid)</code>.</p>
+<p class='note'> Usaremos clusters e tópicos nos métodos não supervisionados <code>salary_log = log(salary_mid)</code>.</p>
+
+<h3>1.2 Visão geral (resultados desta execução)</h3>
+<p class='note'> Tamanho do dataset: <b>2000</b> vagas e <b>17</b> colunas. Base modelável (após <code>salary_valid</code> e remoção de salários ausentes): <b>1960</b> vagas. </p>
+<p class='note'> Modelo com melhor RMSE em teste: <b>xgboost</b> (RMSE ≈ 0.283, MAE ≈ 0.237, em <code>salary_log</code>). </p>
+<p class='note'> Na comparação das representações textuais (mantendo Random Forest fixa), a menor RMSE em teste foi obtida com <b>tfidf_lsa</b>. </p>
+<h2>2. Descrição dos dados e EDA</h2>
+<h3>2.1 Estrutura geral dos dados</h3>
+<h3>Dimensão do dataset</h3>
+<table><thead><tr><th>linhas</th><th>colunas</th></tr></thead><tbody>
+<tr> <td class='num'>2000</td><td class='num'>17</td> </tr>
+</tbody></table>
+<h3>Resumo da variável salary_mid</h3>
+<table><thead><tr><th>estatistica</th><th>valor</th></tr></thead><tbody>
+<tr> <td>Min.</td><td class='num'>47578.50</td> </tr>
+<tr> <td>1st Qu.</td><td class='num'>94466.25</td> </tr>
+<tr> <td>Median</td><td class='num'>123202.75</td> </tr>
+<tr> <td>Mean</td><td class='num'>123040.00</td> </tr>
+<tr> <td>3rd Qu.</td><td class='num'>151413.00</td> </tr>
+<tr> <td>Max.</td><td class='num'>197776.50</td> </tr>
+</tbody></table>
+<h3>Resumo da variável posted_date</h3>
+<table><thead><tr><th>estatistica</th><th>valor</th></tr></thead><tbody>
+<tr> <td>Min.</td><td>2023-09-21</td> </tr>
+<tr> <td>1st Qu.</td><td>2024-03-20</td> </tr>
+<tr> <td>Median</td><td>2024-09-26</td> </tr>
+<tr> <td>Mean</td><td>2024-09-21</td> </tr>
+<tr> <td>3rd Qu.</td><td>2025-03-16</td> </tr>
+<tr> <td>Max.</td><td>2025-09-19</td> </tr>
+</tbody></table>
+<h3>Distribuição de experience_level</h3>
+<table><thead><tr><th>experience_level</th><th>n</th></tr></thead><tbody>
+<tr> <td>Entry</td><td class='num'>702</td> </tr>
+<tr> <td>Mid</td><td class='num'>668</td> </tr>
+<tr> <td>Senior</td><td class='num'>630</td> </tr>
+</tbody></table>
+<h3>Distribuição de employment_type</h3>
+<table><thead><tr><th>employment_type</th><th>n</th></tr></thead><tbody>
+<tr> <td>Internship</td><td class='num'>574</td> </tr>
+<tr> <td>Full-time</td><td class='num'>509</td> </tr>
+<tr> <td>Contract</td><td class='num'>465</td> </tr>
+<tr> <td>Remote</td><td class='num'>452</td> </tr>
+</tbody></table>
+<h3>Top 20 indústrias por número de vagas</h3>
+<table><thead><tr><th>industry</th><th>n</th></tr></thead><tbody>
+<tr> <td>Automotive</td><td class='num'>300</td> </tr>
+<tr> <td>Education</td><td class='num'>294</td> </tr>
+<tr> <td>Retail</td><td class='num'>293</td> </tr>
+<tr> <td>E-commerce</td><td class='num'>291</td> </tr>
+<tr> <td>Finance</td><td class='num'>279</td> </tr>
+<tr> <td>Tech</td><td class='num'>274</td> </tr>
+<tr> <td>Healthcare</td><td class='num'>269</td> </tr>
+</tbody></table>
+<p class='note'> Na limpeza inicial, garantimos <code>job_id</code> como identificador, parseamos a faixa salarial em <code>salary_min</code>/<code>salary_max</code>, definimos <code>salary_mid</code> como alvo numérico e padronizamos datas e campos textuais. </p>
+<h3>2.2 Distribuição de salários (salary_mid)</h3>
+<p><b>Figura 1 – Distribuição de salary_mid</b><br/><img src='eda_salary_mid_hist.png'></p>
+<p><b>Figura 2 – Distribuição de log(salary_mid)</b><br/><img src='eda_salary_log_hist.png'></p>
+<p> Entre as vagas com <code>salary_mid</code> informado, a mediana é US$123,203, o 3º quartil é US$151,413 e o máximo alcança US$197,776. Essa distância entre mediana e máximo indica uma distribuição assimétrica à direita. A transformação logarítmica (Figura 2) produz uma distribuição mais regular, justificando o uso de <code>salary_log = log(salary_mid)</code> como alvo da regressão. </p>
+<h3>2.3 Salário por nível de experiência e país</h3>
+<p><b>Figura 3 – Salário por nível de experiência</b><br/><img src='eda_salary_box_experience.png'></p>
+<p><b>Figura 4 – Salário por país (top 10)</b><br/><img src='eda_salary_box_country.png'></p>
+<h3>Mediana de salary_mid por nível de experiência</h3>
+<table><thead><tr><th>experience_level</th><th>n</th><th>med</th></tr></thead><tbody>
+<tr> <td>Senior</td><td class='num'>630</td><td class='num'>125470</td> </tr>
+<tr> <td>Entry</td><td class='num'>702</td><td class='num'>123638</td> </tr>
+<tr> <td>Mid</td><td class='num'>668</td><td class='num'>120882</td> </tr>
+</tbody></table>
+<h3>Mediana de salary_mid por país (entre os 10 países com mais vagas)</h3>
+<table><thead><tr><th>country</th><th>n</th><th>med</th></tr></thead><tbody>
+<tr> <td> GQ</td><td class='num'>16</td><td class='num'>165485</td> </tr>
+<tr> <td> JM</td><td class='num'>16</td><td class='num'>144525</td> </tr>
+<tr> <td> FJ</td><td class='num'>18</td><td class='num'>140864</td> </tr>
+<tr> <td> BB</td><td class='num'>18</td><td class='num'>119972</td> </tr>
+<tr> <td> HR</td><td class='num'>18</td><td class='num'>118389</td> </tr>
+<tr> <td> JO</td><td class='num'>17</td><td class='num'>117034</td> </tr>
+<tr> <td> UZ</td><td class='num'>16</td><td class='num'>114018</td> </tr>
+<tr> <td> BT</td><td class='num'>18</td><td class='num'>111420</td> </tr>
+<tr> <td> IQ</td><td class='num'>17</td><td class='num'>109410</td> </tr>
+<tr> <td> PG</td><td class='num'>19</td><td class='num'>106442</td> </tr>
+</tbody></table>
+<p> Os boxplots das Figuras 3 e 4 mostram heterogeneidade salarial. Na base, os níveis com maior mediana salarial são <code>Senior</code> e <code>Entry</code> (medianas em torno de US$125,470 e US$123,638). Entre os 10 países com mais vagas, as maiores medianas aparecem em  GQ e  JM (medianas em torno de US$165,485 e US$144,525). Isso reforça a importância de <code>experience_level</code> e localização como preditores. </p>
+<h3>2.4 Valores faltantes</h3>
+<p class='note'> Após a etapa de preparação, não foram identificados valores faltantes residuais nas variáveis analisadas. </p>
+<p> Em variáveis numéricas, os faltantes são imputados com mediana na receita (<code>step_impute_median</code>), pois a mediana é robusta a outliers. Nas colunas textuais usadas em <code>text_blob</code> (<code>job_title</code>, <code>skills_required</code>, <code>tools_preferred</code> e <code>industry</code>), <code>NA</code> é substituído por string vazia antes da concatenação, evitando problemas na tokenização. </p>
+<h3>2.5 EDA de texto – skills</h3>
+<p><b>Figura 6 – Skills mais frequentes</b><br/><img src='eda_top_skills.png'></p>
+<p> A Figura 6 mostra que as skills mais mencionadas incluem <code>tensorflow</code>, <code>excel</code>, <code>pandas</code>, <code>fastapi</code>, <code>numpy</code>. Essa concentração em um conjunto relativamente pequeno de tecnologias motiva o uso de representações textuais mais ricas (TF‑IDF, LSA e embeddings) na modelagem supervisionada. </p>
+<h3>2.6 Correlações e associações com o salário</h3>
+<p> A seguir, medimos relações entre variáveis e salário usando <code>salary_log</code>. Para variáveis numéricas, reportamos correlação de Pearson e Spearman. Para variáveis categóricas, usamos <b>η²</b> (proporção da variância de <code>salary_log</code> explicada por grupos; não implica causalidade). Para manter interpretabilidade, categorias raras em variáveis de alta cardinalidade são agrupadas em <code>Outros</code>. Variáveis diretamente derivadas do próprio salário não são incluídas nesta EDA para evitar correlações triviais. </p>
+<h3>Correlação com salary_log (numéricas)</h3>
+<table><thead><tr><th>predictor</th><th>spearman</th><th>p_spearman</th><th>p_spearman_fdr</th><th>sig_spearman</th><th>pearson</th><th>p_pearson</th><th>n</th></tr></thead><tbody>
+<tr> <td>text_chars</td><td class='num'>0.0430</td><td class='num'>0.0570</td><td class='num'>0.3993</td><td></td><td class='num'>0.0409</td><td class='num'>0.0705</td><td class='num'>1960</td> </tr>
+<tr> <td>n_tools</td><td class='num'>0.0308</td><td class='num'>0.1734</td><td class='num'>0.5440</td><td></td><td class='num'>0.0320</td><td class='num'>0.1573</td><td class='num'>1960</td> </tr>
+<tr> <td>title_n_words</td><td class='num'>-0.0250</td><td class='num'>0.2692</td><td class='num'>0.5440</td><td></td><td class='num'>-0.0204</td><td class='num'>0.3659</td><td class='num'>1960</td> </tr>
+<tr> <td>posted_month</td><td class='num'>0.0229</td><td class='num'>0.3108</td><td class='num'>0.5440</td><td></td><td class='num'>0.0256</td><td class='num'>0.2578</td><td class='num'>1960</td> </tr>
+<tr> <td>n_skills</td><td class='num'>0.0150</td><td class='num'>0.5081</td><td class='num'>0.7114</td><td></td><td class='num'>0.0117</td><td class='num'>0.6041</td><td class='num'>1960</td> </tr>
+<tr> <td>posted_date_num</td><td class='num'>0.0085</td><td class='num'>0.7053</td><td class='num'>0.7792</td><td></td><td class='num'>0.0057</td><td class='num'>0.8015</td><td class='num'>1960</td> </tr>
+<tr> <td>posted_year</td><td class='num'>-0.0063</td><td class='num'>0.7792</td><td class='num'>0.7792</td><td></td><td class='num'>-0.0065</td><td class='num'>0.7746</td><td class='num'>1960</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Top correlações numéricas com salary_log</b><br/><img src='eda_salary_spearman_top10.png'></p>
+<h3>Associação categórica com salary_log (η² – variância explicada)</h3>
+<table><thead><tr><th>variable</th><th>eta2</th><th>n</th><th>n_levels</th></tr></thead><tbody>
+<tr> <td>country_top</td><td class='num'>0.0063</td><td class='num'>1960</td><td class='num'>13</td> </tr>
+<tr> <td>job_title_top</td><td class='num'>0.0035</td><td class='num'>1960</td><td class='num'>8</td> </tr>
+<tr> <td>experience_level</td><td class='num'>0.0022</td><td class='num'>1960</td><td class='num'>3</td> </tr>
+<tr> <td>employment_type</td><td class='num'>0.0013</td><td class='num'>1960</td><td class='num'>4</td> </tr>
+<tr> <td>industry_top</td><td class='num'>0.0009</td><td class='num'>1960</td><td class='num'>7</td> </tr>
+<tr> <td>company_size</td><td class='num'>0.0004</td><td class='num'>1960</td><td class='num'>3</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Associação categórica (η²) com salary_log</b><br/><img src='eda_salary_eta2_categorical.png'></p>
+<p class='note'> Tratando <code>experience_level</code> como ordinal (Entry < Mid < Senior < Lead/Principal < Executive), a correlação de Spearman com <code>salary_log</code> é ≈ <b>0.019</b> (p ≈ 3.93e-01). </p>
+<p> Essas relações descritivas ajudam a interpretar o problema e a priorizar variáveis no modelo, mas não devem ser lidas como efeito causal (há confusão por setor, país, senioridade, empresa etc.). </p>
+<h2>3. Pré-processamento e decisões</h2>
+<h3>3.1 Parsing de salário e definição do alvo</h3>
+<p> A coluna original <code>salary_range_usd</code> traz faixas em texto (ex.: "100000-150000" ou "100,000 - 150,000 USD"). Implementamos uma função que limpa símbolos de moeda e vírgulas, identifica padrões <code>min-max</code> e valores únicos, corrige faixas invertidas e constrói <code>salary_min</code>, <code>salary_max</code> e <code>salary_mid</code>. O alvo da regressão é <code>salary_log = log(salary_mid)</code>. </p>
+<h3>3.2 Regras de trimming de salário (salary_valid)</h3>
+<h3>Regras candidatas de trimming de salário (modelo probe – RMSE em log) – até 10 linhas</h3>
+<table><thead><tr><th>rule_name</th><th>rmse</th><th>n</th><th>penalty</th><th>mixture</th></tr></thead><tbody>
+<tr> <td>iqr_1.5</td><td class='num'>0.3062</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0.6833</td> </tr>
+<tr> <td>iqr_3</td><td class='num'>0.3062</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0.6833</td> </tr>
+<tr> <td>none</td><td class='num'>0.3062</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0.6833</td> </tr>
+<tr> <td>quantile_0.5_99.5</td><td class='num'>0.2999</td><td class='num'>1980</td><td class='num'>1</td><td class='num'>0.6833</td> </tr>
+<tr> <td>quantile_1_99</td><td class='num'>0.2945</td><td class='num'>1960</td><td class='num'>1</td><td class='num'>0.6833</td> </tr>
+</tbody></table>
+<h3>Impacto das regras de trimming no dataset completo (apenas sobre salários não ausentes)</h3>
+<table><thead><tr><th>rule_name</th><th>type</th><th>n_non_na</th><th>n_valid_full</th><th>n_removed_non_na</th><th>prop_removed</th><th>min_kept</th><th>max_kept</th></tr></thead><tbody>
+<tr> <td>none</td><td>none</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>47578.5</td><td class='num'>197776.5</td> </tr>
+<tr> <td>quantile_1_99</td><td>quantile</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>47578.5</td><td class='num'>197776.5</td> </tr>
+<tr> <td>quantile_0.5_99.5</td><td>quantile</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>47578.5</td><td class='num'>197776.5</td> </tr>
+<tr> <td>iqr_1.5</td><td>iqr</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>47578.5</td><td class='num'>197776.5</td> </tr>
+<tr> <td>iqr_3</td><td>iqr</td><td class='num'>2000</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>47578.5</td><td class='num'>197776.5</td> </tr>
+</tbody></table>
+<p><b>Figura 7 – Regras de trimming de salário</b><br/><img src='prep_salary_rules_rmse.png'></p>
+<p class='note'> A melhor regra de trimming pelo menor RMSE em CV foi <b>quantile_1_99</b>, mantendo 1960 de 2000 vagas com salário informado (98.0%). Em relação ao dataset completo (incluindo salários ausentes), isso corresponde a 98.0%. </p>
+<p> As regras baseadas em IQR (<code>iqr_1.5</code>, <code>iqr_3</code>) resultaram no mesmo conjunto de vagas que a regra <code>none</code> (após exclusão de salários ausentes), indicando ausência de outliers extremos segundo esse critério específico. Na prática, somente as regras por quantis efetivamente removem observações. </p>
+<h3>3.3 Construção de texto unificado (text_blob)</h3>
+<p> As colunas <code>job_title</code>, <code>skills_required</code>, <code>tools_preferred</code> e <code>industry</code> são concatenadas em <code>text_blob</code>. Isso permite aplicar um pipeline único de NLP e capturar tanto skills quanto contexto de setor e cargo. </p>
+<h3>3.4 Representações de texto: TF‑IDF+LSA, embeddings e híbrido</h3>
+<p> Em todas as variantes, utilizamos as mesmas variáveis estruturadas (nível de experiência, tipo de vínculo, localização, indústria, etc.). O que muda é apenas a forma como o texto unificado <code>text_blob</code> é projetado em espaço vetorial: os componentes <code>tfidf_lsa_*</code> vêm de TF‑IDF seguido de SVD (LSA); os vetores <code>emb_*</code> são embeddings GloVe médios por vaga; e a representação <code>hybrid</code> concatena as duas. </p>
+<p><b>Figura 8 – Variância explicada por componentes LSA</b><br/><img src='prep_lsa_variance.png'></p>
+<h3>Desempenho de Random Forest por representação textual (teste) – até 10 linhas</h3>
+<table><thead><tr><th>.metric</th><th>.estimator</th><th>.estimate</th><th>model</th><th>features</th></tr></thead><tbody>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.237215</td><td>random_forest</td><td>tfidf_lsa</td> </tr>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.237243</td><td>random_forest</td><td>hybrid</td> </tr>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.237268</td><td>random_forest</td><td>embeddings</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.283496</td><td>random_forest</td><td>tfidf_lsa</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.283539</td><td>random_forest</td><td>hybrid</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.283544</td><td>random_forest</td><td>embeddings</td> </tr>
+</tbody></table>
+<p><b>Figura 9 – Diferença relativa de RMSE por representação textual</b><br/><img src='prep_repr_rf_rmse.png'></p>
+<p><b>Gráfico – Diferença relativa de MAE por representação textual</b><br/><img src='prep_repr_rf_mae.png'></p>
+<p class='note'> Mantendo a família Random Forest fixa, a representação com menor RMSE de teste foi <b>tfidf_lsa</b> (apenas TF‑IDF+LSA). Por isso, adotamos essa representação como padrão na comparação entre famílias de modelos. </p>
+<p> As diferenças relativas de RMSE entre representações textuais ficam abaixo de 0.02%, indicando que a escolha fina da representação tem impacto marginal no desempenho, frente às variáveis estruturadas e ao ruído do alvo. </p>
+<h3>3.5 Receita de pré-processamento (build_recipe)</h3>
+<p> A função <code>build_recipe()</code> remove IDs e texto bruto, extrai ano/mês da data, imputa faltantes numéricos com mediana, cria dummies one‑hot para variáveis categóricas, marca níveis novos em dados futuros (<code>step_novel</code>), remove preditores de variância quase zero e normaliza preditores numéricos, garantindo entrada consistente para Elastic Net, Random Forest e XGBoost. </p>
+<h2>4. Modelagem supervisionada – predição de salário</h2>
+<h3>4.1 Configuração de treino, validação e teste</h3>
+<p> O alvo é <code>salary_log</code>. Usamos split treino/teste estratificado em <code>salary_log</code>, com 1568 observações (80.0%) no treino e 392 (20.0%) no teste. No treino, aplicamos validação cruzada em 5 folds. Foram comparados três modelos sobre as features híbridas: Elastic Net, Random Forest e XGBoost. </p>
+<h3>Melhor combinação de hiperparâmetros por modelo (validação cruzada, features híbridas)</h3>
+<table><thead><tr><th>model</th><th>.metric</th><th>mean</th><th>std_err</th><th>n</th><th>params</th></tr></thead><tbody>
+<tr> <td>elastic_net</td><td>mae</td><td class='num'>0.2475</td><td class='num'>0.0028</td><td class='num'>5</td><td>penalty=0.01604, mixture=0.756</td> </tr>
+<tr> <td>elastic_net</td><td>rmse</td><td class='num'>0.2971</td><td class='num'>0.0036</td><td class='num'>5</td><td>penalty=0.307, mixture=0.172</td> </tr>
+<tr> <td>random_forest</td><td>mae</td><td class='num'>0.2488</td><td class='num'>0.0027</td><td class='num'>5</td><td>mtry=1, trees=1128, min_n=10</td> </tr>
+<tr> <td>random_forest</td><td>rmse</td><td class='num'>0.2971</td><td class='num'>0.0036</td><td class='num'>5</td><td>mtry=1, trees=1128, min_n=10</td> </tr>
+<tr> <td>xgboost</td><td>mae</td><td class='num'>0.2488</td><td class='num'>0.0027</td><td class='num'>5</td><td>mtry=72, trees=1282, min_n=11, depth=4, lr=0.1512, gamma=31.623, sample=0.769</td> </tr>
+<tr> <td>xgboost</td><td>rmse</td><td class='num'>0.2971</td><td class='num'>0.0036</td><td class='num'>5</td><td>mtry=72, trees=1282, min_n=11, depth=4, lr=0.1512, gamma=31.623, sample=0.769</td> </tr>
+</tbody></table>
+<h3>Métricas de validação cruzada (melhor combinação de hiperparâmetros por modelo)</h3>
+<table><thead><tr><th>model</th><th>.metric</th><th>mean_cv</th><th>se_cv</th></tr></thead><tbody>
+<tr> <td>elastic_net</td><td>mae</td><td class='num'>0.247482</td><td class='num'>0.002845</td> </tr>
+<tr> <td>elastic_net</td><td>rmse</td><td class='num'>0.297100</td><td class='num'>0.003614</td> </tr>
+<tr> <td>random_forest</td><td>mae</td><td class='num'>0.248775</td><td class='num'>0.002677</td> </tr>
+<tr> <td>random_forest</td><td>rmse</td><td class='num'>0.297117</td><td class='num'>0.003614</td> </tr>
+<tr> <td>xgboost</td><td>mae</td><td class='num'>0.248803</td><td class='num'>0.002729</td> </tr>
+<tr> <td>xgboost</td><td>rmse</td><td class='num'>0.297086</td><td class='num'>0.003598</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Validação cruzada: métricas por modelo (melhor combinação)</b><br/><img src='sup_models_cv_metrics.png'></p>
+<p> Na validação cruzada, os três modelos apresentam RMSE muito próximos quando avaliados na melhor combinação de hiperparâmetros. As diferenças estão na segunda/terceira casa decimal e são da mesma ordem da incerteza (erro padrão) das métricas por fold. </p>
+<h3>4.2 Desempenho no conjunto de teste</h3>
+<h3>Métricas no conjunto de teste (features híbridas) – até 10 linhas</h3>
+<table><thead><tr><th>.metric</th><th>.estimator</th><th>.estimate</th><th>model</th><th>features</th></tr></thead><tbody>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.2371</td><td>xgboost</td><td>hybrid</td> </tr>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.2372</td><td>random_forest</td><td>hybrid</td> </tr>
+<tr> <td>mae</td><td>standard</td><td class='num'>0.2373</td><td>elastic_net</td><td>hybrid</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.2835</td><td>xgboost</td><td>hybrid</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.2835</td><td>elastic_net</td><td>hybrid</td> </tr>
+<tr> <td>rmse</td><td>standard</td><td class='num'>0.2835</td><td>random_forest</td><td>hybrid</td> </tr>
+</tbody></table>
+<p><b>Figura 10 – Desempenho em teste por modelo</b><br/><img src='sup_models_test_metrics.png'></p>
+<p> No conjunto de teste, os valores de RMSE/MAE (em log‑salário) por modelo são: xgboost – RMSE ≈ 0.283, MAE ≈ 0.237; random_forest – RMSE ≈ 0.284, MAE ≈ 0.237; elastic_net – RMSE ≈ 0.284, MAE ≈ 0.237. As diferenças absolutas são pequenas, sugerindo que a qualidade das features e o ruído do alvo dominam o desempenho. </p>
+<p class='note'> No teste, o menor RMSE em log foi do modelo <b>xgboost</b> (RMSE ≈ 0.283). Isso implica um erro multiplicativo típico em torno de <b>1.33×</b> no salário previsto (erro relativo típico ≈ 33%). </p>
+<h3>4.3 Coerência entre salários reais e previstos</h3>
+<p><b>Gráfico – "Matriz de confusão" em faixas de salário (modelo final)</b><br/><img src='sup_regression_quintile_confusion.png'></p>
+<p> A matriz acima discretiza salários reais e previstos em quintis de <code>salary_log</code>. Concentração na diagonal indica que o modelo tende a colocar a vaga na faixa correta ou adjacente. </p>
+<h2>5. Análise não supervisionada – clusters e tópicos</h2>
+<h3>5.1 PCA + k‑means sobre features híbridas</h3>
+<p><b>Figura 11 – Scree plot da PCA</b><br/><img src='unsup_pca_scree.png'></p>
+<p><b>Figura 12 – Silhouette médio por número de clusters</b><br/><img src='unsup_kmeans_silhouette.png'></p>
+<h3>Silhouette médio por k – até 10 linhas</h3>
+<table><thead><tr><th>k</th><th>mean_silhouette</th></tr></thead><tbody>
+<tr> <td class='num'>2</td><td class='num'>0.057</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>0.071</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>0.070</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>0.056</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>0.046</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>0.049</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>0.051</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>0.049</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>0.050</td> </tr>
+<tr> <td class='num'>11</td><td class='num'>0.050</td> </tr>
+</tbody></table>
+<p> Aplicamos PCA às features híbridas e rodamos k‑means nos scores das primeiras 113 componentes, que explicam aproximadamente 80.1% da variância total. O k foi escolhido pelo maior silhouette médio: <b>k = 3</b> (silhouette médio ≈ 0.071). A razão <code>betweenss / totss</code> é 10.6%. </p>
+<h3>Estatísticas globais do k‑means para o k selecionado</h3>
+<table><thead><tr><th>k</th><th>totss</th><th>betweenss</th><th>betweenss_ratio</th></tr></thead><tbody>
+<tr> <td class='num'>3</td><td class='num'>370287.6</td><td class='num'>39409.85</td><td class='num'>0.106</td> </tr>
+</tbody></table>
+<p><b>Figura 13 – Clusters no espaço PCA</b><br/><img src='unsup_pca_clusters.png'></p>
+<h3>Perfil salarial por cluster (k‑means) – até 10 linhas</h3>
+<table><thead><tr><th>cluster_kmeans</th><th>n</th><th>salary_med</th><th>salary_p25</th><th>salary_p75</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>505</td><td class='num'>123939</td><td class='num'>94325</td><td class='num'>153934</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>724</td><td class='num'>125868</td><td class='num'>98101</td><td class='num'>151549</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>731</td><td class='num'>120019</td><td class='num'>94002</td><td class='num'>148671</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Perfil salarial por cluster (k‑means)</b><br/><img src='unsup_kmeans_cluster_salary.png'></p>
+<h3>Top indústrias por cluster (k‑means) – até 10 linhas</h3>
+<table><thead><tr><th>cluster_kmeans</th><th>industry</th><th>n</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>Education</td><td class='num'>80</td> </tr>
+<tr> <td class='num'>1</td><td>E-commerce</td><td class='num'>78</td> </tr>
+<tr> <td class='num'>1</td><td>Automotive</td><td class='num'>77</td> </tr>
+<tr> <td class='num'>1</td><td>Retail</td><td class='num'>71</td> </tr>
+<tr> <td class='num'>1</td><td>Finance</td><td class='num'>68</td> </tr>
+<tr> <td class='num'>2</td><td>Retail</td><td class='num'>119</td> </tr>
+<tr> <td class='num'>2</td><td>Automotive</td><td class='num'>110</td> </tr>
+<tr> <td class='num'>2</td><td>E-commerce</td><td class='num'>109</td> </tr>
+<tr> <td class='num'>2</td><td>Finance</td><td class='num'>101</td> </tr>
+<tr> <td class='num'>2</td><td>Education</td><td class='num'>96</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Top indústrias por cluster</b><br/><img src='unsup_kmeans_top_industries.png'></p>
+<h3>Top títulos por cluster (k‑means) – até 10 linhas</h3>
+<table><thead><tr><th>cluster_kmeans</th><th>job_title</th><th>n</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>Data Analyst</td><td class='num'>269</td> </tr>
+<tr> <td class='num'>1</td><td>Data Scientist</td><td class='num'>236</td> </tr>
+<tr> <td class='num'>2</td><td>NLP Engineer</td><td class='num'>257</td> </tr>
+<tr> <td class='num'>2</td><td>ML Engineer</td><td class='num'>246</td> </tr>
+<tr> <td class='num'>2</td><td>Computer Vision Engineer</td><td class='num'>221</td> </tr>
+<tr> <td class='num'>3</td><td>AI Product Manager</td><td class='num'>256</td> </tr>
+<tr> <td class='num'>3</td><td>Quant Researcher</td><td class='num'>242</td> </tr>
+<tr> <td class='num'>3</td><td>AI Researcher</td><td class='num'>233</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Top títulos por cluster</b><br/><img src='unsup_kmeans_top_titles.png'></p>
+<h3>Exemplos de atribuições de vagas a clusters (k‑means e espectral) – até 10 linhas</h3>
+<table><thead><tr><th>job_id</th><th>cluster_kmeans</th><th>cluster_spectral</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>1</td><td class='num'>2</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>2</td><td class='num'>1</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>3</td><td class='num'>3</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>3</td><td class='num'>3</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>1</td><td class='num'>2</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>3</td><td class='num'>3</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>1</td><td class='num'>2</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>1</td><td class='num'>2</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>2</td><td class='num'>1</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>2</td><td class='num'>1</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Distribuição de vagas por cluster (k‑means)</b><br/><img src='unsup_kmeans_cluster_sizes.png'></p>
+<p> Os clusters exibem perfis salariais distintos: a mediana de <code>salary_mid</code> varia de US$120,019 (cluster 3) a US$125,868 (cluster 2). No cluster de maior mediana, o nível de experiência mais frequente é <code>Entry</code> (35%); no cluster de menor mediana, domina <code>Mid</code> (37%). </p>
+<p class='note'> Cluster 1: mediana salarial US$123,939 (P25–P75: US$94,325 – US$153,934); indústria mais comum: <code>Education</code>; título mais recorrente: <code>Data Analyst</code>; tópico LDA dominante: <code>T3: keras, aws, c++, tensorflow, numpy</code> (≈ 25%). </p>
+<p class='note'> Cluster 2: mediana salarial US$125,868 (P25–P75: US$98,101.38 – US$151,549); indústria mais comum: <code>Retail</code>; título mais recorrente: <code>NLP Engineer</code>; tópico LDA dominante: <code>T3: keras, aws, c++, tensorflow, numpy</code> (≈ 24%). </p>
+<p class='note'> Cluster 3: mediana salarial US$120,019 (P25–P75: US$94,002.25 – US$148,671); indústria mais comum: <code>Education</code>; título mais recorrente: <code>AI Product Manager</code>; tópico LDA dominante: <code>T1: hugging face, r, cuda, langchain, mlflow</code> (≈ 24%). </p>
+<h3>5.2 Clustering espectral em embeddings</h3>
+<h3>Perfil salarial por cluster (clustering espectral) – até 10 linhas</h3>
+<table><thead><tr><th>cluster_spectral</th><th>n</th><th>salary_med</th><th>salary_p25</th><th>salary_p75</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>724</td><td class='num'>125868</td><td class='num'>98101</td><td class='num'>151549</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>505</td><td class='num'>123939</td><td class='num'>94325</td><td class='num'>153934</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>731</td><td class='num'>120019</td><td class='num'>94002</td><td class='num'>148671</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Perfil salarial por cluster (clustering espectral)</b><br/><img src='unsup_spectral_cluster_salary.png'></p>
+<p class='note'> O clustering espectral nos embeddings apresentou silhouette médio ≈ 0.165, sugerindo que estruturas não esféricas podem ser capturadas de forma um pouco mais nítida do que pelo k‑means em PCA. Ainda assim, os valores seguem baixos, indicando fronteiras difusas. </p>
+<h3>5.3 Tópicos de skills (LDA)</h3>
+<h3>Busca de número de tópicos (k) por log-verossimilhança – até 10 linhas</h3>
+<table><thead><tr><th>k</th><th>loglik</th></tr></thead><tbody>
+<tr> <td class='num'>5</td><td class='num'>-27845</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>-27899</td> </tr>
+<tr> <td class='num'>20</td><td class='num'>-27971</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Escolha de k em LDA por log-verossimilhança</b><br/><img src='unsup_lda_k_loglik.png'></p>
+<p class='note'> Entre os k testados, o melhor valor foi <code>k = 5</code> (loglik ≈ -27845). </p>
+<p><b>Figura 14 – Tópicos de skills (LDA)</b><br/><img src='unsup_lda_top_terms.png'></p>
+<h3>Exemplos de termos com maior peso em cada tópico (até 10 linhas)</h3>
+<table><thead><tr><th>topic</th><th>term</th><th>beta</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>hugging face</td><td class='num'>0.096</td> </tr>
+<tr> <td class='num'>1</td><td>r</td><td class='num'>0.093</td> </tr>
+<tr> <td class='num'>1</td><td>cuda</td><td class='num'>0.093</td> </tr>
+<tr> <td class='num'>1</td><td>langchain</td><td class='num'>0.090</td> </tr>
+<tr> <td class='num'>1</td><td>mlflow</td><td class='num'>0.077</td> </tr>
+<tr> <td class='num'>1</td><td>fastapi</td><td class='num'>0.063</td> </tr>
+<tr> <td class='num'>1</td><td>flask</td><td class='num'>0.059</td> </tr>
+<tr> <td class='num'>2</td><td>power bi</td><td class='num'>0.109</td> </tr>
+<tr> <td class='num'>2</td><td>azure</td><td class='num'>0.097</td> </tr>
+<tr> <td class='num'>2</td><td>keras</td><td class='num'>0.077</td> </tr>
+</tbody></table>
+<h3>Número de vagas por tópico dominante (skills_required) – até 10 linhas</h3>
+<table><thead><tr><th>dominant_topic</th><th>n_jobs</th><th>label</th><th>topic_label</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>475</td><td>hugging face, r, cuda, langchain, mlflow</td><td>T1: hugging face, r, cuda, langchain, mlflow</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>362</td><td>power bi, azure, keras, tensorflow, sql</td><td>T2: power bi, azure, keras, tensorflow, sql</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>469</td><td>keras, aws, c++, tensorflow, numpy</td><td>T3: keras, aws, c++, tensorflow, numpy</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>425</td><td>gcp, python, aws, scikit-learn, langchain</td><td>T4: gcp, python, aws, scikit-learn, langchain</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>269</td><td>fastapi, pandas, pytorch, reinforcement learning, flask</td><td>T5: fastapi, pandas, pytorch, reinforcement learning, flask</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Tamanho dos tópicos (número de vagas)</b><br/><img src='unsup_lda_topic_sizes.png'></p>
+<h3>Exemplos de atribuição de vagas ao tópico dominante – até 10 linhas</h3>
+<table><thead><tr><th>job_id</th><th>dominant_topic</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>4</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>1</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>5</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>1</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>2</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>4</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>4</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>5</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>4</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>3</td> </tr>
+</tbody></table>
+<p> O LDA foi ajustado sobre <code>skills_required</code>. Cada tópico corresponde a um stack recorrente; por exemplo: Tópico 1: hugging face, r, cuda, langchain, mlflow ; Tópico 2: power bi, azure, keras, tensorflow, sql ; Tópico 3: keras, aws, c++, tensorflow, numpy ; Tópico 4: gcp, python, aws, scikit-learn, langchain ; Tópico 5: fastapi, pandas, pytorch, reinforcement learning, flask. </p>
+<h3>5.4 Mapa de skills (MDS)</h3>
+<p><b>Figura 15 – Mapa de proximidade entre skills</b><br/><img src='unsup_skills_mds.png'></p>
+<p> O MDS em cima da matriz de coocorrência gera um mapa em que habilidades próximas tendem a aparecer juntas em vagas semelhantes. Agrupamentos visuais indicam stacks que coocorrem com frequência (BI, ML clássico, DL, MLOps etc.). </p>
+<h3>5.5 Comparação geral de métodos não supervisionados</h3>
+<h3>Resumo de métodos não supervisionados – até 10 linhas</h3>
+<table><thead><tr><th>method</th><th>n_clusters</th><th>mean_silhouette</th></tr></thead><tbody>
+<tr> <td>pca_kmeans</td><td class='num'>3</td><td class='num'>0.071</td> </tr>
+<tr> <td>spectral_clustering</td><td class='num'>3</td><td class='num'>0.165</td> </tr>
+<tr> <td>lda_topics</td><td class='num'>5</td><td>NA</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Comparação entre métodos não supervisionados</b><br/><img src='unsup_methods_silhouette_summary.png'></p>
+<p> Os valores de silhouette médio são modestos, indicando estrutura apenas moderadamente definida: há tendência a formação de grupos, mas com fronteiras difusas. Na prática, os clusters organizam o espaço de vagas em segmentos interpretáveis, não classes rígidas. </p>
+<h3>5.6 Consistência entre métodos de clustering e tópicos</h3>
+<p><b>Gráfico – Heatmap k-means × clustering espectral</b><br/><img src='unsup_cm_kmeans_spectral.png'></p>
+<p> As proporções são normalizadas por linha (dentro de cada cluster do k‑means). Concentração em poucas células sugere alta consistência. </p>
+<p><b>Gráfico – Heatmap cluster × tópico LDA</b><br/><img src='unsup_cm_cluster_topic.png'></p>
+<p> O heatmap cluster × tópico LDA mostra quais stacks de skills são mais frequentes em cada cluster salarial. </p>
+<h2>6. Sistema de recomendação baseado em conteúdo</h2>
+<p> Implementamos um sistema de recomendação <i>content‑based</i> para recomendar vagas semelhantes a um perfil de usuário ou a uma vaga específica. </p>
+<p> Fluxo: representar vagas por TF‑IDF normalizado; gerar vetor do usuário; calcular similaridade cosseno; aplicar filtros de negócio; e, opcionalmente, usar MMR para balancear relevância e diversidade. </p>
+<h3>6.1 Vagas similares a uma vaga base</h3>
+<h3>Exemplo de recomendações similares a uma vaga real – até 10 linhas</h3>
+<table><thead><tr><th>rank</th><th>job_id</th><th>company_name</th><th>job_title</th><th>industry</th><th>experience_level</th><th>employment_type</th><th>location</th><th>salary_range_usd</th><th>score</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>1662</td><td>Anderson, Tucker and Phillips</td><td>Data Scientist</td><td>Healthcare</td><td>Mid</td><td>Remote</td><td>Jenniferborough, CO</td><td>76395-94209</td><td class='num'>0.334</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>1720</td><td>Grimes-Cruz</td><td>Data Analyst</td><td>Healthcare</td><td>Entry</td><td>Contract</td><td>West Nicolefurt, US</td><td>145486-222351</td><td class='num'>0.320</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>345</td><td>Anthony, Miller and Russell</td><td>Data Analyst</td><td>E-commerce</td><td>Senior</td><td>Internship</td><td>East Linda, NZ</td><td>120234-139093</td><td class='num'>0.308</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>780</td><td>Harris and Sons</td><td>Data Analyst</td><td>E-commerce</td><td>Entry</td><td>Internship</td><td>Amandabury, GW</td><td>142504-235377</td><td class='num'>0.304</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>1198</td><td>Woods-French</td><td>AI Researcher</td><td>Healthcare</td><td>Mid</td><td>Internship</td><td>South Meagan, GQ</td><td>81361-133784</td><td class='num'>0.296</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>984</td><td>Garcia-Smith</td><td>Data Scientist</td><td>Automotive</td><td>Entry</td><td>Contract</td><td>North Kevin, YE</td><td>47150-124312</td><td class='num'>0.275</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>998</td><td>Anderson LLC</td><td>ML Engineer</td><td>Tech</td><td>Senior</td><td>Full-time</td><td>Elizabethton, PW</td><td>141251-152764</td><td class='num'>0.259</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>426</td><td>Edwards, Jackson and Baker</td><td>Data Analyst</td><td>Automotive</td><td>Entry</td><td>Contract</td><td>Sullivanshire, WS</td><td>147219-223596</td><td class='num'>0.249</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>1038</td><td>Ramirez, Sanchez and Lucas</td><td>NLP Engineer</td><td>Retail</td><td>Senior</td><td>Internship</td><td>Johnsonfurt, GQ</td><td>147851-188241</td><td class='num'>0.244</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>1458</td><td>Bush Inc</td><td>AI Researcher</td><td>Education</td><td>Entry</td><td>Full-time</td><td>New Christophermouth, MC</td><td>89994-162981</td><td class='num'>0.227</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Score das recomendações similares</b><br/><img src='recs_similar_scores.png'></p>
+<p> O score é a similaridade cosseno entre descrições. No exemplo, a primeira recomendação tem score ≈ 0.334 e a última do top‑10 tem score ≈ 0.227. </p>
+<h3>6.2 Vagas recomendadas para um perfil de usuário</h3>
+<h3>Exemplo de recomendações para um perfil: Machine Learning Engineer Senior (skills: python, pandas, sql, tensorflow, nlp; tools: pytorch, mlflow) – até 10 linhas</h3>
+<table><thead><tr><th>rank</th><th>job_id</th><th>company_name</th><th>job_title</th><th>industry</th><th>experience_level</th><th>employment_type</th><th>location</th><th>salary_range_usd</th><th>score</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td class='num'>1884</td><td>Wolfe, Stephenson and Sanchez</td><td>NLP Engineer</td><td>Tech</td><td>Mid</td><td>Full-time</td><td>Wallacetown, MG</td><td>68291-154121</td><td class='num'>0.213</td> </tr>
+<tr> <td class='num'>2</td><td class='num'>1251</td><td>Garcia, Smith and James</td><td>ML Engineer</td><td>Automotive</td><td>Mid</td><td>Full-time</td><td>Lake Gregoryshire, CD</td><td>111473-178933</td><td class='num'>0.195</td> </tr>
+<tr> <td class='num'>3</td><td class='num'>50</td><td>Richards PLC</td><td>NLP Engineer</td><td>Finance</td><td>Mid</td><td>Full-time</td><td>Lewismouth, TD</td><td>75575-120477</td><td class='num'>0.181</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>1154</td><td>Smith-Hansen</td><td>Quant Researcher</td><td>Retail</td><td>Mid</td><td>Full-time</td><td>North Michellestad, ME</td><td>126850-203760</td><td class='num'>0.171</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>1055</td><td>Black-Simmons</td><td>Data Scientist</td><td>Automotive</td><td>Senior</td><td>Full-time</td><td>Allenburgh, BW</td><td>136391-226513</td><td class='num'>0.169</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>761</td><td>Mcdowell-Thompson</td><td>Computer Vision Engineer</td><td>E-commerce</td><td>Mid</td><td>Full-time</td><td>Nathanville, GH</td><td>100842-113216</td><td class='num'>0.169</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>964</td><td>Flynn-Franco</td><td>AI Product Manager</td><td>Tech</td><td>Senior</td><td>Full-time</td><td>North Grant, MR</td><td>110260-191166</td><td class='num'>0.164</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>430</td><td>Wilcox Ltd</td><td>Computer Vision Engineer</td><td>Automotive</td><td>Mid</td><td>Full-time</td><td>Robertsonbury, VN</td><td>100296-111823</td><td class='num'>0.147</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>1171</td><td>Nguyen, Brown and Edwards</td><td>Data Scientist</td><td>Finance</td><td>Mid</td><td>Full-time</td><td>Port Victoriaburgh, PG</td><td>84079-116621</td><td class='num'>0.144</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>1269</td><td>Gonzalez-Gordon</td><td>Data Scientist</td><td>Education</td><td>Senior</td><td>Full-time</td><td>Jodyville, BA</td><td>98960-171179</td><td class='num'>0.134</td> </tr>
+</tbody></table>
+<p><b>Gráfico – Score das recomendações para o perfil</b><br/><img src='recs_user_profile_scores.png'></p>
+<p> Para o perfil configurado, o score da primeira vaga recomendada é ≈ 0.213 e o da última do top‑15 é ≈ 0.070. </p>
+<p class='note'> Para reduzir risco de consumo excessivo de memória, aplicamos uma prefiltragem (pool_top) antes do MMR: o MMR roda apenas sobre os candidatos mais relevantes (ex.: top 300–1000 conforme top_k). </p>
+<h2>7. Conclusões, limitações e trabalhos futuros</h2>
+<h3>7.1 Conclusões sobre o modelo supervisionado</h3>
+<p> No teste, os modelos apresentaram RMSE/MAE (em log‑salário): xgboost: RMSE ≈ 0.283, MAE ≈ 0.237; random_forest: RMSE ≈ 0.284, MAE ≈ 0.237; elastic_net: RMSE ≈ 0.284, MAE ≈ 0.237. O modelo final (menor RMSE) foi <b>xgboost</b>. O RMSE corresponde a erro multiplicativo típico ≈ 1.33× (erro relativo ≈ 33%), comparável à dispersão observada de <code>salary_log</code> (DP ≈ 0.295). </p>
+<h3>7.2 Insights não supervisionados e estrutura do mercado</h3>
+<p> A análise de clusters revela segmentos com perfis salariais relativamente distintos: a mediana de <code>salary_mid</code> varia de US$120,019 (cluster 3) a US$125,868 (cluster 2). Ainda assim, há ampla variação dentro de cada cluster, sugerindo um mercado mais contínuo que discretizado. </p>
+<p> O LDA identificou stacks de skills recorrentes, como Tópico 1: hugging face, r, cuda, langchain, mlflow ; Tópico 2: power bi, azure, keras, tensorflow, sql ; Tópico 3: keras, aws, c++, tensorflow, numpy, úteis para sumarizar perfis técnicos e conectar tópicos às faixas salariais. </p>
+</body></html>

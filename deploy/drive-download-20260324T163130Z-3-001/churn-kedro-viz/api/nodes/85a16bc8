@@ -1,0 +1,41 @@
+{
+  "code": "def clean_data(\n    raw_churn_data: pd.DataFrame,\n    columns: dict[str, Any],\n) -> pd.DataFrame:\n    \"\"\"Select, coerce, and impute columns from a raw DataFrame.\n\n    Columns listed in ``columns`` that are absent from the DataFrame are\n    silently skipped, so the same function works for both training data\n    (which includes a target column) and inference data (which does not).\n    Numerical columns are coerced to float with NaNs filled by 0;\n    categorical columns are cast to stripped strings with NaNs filled by\n    ``\"Unknown\"``.\n\n    Args:\n        raw_churn_data: Raw input DataFrame.\n        columns: Column groups to process. Recognised keys:\n            - ``target`` (str, optional): Target column name.\n            - ``numerical`` (list[str]): Numerical feature column names.\n            - ``categorical`` (list[str]): Categorical feature column names.\n\n    Returns:\n        Cleaned DataFrame containing only the columns that were both\n        specified and present in the input.\n    \"\"\"\n    df_raw = raw_churn_data.copy()\n\n    all_columns = [\n        item\n        for v in columns.values()\n        for item in (v if isinstance(v, list) else [v])\n        if item in df_raw.columns\n    ]\n\n    df_flt = df_raw[all_columns].copy()\n\n    for c in columns[\"numerical\"]:\n        df_flt[c] = pd.to_numeric(df_flt[c], errors=\"coerce\").fillna(0)\n\n    for c in columns[\"categorical\"]:\n        df_flt[c] = df_flt[c].astype(str).str.strip().fillna(\"Unknown\")\n\n    logger.info(\"Cleaned data: %d rows, %d columns\", len(df_flt), len(df_flt.columns))\n\n    return df_flt\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    }
+  },
+  "run_command": "kedro run --to-nodes='clean_inference_data'",
+  "inputs": [
+    "raw_inference_dataframe",
+    "params:columns"
+  ],
+  "outputs": [
+    "cleaned_inference_data"
+  ],
+  "preview": null
+}

@@ -1,0 +1,139 @@
+{
+  "clean_output_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_2/analysis_output_clean_20260226_111423",
+  "summary_common_metrics_total": 11,
+  "summary_common_metrics_match": 11,
+  "summary_matches": [
+    {
+      "metric": "state_missing_pct",
+      "baseline": 0.46427215189873416,
+      "clean": 0.46427215189873416,
+      "match": true
+    },
+    {
+      "metric": "utm_missing_pct",
+      "baseline": 0.20720886075949366,
+      "clean": 0.20720886075949366,
+      "match": true
+    },
+    {
+      "metric": "short_sessions_le_5s",
+      "baseline": 243319,
+      "clean": 243319,
+      "match": true
+    },
+    {
+      "metric": "short_sessions_rate_le_5s",
+      "baseline": 0.2632724164421506,
+      "clean": 0.2632724164421506,
+      "match": true
+    },
+    {
+      "metric": "return_gap_median_days",
+      "baseline": 0.33557450231578617,
+      "clean": 0.33557450231578617,
+      "match": true
+    },
+    {
+      "metric": "return_gap_heavy_median_days",
+      "baseline": 0.4315382175947781,
+      "clean": 0.4315382175947781,
+      "match": true
+    },
+    {
+      "metric": "return_gap_base_median_days",
+      "baseline": 0.18820373264037898,
+      "clean": 0.18820373264037898,
+      "match": true
+    },
+    {
+      "metric": "latest_new_users_month",
+      "baseline": "2025-10-01",
+      "clean": "2025-10-01",
+      "match": true
+    },
+    {
+      "metric": "latest_new_users_count",
+      "baseline": 80,
+      "clean": 80,
+      "match": true
+    },
+    {
+      "metric": "recent_6m_mau_interactions_slope_users_per_month",
+      "baseline": -457.9142857142854,
+      "clean": -457.9142857142854,
+      "match": true
+    },
+    {
+      "metric": "causal_claim_allowed",
+      "baseline": false,
+      "clean": false,
+      "match": true
+    }
+  ],
+  "retained_hypotheses_total": 9,
+  "retained_hypotheses_match": 9,
+  "retained_hypotheses": [
+    {
+      "hypothesis_id": "H1",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H10",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H13",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H14",
+      "status_baseline": "inconclusive",
+      "status_clean": "inconclusive",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H15",
+      "status_baseline": "not_testable",
+      "status_clean": "not_testable",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H2",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H4",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H5",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    },
+    {
+      "hypothesis_id": "H8",
+      "status_baseline": "validated",
+      "status_clean": "validated",
+      "match": true
+    }
+  ],
+  "removed_hypotheses": [
+    "H11",
+    "H12",
+    "H3",
+    "H6",
+    "H7",
+    "H9"
+  ]
+}

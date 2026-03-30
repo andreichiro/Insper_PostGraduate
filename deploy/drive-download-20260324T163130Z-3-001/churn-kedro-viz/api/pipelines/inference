@@ -1,0 +1,441 @@
+{
+  "nodes": [
+    {
+      "id": "fefdee63",
+      "name": "params:columns",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "data_engineering",
+        "inference",
+        "modelling",
+        "refit"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "6598d22e",
+      "name": "to_dataframe",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "589eb506",
+      "name": "raw_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 705,
+          "columns": 21,
+          "file_size": 98410
+        },
+        "styles": null
+      },
+      "layer": "raw",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "b3f4075f",
+      "name": "raw_inference_dataframe",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 705,
+          "columns": 21
+        },
+        "styles": null
+      },
+      "layer": null,
+      "dataset_type": "io.memory_dataset.MemoryDataset"
+    },
+    {
+      "id": "85a16bc8",
+      "name": "clean_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ddd7c831",
+      "name": "cleaned_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 705,
+          "columns": 19,
+          "file_size": 87296
+        },
+        "styles": null
+      },
+      "layer": "intermediate",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "b6262a34",
+      "name": "production_encoders",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "c1710c4c",
+      "name": "production_scalers",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "babd1309",
+      "name": "encode_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "d910f28f",
+      "name": "encoded_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 705,
+          "columns": 19,
+          "file_size": 33582
+        },
+        "styles": null
+      },
+      "layer": "feature",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "36e9025d",
+      "name": "scale_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "c9695594",
+      "name": "scaled_inference_data",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 705,
+          "columns": 19,
+          "file_size": 64223
+        },
+        "styles": null
+      },
+      "layer": "model_input",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "1aa02b26",
+      "name": "production_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "4b9d36dc",
+      "name": "predict",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "4cd4e6db",
+      "name": "inference_predictions",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": "model_output",
+      "dataset_type": "json.json_dataset.JSONDataset"
+    }
+  ],
+  "edges": [
+    {
+      "source": "b6262a34",
+      "target": "babd1309"
+    },
+    {
+      "source": "ddd7c831",
+      "target": "babd1309"
+    },
+    {
+      "source": "4b9d36dc",
+      "target": "4cd4e6db"
+    },
+    {
+      "source": "fefdee63",
+      "target": "85a16bc8"
+    },
+    {
+      "source": "babd1309",
+      "target": "d910f28f"
+    },
+    {
+      "source": "36e9025d",
+      "target": "c9695594"
+    },
+    {
+      "source": "589eb506",
+      "target": "6598d22e"
+    },
+    {
+      "source": "b3f4075f",
+      "target": "85a16bc8"
+    },
+    {
+      "source": "d910f28f",
+      "target": "36e9025d"
+    },
+    {
+      "source": "c1710c4c",
+      "target": "36e9025d"
+    },
+    {
+      "source": "c9695594",
+      "target": "4b9d36dc"
+    },
+    {
+      "source": "85a16bc8",
+      "target": "ddd7c831"
+    },
+    {
+      "source": "6598d22e",
+      "target": "b3f4075f"
+    },
+    {
+      "source": "1aa02b26",
+      "target": "4b9d36dc"
+    }
+  ],
+  "layers": [
+    "raw",
+    "primary",
+    "reporting",
+    "intermediate",
+    "feature",
+    "model_input",
+    "model_output"
+  ],
+  "tags": [],
+  "pipelines": [
+    {
+      "id": "__default__",
+      "name": "__default__"
+    },
+    {
+      "id": "modelling",
+      "name": "modelling"
+    },
+    {
+      "id": "data_engineering",
+      "name": "data_engineering"
+    },
+    {
+      "id": "refit",
+      "name": "refit"
+    },
+    {
+      "id": "inference",
+      "name": "inference"
+    }
+  ],
+  "modular_pipelines": {
+    "__root__": {
+      "id": "__root__",
+      "name": "__root__",
+      "inputs": [],
+      "outputs": [],
+      "children": [
+        {
+          "id": "6598d22e",
+          "type": "task"
+        },
+        {
+          "id": "b3f4075f",
+          "type": "data"
+        },
+        {
+          "id": "c9695594",
+          "type": "data"
+        },
+        {
+          "id": "fefdee63",
+          "type": "parameters"
+        },
+        {
+          "id": "ddd7c831",
+          "type": "data"
+        },
+        {
+          "id": "1aa02b26",
+          "type": "data"
+        },
+        {
+          "id": "d910f28f",
+          "type": "data"
+        },
+        {
+          "id": "c1710c4c",
+          "type": "data"
+        },
+        {
+          "id": "589eb506",
+          "type": "data"
+        },
+        {
+          "id": "4cd4e6db",
+          "type": "data"
+        },
+        {
+          "id": "babd1309",
+          "type": "task"
+        },
+        {
+          "id": "4b9d36dc",
+          "type": "task"
+        },
+        {
+          "id": "85a16bc8",
+          "type": "task"
+        },
+        {
+          "id": "fefdee63",
+          "type": "data"
+        },
+        {
+          "id": "b6262a34",
+          "type": "data"
+        },
+        {
+          "id": "36e9025d",
+          "type": "task"
+        }
+      ]
+    }
+  },
+  "selected_pipeline": "inference"
+}

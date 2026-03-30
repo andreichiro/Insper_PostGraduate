@@ -1,0 +1,56 @@
+{% docs nrd_realign_lastPI_v3 %}
+
+-- Source R file(s): nrd_realign_lastPI_v3
+-- Upstream dependencies (dbt sources):
+--   - {{ source('YMP','active_account_query') }}
+--   - {{ source('dwcore','fact_sales_activity') }}
+--   - {{ source('dwcore','dim_acct') }}
+--   - {{ source('dwcore','dim_txn_reason_cd') }}
+--
+-- Expected grain & primary key of this model:
+--   - Grain: one row per (infopro_div_nbr, acct_nbr)
+--   - Deterministic key candidates: (infopro_div_nbr, acct_nbr)
+--
+-- Purpose:
+--   - Compute the latest "PI" effective date key (eff_dt_sk) from dwcore.fact_sales_activity with:
+--       * dtx.txn_cd = :config_last_pi_trans_cd
+--       * dtx.reason_cd NOT IN :config_excl_last_pi_dsppth_rsn_cd
+--       * fsd.sales_activity_period_sk BETWEEN :last_PI_start AND :last_PI_end
+--       * fsd.is_deleted = 0 AND fsd.is_updated = 0
+--     Split into two buckets by (monthly_sales_change_amt + revenue_expect_disposal_change_amt):
+--       * > 0 → fsd1
+--       * = 0 → fsd2 (then restricted to AAQ = active_account_query)
+--     FULL JOIN fsd1 vs fsd3 and pick the non-null keys and the maximum Last_PI.
+--
+-- Materialization:
+--   - 'table' so the two SYS_* audit columns (required by spec) are persisted at build time.
+--
+-- Tests to add (schema.yml recommendation):
+--   - not_null: ["Infopro_Div_Nbr","Acct_Nbr"]
+--   - unique:   ["Infopro_Div_Nbr","Acct_Nbr"]
+--
+-- Assumptions:
+--   - eff_dt_sk, sales_activity_period_sk are numeric; arithmetic NULLs intentionally NOT coalesced
+--     (parity with original behavior: NULL + x → NULL, comparisons exclude those rows).
+--   - TIMESTAMP_NTZ semantics; no timezone logic in business rules.
+--
+-- Determinism notes:
+--   - Core fields deterministic given identical inputs and var() values.
+--   - SYS_* fields use CURRENT_TIMESTAMP per hard requirement; these are intentionally volatile
+--     and do not affect business outputs.
+--
+-- Performance:
+--   - OPTIMIZATION: shared join/filter factored into CTE_sales_base (no change in results).
+--
+-- NO DIRECT TRANSLATION (documented safe approximations):
+--   - T‑SQL variables → dbt var('...').
+--   - NOT IN with possibly-empty parameter list → guarded; empty list means “no exclusions”.
+--   - Schema brackets/notation → dbt source() for portability.
+--
+-- Many-to-many join risk:
+--   - Expect unique *_sk in dim tables. GROUP BY collapses multiplicity; still add uniqueness tests upstream.
+--
+-- Machine learning candidate:
+--   - Not applicable; logic is rule-based (no predictive component).
+
+{% enddocs %}

@@ -1,0 +1,14 @@
+{
+  "code": "def transform_scalers(\n    df_in: pd.DataFrame,\n    scalers: dict[str, StandardScaler],\n) -> pd.DataFrame:\n    \"\"\"Apply fitted StandardScalers to standardize numerical columns.\n\n    Args:\n        df_in: DataFrame containing the columns to scale.\n        scalers: Mapping of column names to fitted ``StandardScaler`` instances.\n\n    Returns:\n        DataFrame with each scaled column replaced by its standardized values.\n    \"\"\"\n    df_out = df_in.copy()\n\n    for col, scaler in scalers.items():\n        if col in df_out.columns:\n            df_out[col] = scaler.transform(df_out[[col]])\n\n    return df_out\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {},
+  "run_command": "kedro run --to-nodes='scale_numerical_features'",
+  "inputs": [
+    "encoded_churn_data",
+    "modelling_scalers"
+  ],
+  "outputs": [
+    "master_table"
+  ],
+  "preview": null
+}

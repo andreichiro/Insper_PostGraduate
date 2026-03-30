@@ -1,0 +1,41 @@
+{
+  "parameters": {
+    "modelling_optimization": {
+      "class_path": "catboost.CatBoostClassifier",
+      "target_column": "Churn",
+      "train_splits": [
+        "train",
+        "test"
+      ],
+      "eval_splits": [
+        "train",
+        "test",
+        "validate"
+      ],
+      "init_args": {
+        "random_seed": 42,
+        "verbose": 0,
+        "train_dir": "data/tmp/catboost_info"
+      },
+      "cv": 5,
+      "scoring": "roc_auc",
+      "param_grid": {
+        "depth": [
+          2,
+          4,
+          8
+        ],
+        "iterations": [
+          10,
+          100,
+          300
+        ],
+        "learning_rate": [
+          0.01,
+          0.05,
+          0.1
+        ]
+      }
+    }
+  }
+}

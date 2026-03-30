@@ -1,0 +1,79 @@
+{
+  "code": "def optimize_hyperparameters(\n    master_table: pd.DataFrame,\n    columns: dict[str, Any],\n    params: dict[str, Any],\n) -> dict[str, Any]:\n    \"\"\"Run a cross-validated grid search and return the best model artifact.\n\n    The returned artifact has the same structure as ``train_model``, so it\n    can be passed directly to ``evaluate_model``.\n\n    Args:\n        master_table: Fully-processed DataFrame with a ``split`` column and\n            all feature and target columns.\n        columns: Column groups dictionary with ``numerical`` and\n            ``categorical`` keys defining the feature columns.\n        params: Optimization configuration with keys:\n            - ``class_path`` (str): Fully-qualified estimator class.\n            - ``init_args`` (dict, optional): Base estimator constructor args.\n            - ``param_grid`` (dict): Hyperparameter grid for ``GridSearchCV``.\n            - ``cv`` (int): Number of cross-validation folds.\n            - ``scoring`` (str): Scoring metric for the search.\n            - ``target_column`` (str): Name of the target column.\n            - ``train_splits`` (list[str]): Split labels used for fitting.\n            - ``eval_splits`` (list[str]): Split labels for evaluation.\n\n    Returns:\n        Model artifact dict with keys ``estimator``, ``target_column``,\n        ``feature_columns``, ``eval_splits``, ``best_params``,\n        and ``cv_best_score``.\n    \"\"\"\n    target = params[\"target_column\"]\n    train_df = master_table[master_table[\"split\"].isin(params[\"train_splits\"])]\n    feature_cols = columns[\"numerical\"] + columns[\"categorical\"]\n\n    X_train = train_df[feature_cols]\n    y_train = train_df[target]\n\n    cls = _load_class(params[\"class_path\"])\n    base_estimator = cls(**params.get(\"init_args\", {}))\n\n    search = GridSearchCV(\n        estimator=base_estimator,\n        param_grid=params[\"param_grid\"],\n        cv=params.get(\"cv\", 5),\n        scoring=params.get(\"scoring\", \"roc_auc\"),\n        n_jobs=-1,\n        verbose=0,\n    )\n    search.fit(X_train, y_train)\n\n    logger.info(\n        \"Grid search complete — best %s: %.4f, params: %s\",\n        params.get(\"scoring\", \"roc_auc\"),\n        search.best_score_,\n        search.best_params_,\n    )\n\n    return {\n        \"estimator\": search.best_estimator_,\n        \"target_column\": target,\n        \"feature_columns\": feature_cols,\n        \"eval_splits\": params[\"eval_splits\"],\n        \"best_params\": search.best_params_,\n        \"cv_best_score\": float(search.best_score_),\n    }\n",
+  "filepath": "churn/src/churn/pipelines/modelling/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    },
+    "modelling_optimization": {
+      "class_path": "catboost.CatBoostClassifier",
+      "target_column": "Churn",
+      "train_splits": [
+        "train",
+        "test"
+      ],
+      "eval_splits": [
+        "train",
+        "test",
+        "validate"
+      ],
+      "init_args": {
+        "random_seed": 42,
+        "verbose": 0,
+        "train_dir": "data/tmp/catboost_info"
+      },
+      "cv": 5,
+      "scoring": "roc_auc",
+      "param_grid": {
+        "depth": [
+          2,
+          4,
+          8
+        ],
+        "iterations": [
+          10,
+          100,
+          300
+        ],
+        "learning_rate": [
+          0.01,
+          0.05,
+          0.1
+        ]
+      }
+    }
+  },
+  "run_command": "kedro run --to-nodes='optimize_hyperparameters'",
+  "inputs": [
+    "master_table",
+    "params:columns",
+    "params:modelling_optimization"
+  ],
+  "outputs": [
+    "optimized_model"
+  ],
+  "preview": null
+}

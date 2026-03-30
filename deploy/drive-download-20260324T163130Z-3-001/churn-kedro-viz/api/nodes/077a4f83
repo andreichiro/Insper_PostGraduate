@@ -1,0 +1,51 @@
+{
+  "code": "def fit_encoders(\n    df_in: pd.DataFrame,\n    columns: dict[str, Any],\n    params: dict[str, Any],\n) -> dict[str, LabelEncoder]:\n    \"\"\"Fit a LabelEncoder for each categorical column on the specified splits.\n\n    Only rows belonging to the splits in ``params[\"split_to_fit\"]`` are used,\n    preventing label leakage from test or validation data.\n\n    Args:\n        df_in: DataFrame with a ``split`` column and all feature columns.\n        columns: Column groups dictionary mapping group keys to column names.\n        params: Encoder configuration with keys:\n            - ``columns`` (list[str]): Group keys from ``columns`` to encode.\n            - ``split_to_fit`` (list[str]): Split labels used for fitting.\n\n    Returns:\n        Mapping of column names to their fitted ``LabelEncoder`` instances.\n    \"\"\"\n    encoders: dict[str, LabelEncoder] = {}\n\n    cols_to_encode = [\n        item\n        for p in params[\"columns\"]\n        for item in (columns[p] if isinstance(columns[p], list) else [columns[p]])\n    ]\n\n    for col in cols_to_encode:\n        le = LabelEncoder()\n        le.fit(df_in.loc[df_in[\"split\"].isin(params[\"split_to_fit\"]), col].astype(str))\n        encoders[col] = le\n\n    logger.info(\"Fitted label encoders for %d columns\", len(encoders))\n    return encoders\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    },
+    "modelling_encoders": {
+      "columns": [
+        "target",
+        "categorical"
+      ],
+      "split_to_fit": [
+        "train"
+      ]
+    }
+  },
+  "run_command": "kedro run --to-nodes='fit_encoders'",
+  "inputs": [
+    "split_churn_data",
+    "params:columns",
+    "params:modelling_encoders"
+  ],
+  "outputs": [
+    "modelling_encoders"
+  ],
+  "preview": null
+}

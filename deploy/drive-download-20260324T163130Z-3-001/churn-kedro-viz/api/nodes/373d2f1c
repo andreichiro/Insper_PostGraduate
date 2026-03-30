@@ -1,0 +1,50 @@
+{
+  "code": "def refit_model(\n    master_table: pd.DataFrame,\n    columns: dict[str, Any],\n    optimized_model: dict[str, Any],\n    params: dict[str, Any],\n) -> dict[str, Any]:\n    \"\"\"Retrain the optimized model on all data splits for production use.\n\n    Extracts the estimator class and best hyperparameters from the\n    ``optimized_model`` artifact, then fits a fresh instance on the\n    splits specified in ``params[\"train_splits\"]`` (typically all splits).\n\n    Args:\n        master_table: Fully-processed DataFrame with a ``split`` column and\n            all feature and target columns.\n        columns: Column groups dictionary with ``numerical`` and\n            ``categorical`` keys defining the feature columns.\n        optimized_model: Model artifact produced by\n            ``optimize_hyperparameters``, containing a fitted ``estimator``\n            whose class and hyperparameters are reused.\n        params: Refit configuration with keys:\n            - ``train_splits`` (list[str]): Split labels to train on.\n\n    Returns:\n        Production model artifact dict with keys ``estimator``,\n        ``target_column``, and ``feature_columns``.\n    \"\"\"\n    source_estimator = optimized_model[\"estimator\"]\n    target = optimized_model[\"target_column\"]\n    feature_cols = columns[\"numerical\"] + columns[\"categorical\"]\n\n    train_df = master_table[master_table[\"split\"].isin(params[\"train_splits\"])]\n    X_train = train_df[feature_cols]\n    y_train = train_df[target]\n\n    estimator = type(source_estimator)(**source_estimator.get_params())\n    estimator.fit(X_train, y_train)\n\n    logger.info(\n        \"Refitted %s on %d samples (%d features) using all splits\",\n        type(source_estimator).__name__,\n        len(X_train),\n        X_train.shape[1],\n    )\n\n    return {\n        \"estimator\": estimator,\n        \"target_column\": target,\n        \"feature_columns\": feature_cols,\n    }\n",
+  "filepath": "churn/src/churn/pipelines/refit/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    },
+    "refit_model": {
+      "train_splits": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  },
+  "run_command": "kedro run --to-nodes='refit_model'",
+  "inputs": [
+    "master_table",
+    "params:columns",
+    "optimized_model",
+    "params:refit_model"
+  ],
+  "outputs": [
+    "production_model"
+  ],
+  "preview": null
+}

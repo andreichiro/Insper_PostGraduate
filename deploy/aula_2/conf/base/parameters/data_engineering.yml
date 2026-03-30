@@ -1,0 +1,41 @@
+raw_columns:
+  target:
+    - Outcome
+  categorical: []
+  numerical:
+    - Pregnancies
+    - Glucose
+    - BloodPressure
+    - SkinThickness
+    - Insulin
+    - BMI
+    - DiabetesPedigreeFunction
+    - Age
+
+columns:
+  target:
+    - Outcome
+  categorical: []
+  numerical:
+    - Pregnancies
+    - Glucose
+    - BloodPressure
+    - SkinThickness
+    - Insulin
+    - BMI
+    - DiabetesPedigreeFunction
+    - Age
+    - glucose_bmi_interaction
+
+split_ratio:
+  train: 0.7
+  validation: 0.15
+  test: 0.15
+
+random_state: 42
+
+stratify_column: Outcome
+
+fit_transform:
+  split_to_fit:
+    - train

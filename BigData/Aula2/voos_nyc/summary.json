@@ -1,0 +1,9 @@
+{
+  "origin": "JFK",
+  "dest": "LAX",
+  "max_depdelay": 1435.0,
+  "top_month_name": "Agosto",
+  "top_month_total_flights": 6228,
+  "counts_csv": "output/jfk_lax_counts.csv",
+  "chart_path": "output/jfk_lax_heatmap.png"
+}

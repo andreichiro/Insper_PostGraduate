@@ -1,0 +1,499 @@
+---
+title: "**Laboratório 3 – Extensões do ggplot2**"
+author: "Práticas Avançadas em Data Visualization - Profa. Thanuci"
+output: html_document
+---
+
+# 📌 Objetivo do Trabalho
+
+Neste trabalho você deverá escolher **uma base de dados real disponível na internet**
+(Kaggle, IBGE, dados governamentais, APIs públicas, repositórios acadêmicos, etc.)
+e produzir visualizações utilizando extensões do `ggplot2`.
+
+## Requisitos
+
+- Escolher uma base real
+- Informar a fonte da base
+- Justificar a escolha
+- Criar visualizações analíticas coerentes
+- Utilizar **todas as extensões apresentadas** (cada extensão em uma visualização diferente)
+  - Dica: vejam se há algo que pode ser aproveitado para a entrega do projeto integrador. 
+- Explicar o que cada gráfico representa
+- Extrair pelo menos um insight relevante
+
+⚠️ O tipo de visualização escolhida deve estar alinhado com o problema analisado.
+
+---
+
+# 📚 Extensão 1 – patchwork (Composição de Gráficos)
+
+
+📖 Documentação:  
+https://patchwork.data-imaginist.com/
+
+```{r patchwork-exemplo, message=FALSE, warning=FALSE}
+#install.packages(patchwork)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+dados_starwars <- starwars |>
+  rename(
+    massa = mass,
+    altura = height,
+    genero = gender
+  )
+
+p1 <- dados_starwars |>
+  ggplot(aes(massa, altura)) +
+  geom_point()
+
+p2 <- dados_starwars |>
+  ggplot(aes(massa)) +
+  geom_histogram()
+
+p3 <- dados_starwars |>
+  ggplot(aes(altura)) +
+  geom_histogram()
+
+p4 <- dados_starwars |>
+  count(genero) |>
+  ggplot(aes(genero, n)) +
+  geom_col()
+
+p1 + p2
+p1 / p2
+```
+
+# ✍️ SUA VEZ – patchwork
+
+## Base escolhida
+
+(Descreva aqui a base e sua fonte)
+
+## Código
+
+```{r}
+# seu código aqui
+```
+
+## Interpretação
+
+(Explique o que os gráficos mostram e o insight extraído)
+
+---
+
+# 📚 Extensão 2 – ggridges (Distribuições Comparadas)
+
+📖 Documentação:  
+https://wilkelab.org/ggridges/
+
+```{r ggridges-exemplo, message=FALSE, warning=FALSE}
+library(ggridges)
+library(tidyverse)
+library(dados)
+
+diamante |>
+  ggplot() +
+  aes(x = preco, y = corte, fill = corte) +
+  geom_density_ridges(
+    alpha = .6,
+    quantile_lines = TRUE, 
+    quantiles = 2
+  )
+```
+
+# ✍️ SUA VEZ – ggridges
+
+```{r}
+# seu código aqui
+```
+
+## Interpretação
+
+- O que as distribuições revelam?
+- Há diferença clara entre grupos?
+- Que decisão poderia ser tomada?
+
+---
+
+# 📚 Extensão 3 – plotly (Interatividade)
+
+📖 Documentação:  
+https://plotly.com/r/
+
+```{r plotly-exemplo, message=FALSE, warning=FALSE}
+library(plotly)
+
+dados_starwars <- starwars |>
+  rename(
+    massa = mass,
+    altura = height,
+    genero = gender,
+    nome = name
+  )
+
+p <- dados_starwars |>
+  ggplot() +
+  aes(x = massa, y = altura, colour = genero, name = nome) +
+  geom_point(size = 3)
+
+plotly::ggplotly(p)
+```
+
+# ✍️ SUA VEZ – plotly
+
+```{r}
+# seu código aqui
+```
+
+## Interpretação
+
+- O que a interatividade adiciona?
+- O hover traz novas informações?
+- O zoom facilita análise?
+
+---
+
+# 📚 Extensão 4 – gganimate (Animação)
+
+📖 Documentação:  
+https://gganimate.com/
+
+```{r gganimate-exemplo, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(dados)
+library(gganimate)
+
+anim <- dados_gapminder |> 
+  ggplot() +
+  aes(expectativa_de_vida, log10(pib_per_capita), 
+      size = log10(populacao)) +
+  geom_point() +
+  facet_wrap(~continente) +
+  theme_minimal(15) +
+  labs(
+    title = 'Ano: {frame_time}', 
+    x = 'Expectativa de vida', 
+    y = 'log10(Pib per capita)'
+  ) +
+  transition_time(ano)
+
+animate(
+  anim, 
+  nframes = 40, 
+  duration = 10
+)
+```
+
+# ✍️ SUA VEZ – gganimate
+
+```{r gganimate-sua-vez, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(gganimate)
+library(scales)
+library(tidyr)
+
+base_dir <- "/Users/akatsurada/Documents/INSPER/Visualization/Aula3"
+arquivos_excel <- Sys.glob(file.path(base_dir, "dados_luis*.xlsx"))
+input_path <- arquivos_excel[which.max(file.info(arquivos_excel)$mtime)]
+
+dados_mensais_estado <- read_excel(input_path) |>
+  mutate(
+    Data = as.Date(Data),
+    mes = floor_date(Data, "month"),
+    Estado = if_else(is.na(Estado), NA_character_, paste("Estado", as.character(Estado)))
+  ) |>
+  filter(!is.na(Estado)) |>
+  group_by(mes, Estado) |>
+  summarise(
+    juros_medio_diario = sum(juros_diarios, na.rm = TRUE) / n_distinct(Data),
+    .groups = "drop"
+  )
+
+mes_inicio <- min(dados_mensais_estado$mes)
+mes_fim <- max(dados_mensais_estado$mes)
+
+estados_comuns <- intersect(
+  dados_mensais_estado |> filter(mes == mes_inicio) |> pull(Estado),
+  dados_mensais_estado |> filter(mes == mes_fim) |> pull(Estado)
+)
+ordem_estados <- sort(estados_comuns)
+
+dados_animacao <- dados_mensais_estado |>
+  filter(Estado %in% estados_comuns) |>
+  mutate(Estado = factor(Estado, levels = ordem_estados)) |>
+  arrange(Estado, mes)
+
+meses_animacao <- tibble(
+  mes = sort(unique(dados_animacao$mes)),
+  mes_id = seq_along(mes),
+  frame_label = format(mes, "%m/%Y")
+)
+
+dados_animacao <- dados_animacao |>
+  left_join(meses_animacao, by = "mes") |>
+  arrange(Estado, mes_id)
+
+ponto_inicio <- dados_animacao |> filter(mes == mes_inicio)
+ponto_fim <- dados_animacao |> filter(mes == mes_fim)
+
+frames_estaticos <- 3L
+frames_transicao <- 2L
+frames_pulso_inicial <- 14L
+frames_pulso_final <- 18L
+tolerancia_relativa <- 0.05
+
+resumo_estados <- dados_animacao |>
+  filter(mes %in% c(mes_inicio, mes_fim)) |>
+  mutate(periodo = if_else(mes == mes_inicio, "inicio", "fim")) |>
+  select(Estado, periodo, juros_medio_diario) |>
+  pivot_wider(names_from = periodo, values_from = juros_medio_diario) |>
+  left_join(
+    dados_animacao |>
+      group_by(Estado) |>
+      summarise(
+        min_val = min(juros_medio_diario),
+        min_mes = format(mes[which.min(juros_medio_diario)][1], "%m/%Y"),
+        max_val = max(juros_medio_diario),
+        max_mes = format(mes[which.max(juros_medio_diario)][1], "%m/%Y"),
+        .groups = "drop"
+      ),
+    by = "Estado"
+  ) |>
+  mutate(
+    delta = fim - inicio,
+    recuperacao = fim - min_val,
+    tolerancia = abs(inicio) * tolerancia_relativa,
+    cor_halo = case_when(
+      delta > tolerancia ~ "#22c55e",
+      delta < -tolerancia ~ "#ef4444",
+      TRUE ~ "#94a3b8"
+    )
+  )
+
+frame_specs <- list()
+frame_cursor <- 1L
+
+forca_pulso_inicial <- sin(seq(0, pi, length.out = frames_pulso_inicial))
+
+for (j in seq_len(frames_pulso_inicial)) {
+  frame_specs[[length(frame_specs) + 1L]] <- tibble(
+    frame_id = frame_cursor,
+    segment_id = 1L,
+    progress = 0,
+    mes_plot = mes_inicio,
+    frame_label = format(mes_inicio, "%m/%Y"),
+    pulse_type = "inicio",
+    halo_alpha = 0.08 + 0.26 * forca_pulso_inicial[j],
+    halo_size = 6 + 4 * forca_pulso_inicial[j]
+  )
+  frame_cursor <- frame_cursor + 1L
+}
+
+for (i in seq_len(nrow(meses_animacao))) {
+  for (j in seq_len(frames_estaticos)) {
+    frame_specs[[length(frame_specs) + 1L]] <- tibble(
+      frame_id = frame_cursor,
+      segment_id = i,
+      progress = 0,
+      mes_plot = meses_animacao$mes[i],
+      frame_label = meses_animacao$frame_label[i],
+      pulse_type = "nenhum",
+      halo_alpha = 0,
+      halo_size = 0
+    )
+    frame_cursor <- frame_cursor + 1L
+  }
+
+  if (i < nrow(meses_animacao)) {
+    for (j in seq_len(frames_transicao)) {
+      progress <- j / frames_transicao
+      label_transicao <- if (j < frames_transicao) meses_animacao$frame_label[i] else meses_animacao$frame_label[i + 1L]
+
+      frame_specs[[length(frame_specs) + 1L]] <- tibble(
+        frame_id = frame_cursor,
+        segment_id = i,
+        progress = progress,
+        mes_plot = as.Date(
+          as.numeric(meses_animacao$mes[i]) +
+            (as.numeric(meses_animacao$mes[i + 1L]) - as.numeric(meses_animacao$mes[i])) * progress,
+          origin = "1970-01-01"
+        ),
+        frame_label = label_transicao,
+        pulse_type = "nenhum",
+        halo_alpha = 0,
+        halo_size = 0
+      )
+      frame_cursor <- frame_cursor + 1L
+    }
+  }
+}
+
+forca_pulso_final <- sin(seq(0, pi, length.out = frames_pulso_final))
+
+for (j in seq_len(frames_pulso_final)) {
+  frame_specs[[length(frame_specs) + 1L]] <- tibble(
+    frame_id = frame_cursor,
+    segment_id = nrow(meses_animacao),
+    progress = 0,
+    mes_plot = mes_fim,
+    frame_label = format(mes_fim, "%m/%Y"),
+    pulse_type = "fim",
+    halo_alpha = 0.06 + 0.24 * forca_pulso_final[j],
+    halo_size = 5.8 + 3.8 * forca_pulso_final[j]
+  )
+  frame_cursor <- frame_cursor + 1L
+}
+
+frame_specs <- bind_rows(frame_specs)
+
+frame_labels <- frame_specs |>
+  distinct(frame_id, frame_label) |>
+  arrange(frame_id) |>
+  pull(frame_label)
+
+segmentos_estado <- dados_animacao |>
+  group_by(Estado) |>
+  arrange(mes_id, .by_group = TRUE) |>
+  mutate(
+    juros_proximo = lead(juros_medio_diario, default = last(juros_medio_diario))
+  ) |>
+  ungroup() |>
+  select(Estado, mes_id, juros_medio_diario, juros_proximo)
+
+pontos_frames <- frame_specs |>
+  select(frame_id, segment_id, progress, mes_plot) |>
+  left_join(segmentos_estado, by = c("segment_id" = "mes_id"), relationship = "many-to-many") |>
+  transmute(
+    frame_id,
+    Estado,
+    mes = mes_plot,
+    juros_medio_diario = juros_medio_diario + (juros_proximo - juros_medio_diario) * progress
+  )
+
+marcador_tempo <- frame_specs |>
+  transmute(
+    frame_id,
+    mes = mes_plot
+  )
+
+halo_inicio <- frame_specs |>
+  filter(pulse_type == "inicio") |>
+  select(frame_id, halo_alpha, halo_size) |>
+  tidyr::crossing(
+    ponto_inicio |>
+      select(Estado, mes, juros_medio_diario) |>
+      mutate(cor_halo = "#94a3b8")
+  )
+
+halo_final <- frame_specs |>
+  filter(pulse_type == "fim") |>
+  select(frame_id, halo_alpha, halo_size) |>
+  tidyr::crossing(
+    ponto_fim |>
+      select(Estado, mes, juros_medio_diario) |>
+      left_join(
+        resumo_estados |> select(Estado, cor_halo),
+        by = "Estado"
+      )
+  )
+
+halos_animados <- bind_rows(halo_inicio, halo_final)
+
+anim <- ggplot() +
+  geom_vline(
+    data = marcador_tempo,
+    aes(xintercept = as.numeric(mes)),
+    colour = "#e2e8f0",
+    linewidth = 0.75,
+    linetype = "dashed"
+  ) +
+  geom_line(
+    data = dados_animacao,
+    aes(x = mes, y = juros_medio_diario, group = Estado),
+    colour = "#cbd5e1",
+    linewidth = 1.15
+  ) +
+  geom_point(data = ponto_inicio, aes(x = mes, y = juros_medio_diario), size = 2.8, colour = "#94a3b8") +
+  geom_point(data = ponto_fim, aes(x = mes, y = juros_medio_diario), size = 2.8, colour = "#ef4444") +
+  geom_point(
+    data = halos_animados,
+    aes(x = mes, y = juros_medio_diario, size = halo_size, alpha = halo_alpha, colour = cor_halo),
+    shape = 16,
+    stroke = 0
+  ) +
+  geom_point(
+    data = pontos_frames,
+    aes(x = mes, y = juros_medio_diario),
+    inherit.aes = FALSE,
+    size = 3.4,
+    colour = "#0f172a"
+  ) +
+  facet_wrap(~Estado, ncol = 2, scales = "free_y") +
+  scale_x_date(
+    date_breaks = "1 year",
+    date_labels = "%Y",
+    expand = expansion(mult = c(0.04, 0.06))
+  ) +
+  scale_y_continuous(
+    labels = label_number(
+      prefix = "R$ ",
+      big.mark = ".",
+      decimal.mark = ","
+    ),
+    expand = expansion(mult = c(0.12, 0.18))
+  ) +
+  scale_size_identity() +
+  scale_alpha_identity() +
+  scale_colour_identity() +
+  theme_minimal(15) +
+  labs(
+    title = "Juro médio diário por estado ao longo do tempo",
+    subtitle = paste0(
+      "Mês destacado: {frame_labels[pmax(1, pmin(length(frame_labels), round(frame_time)))]}",
+      "\nHalo inicial cinza | halo final: verde = fim acima do início | vermelho = fim abaixo | cinza = fim próximo"
+    ),
+    x = "Ano",
+    y = "Juro médio diário"
+  ) +
+  theme(
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 18, colour = "#0f172a", margin = margin(b = 20)),
+    plot.subtitle = element_text(size = 12.5, colour = "#334155", lineheight = 1.15, margin = margin(t = 4, b = 10)),
+    plot.caption = element_text(size = 10.5, colour = "#475569", margin = margin(t = 12)),
+    plot.margin = margin(18, 24, 24, 32),
+    axis.title.x = element_text(size = 12.5, margin = margin(t = 16)),
+    axis.title.y = element_text(size = 12.5, margin = margin(r = 18)),
+    axis.text.x = element_text(size = 11, margin = margin(t = 8)),
+    axis.text.y = element_text(size = 10.5, margin = margin(r = 6)),
+    strip.text = element_text(face = "bold", size = 13, colour = "#0f172a", margin = margin(t = 6, b = 6)),
+    strip.background = element_rect(fill = "#f8fafc", colour = NA),
+    panel.spacing.x = grid::unit(1.5, "cm"),
+    panel.spacing.y = grid::unit(1.35, "cm"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(colour = "#e2e8f0"),
+    panel.grid.major.y = element_line(colour = "#f1f5f9")
+  ) +
+  transition_time(frame_id) +
+  ease_aes("linear")
+
+animate(
+  anim,
+  nframes = max(frame_specs$frame_id),
+  duration = max(frame_specs$frame_id) / 12,
+  fps = 12,
+  width = 1400,
+  height = 980,
+  renderer = gifski_renderer(loop = TRUE)
+)
+```
+
+## Interpretação
+
+- Em termos de SQL, a transformação principal foi `GROUP BY DATE_TRUNC('month', Data), Estado`, calculando `SUM(juros_diarios) / COUNT(DISTINCT Data)` como `juro_medio_diario`.
+- O que muda ao longo do tempo? O `Estado 5` começa no patamar mais alto, atinge o pico de `R$ 50.045` em `05/2023` e depois entra em queda prolongada, encerrando a série em `R$ 2.088`. Já o `Estado 3` faz o movimento oposto: cresce ao longo da série, alcança `R$ 39.425` em `06/2024` e termina acima do nível inicial.
+- A animação facilita entendimento? Sim. O halo cinza inicial fixa o ponto de partida e o halo final resume a leitura sob a perspectiva da empresa: verde indica que o estado terminou acima do nível inicial, vermelho indica que terminou abaixo, e cinza indica pouca mudança. Isso facilita comparar começo e fim sem perder a trajetória completa.
+- Qual fenômeno temporal está sendo mostrado? O gráfico mostra a evolução mensal do `juro_médio_diário` em cada estado, destacando períodos de queda, recuperação e estabilidade ao longo da série.

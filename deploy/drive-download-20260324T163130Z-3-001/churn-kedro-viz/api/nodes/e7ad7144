@@ -1,0 +1,12 @@
+{
+  "parameters": {
+    "modelling_scalers": {
+      "columns": [
+        "numerical"
+      ],
+      "split_to_fit": [
+        "train"
+      ]
+    }
+  }
+}

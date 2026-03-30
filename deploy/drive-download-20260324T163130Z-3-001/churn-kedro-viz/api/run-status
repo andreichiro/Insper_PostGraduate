@@ -1,0 +1,278 @@
+{
+  "nodes": {
+    "58b4679c": {
+      "duration": 0.015741416000309982,
+      "status": "success",
+      "error": null
+    },
+    "6598d22e": {
+      "duration": 0.0005002079997211695,
+      "status": "success",
+      "error": null
+    },
+    "6087fdcf": {
+      "duration": 0.0029709999998885905,
+      "status": "success",
+      "error": null
+    },
+    "85a16bc8": {
+      "duration": 0.01580024999930174,
+      "status": "success",
+      "error": null
+    },
+    "077a4f83": {
+      "duration": 0.010649915999238146,
+      "status": "success",
+      "error": null
+    },
+    "7ddf9673": {
+      "duration": 0.007547666000391473,
+      "status": "success",
+      "error": null
+    },
+    "12823352": {
+      "duration": 0.005045707999670412,
+      "status": "success",
+      "error": null
+    },
+    "396d393f": {
+      "duration": 0.010202165998634882,
+      "status": "success",
+      "error": null
+    },
+    "babd1309": {
+      "duration": 0.003371500000866945,
+      "status": "success",
+      "error": null
+    },
+    "cdf2d678": {
+      "duration": 0.005122208998727729,
+      "status": "success",
+      "error": null
+    },
+    "36e9025d": {
+      "duration": 0.0035348340006748913,
+      "status": "success",
+      "error": null
+    },
+    "97c8779e": {
+      "duration": 0.003807416000199737,
+      "status": "success",
+      "error": null
+    },
+    "272cc30f": {
+      "duration": 33.07122409900148,
+      "status": "success",
+      "error": null
+    },
+    "da1b6d2b": {
+      "duration": 0.15009508399998595,
+      "status": "success",
+      "error": null
+    },
+    "a492fe07": {
+      "duration": 0.03860279199943761,
+      "status": "success",
+      "error": null
+    },
+    "a5f8dfc4": {
+      "duration": 0.036843124998995336,
+      "status": "success",
+      "error": null
+    },
+    "373d2f1c": {
+      "duration": 0.1923444580006617,
+      "status": "success",
+      "error": null
+    },
+    "4b9d36dc": {
+      "duration": 0.004513459000008879,
+      "status": "success",
+      "error": null
+    }
+  },
+  "datasets": {
+    "d7c810c4": {
+      "name": "raw_churn_data",
+      "size": 904901,
+      "status": "success",
+      "error": null
+    },
+    "fefdee63": {
+      "name": "params:columns",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "2131f81c": {
+      "name": "cleaned_churn_data",
+      "size": 805083,
+      "status": "success",
+      "error": null
+    },
+    "589eb506": {
+      "name": "raw_inference_data",
+      "size": 98410,
+      "status": "success",
+      "error": null
+    },
+    "b3f4075f": {
+      "name": "raw_inference_dataframe",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "f6b22d01": {
+      "name": "params:split",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "96899f61": {
+      "name": "split_churn_data",
+      "size": 844970,
+      "status": "success",
+      "error": null
+    },
+    "ddd7c831": {
+      "name": "cleaned_inference_data",
+      "size": 87296,
+      "status": "success",
+      "error": null
+    },
+    "f834cd5b": {
+      "name": "params:modelling_encoders",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "657b3bde": {
+      "name": "modelling_encoders",
+      "size": 1706,
+      "status": "success",
+      "error": null
+    },
+    "23e96dd3": {
+      "name": "params:refit_encoders",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "b6262a34": {
+      "name": "production_encoders",
+      "size": 1706,
+      "status": "success",
+      "error": null
+    },
+    "3c9771bc": {
+      "name": "params:refit_scalers",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "c1710c4c": {
+      "name": "production_scalers",
+      "size": 1012,
+      "status": "success",
+      "error": null
+    },
+    "e4ad6621": {
+      "name": "encoded_churn_data",
+      "size": 352881,
+      "status": "success",
+      "error": null
+    },
+    "d910f28f": {
+      "name": "encoded_inference_data",
+      "size": 33582,
+      "status": "success",
+      "error": null
+    },
+    "e7ad7144": {
+      "name": "params:modelling_scalers",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "14d5c2eb": {
+      "name": "modelling_scalers",
+      "size": 1012,
+      "status": "success",
+      "error": null
+    },
+    "c9695594": {
+      "name": "scaled_inference_data",
+      "size": 64223,
+      "status": "success",
+      "error": null
+    },
+    "d7b83b05": {
+      "name": "master_table",
+      "size": 627946,
+      "status": "success",
+      "error": null
+    },
+    "d486d70f": {
+      "name": "params:modelling_optimization",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "4de0fd79": {
+      "name": "optimized_model",
+      "size": 41614,
+      "status": "success",
+      "error": null
+    },
+    "b1dcd97a": {
+      "name": "params:modelling_baseline",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "0f9a2600": {
+      "name": "baseline_model",
+      "size": 1611,
+      "status": "success",
+      "error": null
+    },
+    "50346aa3": {
+      "name": "baseline_metrics",
+      "size": 2706,
+      "status": "success",
+      "error": null
+    },
+    "4fe39825": {
+      "name": "optimized_metrics",
+      "size": 2715,
+      "status": "success",
+      "error": null
+    },
+    "7d04f180": {
+      "name": "params:refit_model",
+      "size": 0,
+      "status": "success",
+      "error": null
+    },
+    "1aa02b26": {
+      "name": "production_model",
+      "size": 41476,
+      "status": "success",
+      "error": null
+    },
+    "4cd4e6db": {
+      "name": "inference_predictions",
+      "size": 61024,
+      "status": "success",
+      "error": null
+    }
+  },
+  "pipeline": {
+    "run_id": "a53f38f3-bcb4-4917-b05c-98deb93e6204",
+    "start_time": "2026-03-16T18:52:33.742673+00:00",
+    "end_time": "2026-03-16T18:53:07.912022+00:00",
+    "duration": 34.169349,
+    "status": "success",
+    "error": null
+  }
+}

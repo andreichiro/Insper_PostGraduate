@@ -1,0 +1,12 @@
+{
+  "generated_at_utc": "2026-02-26T00:10:31.581011+00:00",
+  "html_file": "/Users/akatsurada/Documents/INSPER/Design/Aula_2/analysis_output/reports/analise_inicial_dos_dados_interativa.html",
+  "claims_total": 3,
+  "supported": 3,
+  "unsupported": 0,
+  "not_verifiable": 0,
+  "by_type": {
+    "numeric": 2,
+    "causal_or_extrapolative": 1
+  }
+}

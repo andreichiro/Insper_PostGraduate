@@ -1,0 +1,6 @@
+rule_name,type,params,n_total,n_non_na,n_valid_full,n_removed_non_na,min_kept,max_kept
+none,none,,2000,2000,1,0,47578.5,197776.5
+quantile_1_99,quantile,,2000,2000,1,0,47578.5,197776.5
+quantile_0.5_99.5,quantile,,2000,2000,1,0,47578.5,197776.5
+iqr_1.5,iqr,,2000,2000,1,0,47578.5,197776.5
+iqr_3,iqr,,2000,2000,1,0,47578.5,197776.5

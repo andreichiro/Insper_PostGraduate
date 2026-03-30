@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "scope": {
+    "freeze_output_patterns": [
+      "reports/analise_inicial_dos_dados_interativa.html",
+      "reports/analise_inicial_dos_dados_summary.json",
+      "consolidated_status.json",
+      "hypothesis_results.csv",
+      "deep_dive_cluster_profiles_detailed.csv",
+      "executive_quadro_por_item.csv",
+      "csv/*.csv",
+      "parquet/*.parquet"
+    ],
+    "output_patterns": [
+      "reports/analise_inicial_dos_dados_interativa.html",
+      "reports/analise_inicial_dos_dados_summary.json",
+      "consolidated_status.json",
+      "hypothesis_results.csv",
+      "deep_dive_cluster_profiles_detailed.csv",
+      "executive_quadro_por_item.csv",
+      "parquet/*.parquet"
+    ],
+    "exclude_path_contains": [
+      "survival_",
+      "survival_benchmark",
+      "archive/"
+    ],
+    "exclude_regex": [
+      "^parquet/survival_.*\\.parquet$",
+      "^parquet/.*survival.*\\.parquet$",
+      "^parquet/ml_.*\\.parquet$",
+      "^parquet/backtest_.*\\.parquet$",
+      "^parquet/solution_activity_cadence_summary\\.parquet$",
+      "^parquet/solution_lifecycle\\.parquet$",
+      "^parquet/solution_stop_by_utm\\.parquet$",
+      "^parquet/solution_stop_by_device\\.parquet$"
+    ],
+    "required_inputs": [
+      "executive_quadro_por_item.csv"
+    ]
+  },
+  "summary_json": {
+    "exclude_key_prefixes": [
+      "survival_"
+    ],
+    "ignore_keys": [
+      "interactive_html",
+      "data_bundle_xlsx",
+      "parquet_dir",
+      "reports_dir",
+      "total_plotly_figures"
+    ]
+  },
+  "tolerances": {
+    "deterministic_float_abs": 1e-9,
+    "ml_float_abs": 5e-3
+  },
+  "ml_path_markers": [
+    "ml_",
+    "temporal_backtest",
+    "cluster",
+    "hypotheses.parquet",
+    "hypothesis_results.csv",
+    "deep_dive_cluster_profiles_detailed.csv"
+  ],
+  "claim_rules": [
+    {
+      "claim_id": "claim_quase_metade_sessoes",
+      "match_regex": "quase metade das sessões",
+      "metric_key": "short_sessions_rate_le_5s",
+      "check": "range",
+      "min": 0.45,
+      "max": 0.55,
+      "evidence_ref": "truth_summary_non_survival.json#short_sessions_rate_le_5s"
+    },
+    {
+      "claim_id": "claim_atividade_mensal_caiu",
+      "match_regex": "atividade mensal.*caiu",
+      "metric_key": "recent_6m_mau_interactions_slope_users_per_month",
+      "check": "lt",
+      "value": 0.0,
+      "evidence_ref": "truth_summary_non_survival.json#recent_6m_mau_interactions_slope_users_per_month"
+    },
+    {
+      "claim_id": "claim_retencao_baixa",
+      "match_regex": "retenção estruturalmente baixa",
+      "metric_key": "retention_recent_avg_6m",
+      "check": "lt",
+      "value": 0.50,
+      "evidence_ref": "truth_summary_non_survival.json#retention_recent_avg_6m"
+    },
+    {
+      "claim_id": "claim_estado_sinal_util",
+      "match_regex": "estado carrega sinal útil",
+      "metric_key": "max_geo_effect_size",
+      "check": "gte",
+      "value": 0.05,
+      "evidence_ref": "truth_core_metrics.json#max_geo_effect_size"
+    },
+    {
+      "claim_id": "claim_sem_causalidade",
+      "match_regex": "sem inferência causal",
+      "metric_key": "causal_claim_allowed",
+      "check": "eq",
+      "value": false,
+      "evidence_ref": "consolidated_status.json#causal_diagnostic_assessment.causal_claim_allowed"
+    }
+  ]
+}

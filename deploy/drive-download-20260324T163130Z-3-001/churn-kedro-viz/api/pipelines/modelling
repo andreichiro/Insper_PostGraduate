@@ -1,0 +1,445 @@
+{
+  "nodes": [
+    {
+      "id": "fefdee63",
+      "name": "params:columns",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "data_engineering",
+        "inference",
+        "modelling",
+        "refit"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "d7b83b05",
+      "name": "master_table",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "data_engineering",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 6338,
+          "columns": 21,
+          "file_size": 627946
+        },
+        "styles": null
+      },
+      "layer": "model_input",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "272cc30f",
+      "name": "optimize_hyperparameters",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        },
+        "modelling_optimization": {
+          "class_path": "catboost.CatBoostClassifier",
+          "target_column": "Churn",
+          "train_splits": [
+            "train",
+            "test"
+          ],
+          "eval_splits": [
+            "train",
+            "test",
+            "validate"
+          ],
+          "init_args": {
+            "random_seed": 42,
+            "verbose": 0,
+            "train_dir": "data/tmp/catboost_info"
+          },
+          "cv": 5,
+          "scoring": "roc_auc",
+          "param_grid": {
+            "depth": [
+              2,
+              4,
+              8
+            ],
+            "iterations": [
+              10,
+              100,
+              300
+            ],
+            "learning_rate": [
+              0.01,
+              0.05,
+              0.1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "d486d70f",
+      "name": "params:modelling_optimization",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "4de0fd79",
+      "name": "optimized_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "da1b6d2b",
+      "name": "train_baseline_model",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        },
+        "modelling_baseline": {
+          "class_path": "sklearn.linear_model.LogisticRegression",
+          "target_column": "Churn",
+          "train_splits": [
+            "train"
+          ],
+          "eval_splits": [
+            "train",
+            "test",
+            "validate"
+          ]
+        }
+      }
+    },
+    {
+      "id": "b1dcd97a",
+      "name": "params:modelling_baseline",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "0f9a2600",
+      "name": "baseline_model",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "a492fe07",
+      "name": "evaluate_baseline_model",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "50346aa3",
+      "name": "baseline_metrics",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": "reporting",
+      "dataset_type": "json.json_dataset.JSONDataset"
+    },
+    {
+      "id": "a5f8dfc4",
+      "name": "evaluate_optimized_model",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {}
+    },
+    {
+      "id": "4fe39825",
+      "name": "optimized_metrics",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": "reporting",
+      "dataset_type": "json.json_dataset.JSONDataset"
+    }
+  ],
+  "edges": [
+    {
+      "source": "fefdee63",
+      "target": "da1b6d2b"
+    },
+    {
+      "source": "d7b83b05",
+      "target": "a5f8dfc4"
+    },
+    {
+      "source": "0f9a2600",
+      "target": "a492fe07"
+    },
+    {
+      "source": "d486d70f",
+      "target": "272cc30f"
+    },
+    {
+      "source": "d7b83b05",
+      "target": "a492fe07"
+    },
+    {
+      "source": "4de0fd79",
+      "target": "a5f8dfc4"
+    },
+    {
+      "source": "fefdee63",
+      "target": "272cc30f"
+    },
+    {
+      "source": "da1b6d2b",
+      "target": "0f9a2600"
+    },
+    {
+      "source": "a5f8dfc4",
+      "target": "4fe39825"
+    },
+    {
+      "source": "d7b83b05",
+      "target": "da1b6d2b"
+    },
+    {
+      "source": "d7b83b05",
+      "target": "272cc30f"
+    },
+    {
+      "source": "a492fe07",
+      "target": "50346aa3"
+    },
+    {
+      "source": "b1dcd97a",
+      "target": "da1b6d2b"
+    },
+    {
+      "source": "272cc30f",
+      "target": "4de0fd79"
+    }
+  ],
+  "layers": [
+    "feature",
+    "intermediate",
+    "model_input",
+    "model_output",
+    "primary",
+    "raw",
+    "reporting"
+  ],
+  "tags": [],
+  "pipelines": [
+    {
+      "id": "__default__",
+      "name": "__default__"
+    },
+    {
+      "id": "modelling",
+      "name": "modelling"
+    },
+    {
+      "id": "data_engineering",
+      "name": "data_engineering"
+    },
+    {
+      "id": "refit",
+      "name": "refit"
+    },
+    {
+      "id": "inference",
+      "name": "inference"
+    }
+  ],
+  "modular_pipelines": {
+    "__root__": {
+      "id": "__root__",
+      "name": "__root__",
+      "inputs": [],
+      "outputs": [],
+      "children": [
+        {
+          "id": "272cc30f",
+          "type": "task"
+        },
+        {
+          "id": "4de0fd79",
+          "type": "data"
+        },
+        {
+          "id": "d486d70f",
+          "type": "parameters"
+        },
+        {
+          "id": "0f9a2600",
+          "type": "data"
+        },
+        {
+          "id": "d7b83b05",
+          "type": "data"
+        },
+        {
+          "id": "fefdee63",
+          "type": "parameters"
+        },
+        {
+          "id": "4fe39825",
+          "type": "data"
+        },
+        {
+          "id": "b1dcd97a",
+          "type": "parameters"
+        },
+        {
+          "id": "da1b6d2b",
+          "type": "task"
+        },
+        {
+          "id": "50346aa3",
+          "type": "data"
+        },
+        {
+          "id": "a5f8dfc4",
+          "type": "task"
+        },
+        {
+          "id": "b1dcd97a",
+          "type": "data"
+        },
+        {
+          "id": "a492fe07",
+          "type": "task"
+        },
+        {
+          "id": "fefdee63",
+          "type": "data"
+        },
+        {
+          "id": "d486d70f",
+          "type": "data"
+        }
+      ]
+    }
+  },
+  "selected_pipeline": "modelling"
+}

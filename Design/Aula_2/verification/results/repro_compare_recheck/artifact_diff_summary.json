@@ -1,0 +1,23 @@
+{
+  "generated_at_utc": "2026-02-26T14:00:31.054204+00:00",
+  "baseline_output_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_2/analysis_output",
+  "repro_output_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_2/analysis_output_repro_current_20260226_105621",
+  "checked_artifacts": 61,
+  "checks_total": 433,
+  "checks_failed": 9,
+  "checks_passed": 424,
+  "failed_by_severity": {
+    "major": 9
+  },
+  "worst_failure": {
+    "artifact": "deep_dive_cluster_profiles_detailed.csv",
+    "metric": "col.teachers.exact_int",
+    "baseline": 0.0,
+    "repro": 52.0,
+    "delta": 52.0,
+    "status": "fail",
+    "severity": "major",
+    "sev_rank": 2
+  },
+  "comparison_passed": false
+}

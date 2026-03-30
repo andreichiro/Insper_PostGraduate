@@ -1,0 +1,10 @@
+{
+  "parameters": {
+    "split": {
+      "train": 0.7,
+      "test": 0.15,
+      "validate": 0.15,
+      "random_state": 42
+    }
+  }
+}

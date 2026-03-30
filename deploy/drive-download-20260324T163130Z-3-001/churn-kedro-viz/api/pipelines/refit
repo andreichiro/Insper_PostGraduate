@@ -1,0 +1,481 @@
+{
+  "nodes": [
+    {
+      "id": "fefdee63",
+      "name": "params:columns",
+      "tags": [],
+      "pipelines": [
+        "__default__",
+        "data_engineering",
+        "inference",
+        "modelling",
+        "refit"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "96899f61",
+      "name": "split_churn_data",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "data_engineering"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 6338,
+          "columns": 21,
+          "file_size": 844970
+        },
+        "styles": null
+      },
+      "layer": "primary",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "7ddf9673",
+      "name": "refit_encoders",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        },
+        "refit_encoders": {
+          "columns": [
+            "target",
+            "categorical"
+          ],
+          "split_to_fit": [
+            "train",
+            "test",
+            "validate"
+          ]
+        }
+      }
+    },
+    {
+      "id": "23e96dd3",
+      "name": "params:refit_encoders",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "b6262a34",
+      "name": "production_encoders",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "12823352",
+      "name": "refit_scalers",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        },
+        "refit_scalers": {
+          "columns": [
+            "numerical"
+          ],
+          "split_to_fit": [
+            "train",
+            "test",
+            "validate"
+          ]
+        }
+      }
+    },
+    {
+      "id": "3c9771bc",
+      "name": "params:refit_scalers",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "c1710c4c",
+      "name": "production_scalers",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "d7b83b05",
+      "name": "master_table",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "data_engineering",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": {
+        "stats": {
+          "rows": 6338,
+          "columns": 21,
+          "file_size": 627946
+        },
+        "styles": null
+      },
+      "layer": "model_input",
+      "dataset_type": "pandas.csv_dataset.CSVDataset"
+    },
+    {
+      "id": "4de0fd79",
+      "name": "optimized_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "modelling"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    },
+    {
+      "id": "373d2f1c",
+      "name": "refit_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "task",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "parameters": {
+        "columns": {
+          "target": "Churn",
+          "numerical": [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+          ],
+          "categorical": [
+            "PaymentMethod",
+            "Contract",
+            "gender",
+            "SeniorCitizen",
+            "Partner",
+            "Dependents",
+            "PhoneService",
+            "MultipleLines",
+            "InternetService",
+            "OnlineSecurity",
+            "OnlineBackup",
+            "DeviceProtection",
+            "TechSupport",
+            "StreamingTV",
+            "StreamingMovies",
+            "PaperlessBilling"
+          ]
+        },
+        "refit_model": {
+          "train_splits": [
+            "train",
+            "test",
+            "validate"
+          ]
+        }
+      }
+    },
+    {
+      "id": "7d04f180",
+      "name": "params:refit_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__"
+      ],
+      "type": "parameters",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": null
+    },
+    {
+      "id": "1aa02b26",
+      "name": "production_model",
+      "tags": [],
+      "pipelines": [
+        "refit",
+        "__default__",
+        "inference"
+      ],
+      "type": "data",
+      "modular_pipelines": null,
+      "node_extras": null,
+      "layer": null,
+      "dataset_type": "pickle.pickle_dataset.PickleDataset"
+    }
+  ],
+  "edges": [
+    {
+      "source": "7d04f180",
+      "target": "373d2f1c"
+    },
+    {
+      "source": "fefdee63",
+      "target": "7ddf9673"
+    },
+    {
+      "source": "fefdee63",
+      "target": "373d2f1c"
+    },
+    {
+      "source": "96899f61",
+      "target": "7ddf9673"
+    },
+    {
+      "source": "373d2f1c",
+      "target": "1aa02b26"
+    },
+    {
+      "source": "fefdee63",
+      "target": "12823352"
+    },
+    {
+      "source": "3c9771bc",
+      "target": "12823352"
+    },
+    {
+      "source": "23e96dd3",
+      "target": "7ddf9673"
+    },
+    {
+      "source": "4de0fd79",
+      "target": "373d2f1c"
+    },
+    {
+      "source": "96899f61",
+      "target": "12823352"
+    },
+    {
+      "source": "12823352",
+      "target": "c1710c4c"
+    },
+    {
+      "source": "d7b83b05",
+      "target": "373d2f1c"
+    },
+    {
+      "source": "7ddf9673",
+      "target": "b6262a34"
+    }
+  ],
+  "layers": [
+    "feature",
+    "intermediate",
+    "model_input",
+    "model_output",
+    "primary",
+    "raw",
+    "reporting"
+  ],
+  "tags": [],
+  "pipelines": [
+    {
+      "id": "__default__",
+      "name": "__default__"
+    },
+    {
+      "id": "modelling",
+      "name": "modelling"
+    },
+    {
+      "id": "data_engineering",
+      "name": "data_engineering"
+    },
+    {
+      "id": "refit",
+      "name": "refit"
+    },
+    {
+      "id": "inference",
+      "name": "inference"
+    }
+  ],
+  "modular_pipelines": {
+    "__root__": {
+      "id": "__root__",
+      "name": "__root__",
+      "inputs": [],
+      "outputs": [],
+      "children": [
+        {
+          "id": "4de0fd79",
+          "type": "data"
+        },
+        {
+          "id": "96899f61",
+          "type": "data"
+        },
+        {
+          "id": "7d04f180",
+          "type": "parameters"
+        },
+        {
+          "id": "d7b83b05",
+          "type": "data"
+        },
+        {
+          "id": "fefdee63",
+          "type": "parameters"
+        },
+        {
+          "id": "23e96dd3",
+          "type": "data"
+        },
+        {
+          "id": "3c9771bc",
+          "type": "parameters"
+        },
+        {
+          "id": "1aa02b26",
+          "type": "data"
+        },
+        {
+          "id": "7ddf9673",
+          "type": "task"
+        },
+        {
+          "id": "c1710c4c",
+          "type": "data"
+        },
+        {
+          "id": "23e96dd3",
+          "type": "parameters"
+        },
+        {
+          "id": "12823352",
+          "type": "task"
+        },
+        {
+          "id": "373d2f1c",
+          "type": "task"
+        },
+        {
+          "id": "7d04f180",
+          "type": "data"
+        },
+        {
+          "id": "fefdee63",
+          "type": "data"
+        },
+        {
+          "id": "3c9771bc",
+          "type": "data"
+        },
+        {
+          "id": "b6262a34",
+          "type": "data"
+        }
+      ]
+    }
+  },
+  "selected_pipeline": "refit"
+}

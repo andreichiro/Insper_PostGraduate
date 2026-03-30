@@ -1,0 +1,14 @@
+{
+  "code": "def transform_encoders(\n    df_in: pd.DataFrame,\n    encoders: dict[str, LabelEncoder],\n) -> pd.DataFrame:\n    \"\"\"Apply fitted LabelEncoders to replace categorical columns with integer labels.\n\n    Args:\n        df_in: DataFrame containing the columns to encode.\n        encoders: Mapping of column names to fitted ``LabelEncoder`` instances.\n\n    Returns:\n        DataFrame with each encoded column replaced by its integer labels.\n    \"\"\"\n    df_out = df_in.copy()\n\n    for col, en in encoders.items():\n        if col in df_out.columns:\n            df_out[col] = en.transform(df_out[col].astype(str))\n\n    return df_out\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {},
+  "run_command": "kedro run --to-nodes='encode_inference_data'",
+  "inputs": [
+    "cleaned_inference_data",
+    "production_encoders"
+  ],
+  "outputs": [
+    "encoded_inference_data"
+  ],
+  "preview": null
+}

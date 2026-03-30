@@ -1,0 +1,24 @@
+inference_raw_columns:
+  categorical: []
+  numerical:
+    - Pregnancies
+    - Glucose
+    - BloodPressure
+    - SkinThickness
+    - Insulin
+    - BMI
+    - DiabetesPedigreeFunction
+    - Age
+
+inference_columns:
+  categorical: []
+  numerical:
+    - Pregnancies
+    - Glucose
+    - BloodPressure
+    - SkinThickness
+    - Insulin
+    - BMI
+    - DiabetesPedigreeFunction
+    - Age
+    - glucose_bmi_interaction

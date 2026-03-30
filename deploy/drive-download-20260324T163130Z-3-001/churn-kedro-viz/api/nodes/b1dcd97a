@@ -1,0 +1,16 @@
+{
+  "parameters": {
+    "modelling_baseline": {
+      "class_path": "sklearn.linear_model.LogisticRegression",
+      "target_column": "Churn",
+      "train_splits": [
+        "train"
+      ],
+      "eval_splits": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  }
+}

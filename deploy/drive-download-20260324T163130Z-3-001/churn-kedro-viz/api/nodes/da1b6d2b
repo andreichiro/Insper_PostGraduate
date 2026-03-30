@@ -1,0 +1,54 @@
+{
+  "code": "def train_model(\n    master_table: pd.DataFrame,\n    columns: dict[str, Any],\n    params: dict[str, Any],\n) -> dict[str, Any]:\n    \"\"\"Fit a classifier on the specified splits and return a model artifact.\n\n    Args:\n        master_table: Fully-processed DataFrame with a ``split`` column and\n            all feature and target columns.\n        columns: Column groups dictionary with ``numerical`` and\n            ``categorical`` keys defining the feature columns.\n        params: Training configuration with keys:\n            - ``class_path`` (str): Fully-qualified sklearn estimator class.\n            - ``init_args`` (dict, optional): Estimator constructor arguments.\n            - ``target_column`` (str): Name of the target column.\n            - ``train_splits`` (list[str]): Split labels used for fitting.\n            - ``eval_splits`` (list[str], optional): Split labels for evaluation.\n\n    Returns:\n        Model artifact dict with keys ``estimator``, ``target_column``,\n        ``feature_columns``, and ``eval_splits``.\n    \"\"\"\n    target = params[\"target_column\"]\n    train_df = master_table[master_table[\"split\"].isin(params[\"train_splits\"])]\n    feature_cols = columns[\"numerical\"] + columns[\"categorical\"]\n\n    X_train = train_df[feature_cols]\n    y_train = train_df[target]\n\n    cls = _load_class(params[\"class_path\"])\n    estimator = cls(**params.get(\"init_args\", {}))\n    estimator.fit(X_train, y_train)\n\n    logger.info(\n        \"Trained %s on %d samples (%d features)\",\n        params[\"class_path\"].rsplit(\".\", 1)[-1],\n        len(X_train),\n        X_train.shape[1],\n    )\n\n    return {\n        \"estimator\": estimator,\n        \"target_column\": target,\n        \"feature_columns\": feature_cols,\n        \"eval_splits\": params.get(\"eval_splits\", []),\n    }\n",
+  "filepath": "churn/src/churn/pipelines/modelling/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    },
+    "modelling_baseline": {
+      "class_path": "sklearn.linear_model.LogisticRegression",
+      "target_column": "Churn",
+      "train_splits": [
+        "train"
+      ],
+      "eval_splits": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  },
+  "run_command": "kedro run --to-nodes='train_baseline_model'",
+  "inputs": [
+    "master_table",
+    "params:columns",
+    "params:modelling_baseline"
+  ],
+  "outputs": [
+    "baseline_model"
+  ],
+  "preview": null
+}

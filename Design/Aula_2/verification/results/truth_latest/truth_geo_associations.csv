@@ -1,0 +1,7 @@
+association,method,effect_size,p_value
+estado_group vs converted_within_window,chi2 + cramers_v,0.34074445332859205,0.0
+estado_group vs churn_label,chi2 + cramers_v,0.06229685059090396,7.397439610101282e-95
+estado_group vs heavy_user_flag,chi2 + cramers_v,0.2662232911742989,0.0
+estado_group vs interaction_count,kruskal + eta2,0.3381319377974213,0.0
+estado_group vs session_count,kruskal + eta2,0.4275074275538469,0.0
+estado_group vs total_alunos,kruskal + eta2,0.005986105550666551,3.4548218830511474e-143

@@ -1,0 +1,2 @@
+measure,spearman,p_value,n
+experience_level (ordinal) × salary_log,0.019294706516631926,0.39324485150862365,1960

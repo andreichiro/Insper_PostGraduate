@@ -1,0 +1,4 @@
+method,n_clusters,mean_silhouette
+pca_kmeans,3,0.07145572748834944
+spectral_clustering,3,0.16512864762393145
+lda_topics,5,NA

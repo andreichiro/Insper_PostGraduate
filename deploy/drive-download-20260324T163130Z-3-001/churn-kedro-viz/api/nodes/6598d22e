@@ -1,0 +1,13 @@
+{
+  "code": "def to_dataframe(\n    raw_data: pd.DataFrame | list[dict[str, Any]],\n) -> pd.DataFrame:\n    \"\"\"Convert raw input data to a DataFrame if it is not one already.\n\n    Args:\n        raw_data: Input data as either a DataFrame (e.g. from a CSVDataset)\n            or a list of dictionaries (e.g. from a JSONDataset).\n\n    Returns:\n        DataFrame built from the input data.\n    \"\"\"\n    if isinstance(raw_data, pd.DataFrame):\n        return raw_data\n    return pd.DataFrame(raw_data)\n",
+  "filepath": "churn/src/churn/pipelines/inference/nodes.py",
+  "parameters": {},
+  "run_command": "kedro run --to-nodes='to_dataframe'",
+  "inputs": [
+    "raw_inference_data"
+  ],
+  "outputs": [
+    "raw_inference_dataframe"
+  ],
+  "preview": null
+}

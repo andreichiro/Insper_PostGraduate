@@ -1,0 +1,15 @@
+{
+  "parameters": {
+    "refit_encoders": {
+      "columns": [
+        "target",
+        "categorical"
+      ],
+      "split_to_fit": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  }
+}

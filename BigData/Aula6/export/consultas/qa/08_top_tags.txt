@@ -1,0 +1,38 @@
+Pergunta
+Quais são as tags mais utilizadas top 25
+
+Resposta
+tag	freq
+tumeys dvds	640
+less than 300 ratings	491
+erlends dvds	403
+70mm	370
+based on a book	369
+nudity (topless)	341
+movie to see	328
+betamax	290
+national film registry	290
+bibliothek	283
+classic	268
+cant remember	267
+imdb top 250	266
+adapted from:book	263
+to see	260
+seen more than once	249
+library	233
+atmospheric	228
+clearplay	225
+owned	214
+criterion	212
+stylized	207
+murder	206
+dvd	202
+dvdvideo	201
+
+SQL utilizada
+SELECT tn.tag, COUNT(*) AS freq
+        FROM tags t
+        JOIN tag_names tn ON tn.tid = t.tid
+        GROUP BY tn.tag
+        ORDER BY freq DESC, tn.tag
+        LIMIT 25

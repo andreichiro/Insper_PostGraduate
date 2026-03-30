@@ -1,0 +1,46 @@
+inference_raw_columns:
+  categorical:
+    - gender
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+  numerical:
+    - SeniorCitizen
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+
+inference_columns:
+  categorical:
+    - gender
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+  numerical:
+    - SeniorCitizen
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+    - avg_charge_per_month

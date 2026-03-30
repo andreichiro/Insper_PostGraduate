@@ -1,0 +1,30 @@
+Pergunta
+Exibir todos os nomes dos filmes em que o Daniel Craig foi escalado, ordenar alfabeticamente pelo título do filme com subconsulta
+
+Resposta
+title
+A Kid in King Arthur's Court
+Archangel
+Casino Royale
+Elizabeth
+Enduring Love
+Infamous
+Lara Croft: Tomb Raider
+Layer Cake
+Munich
+Quantum of Solace
+Renaissance
+Road to Perdition
+Sorstalanság
+Sylvia
+The Golden Compass
+The Invasion
+The Jacket
+The Mother
+The Power of One
+
+SQL utilizada
+SELECT DISTINCT m.title
+        FROM movies m
+        WHERE m.mid IN (SELECT a.mid FROM actors a WHERE a.name = 'Daniel Craig')
+        ORDER BY m.title

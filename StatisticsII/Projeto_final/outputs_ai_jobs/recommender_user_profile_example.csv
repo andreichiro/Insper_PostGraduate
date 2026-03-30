@@ -1,0 +1,16 @@
+rank,job_id,company_name,job_title,industry,experience_level,employment_type,location,salary_range_usd,score
+1,1884,"Wolfe, Stephenson and Sanchez",NLP Engineer,Tech,Mid,Full-time,"Wallacetown, MG",68291-154121,0.21298862992562767
+2,1251,"Garcia, Smith and James",ML Engineer,Automotive,Mid,Full-time,"Lake Gregoryshire, CD",111473-178933,0.1948901044712528
+3,50,Richards PLC,NLP Engineer,Finance,Mid,Full-time,"Lewismouth, TD",75575-120477,0.18064947958289254
+4,1154,Smith-Hansen,Quant Researcher,Retail,Mid,Full-time,"North Michellestad, ME",126850-203760,0.17099915097184273
+5,1055,Black-Simmons,Data Scientist,Automotive,Senior,Full-time,"Allenburgh, BW",136391-226513,0.1691117950817889
+6,761,Mcdowell-Thompson,Computer Vision Engineer,E-commerce,Mid,Full-time,"Nathanville, GH",100842-113216,0.168570591656936
+7,964,Flynn-Franco,AI Product Manager,Tech,Senior,Full-time,"North Grant, MR",110260-191166,0.16373724467133313
+8,430,Wilcox Ltd,Computer Vision Engineer,Automotive,Mid,Full-time,"Robertsonbury, VN",100296-111823,0.1469933873510699
+9,1171,"Nguyen, Brown and Edwards",Data Scientist,Finance,Mid,Full-time,"Port Victoriaburgh, PG",84079-116621,0.14446441781790503
+10,1269,Gonzalez-Gordon,Data Scientist,Education,Senior,Full-time,"Jodyville, BA",98960-171179,0.13362511653036024
+11,206,Williams Ltd,Data Scientist,Healthcare,Senior,Full-time,"Samuelhaven, BO",62447-129068,0.13235798614349736
+12,96,Michael Ltd,Computer Vision Engineer,Healthcare,Senior,Full-time,"Maldonadoville, PL",107083-124486,0.12880490731345873
+13,1754,Bell and Sons,NLP Engineer,Retail,Mid,Full-time,"Lake Kathy, HR",56727-128729,0.09155728974996631
+14,1865,Morse-Hodges,NLP Engineer,Finance,Senior,Full-time,"Beckerstad, IN",122408-206048,0.09044729628075832
+15,1087,Matthews-Collins,NLP Engineer,E-commerce,Senior,Full-time,"Jonesville, TO",85449-173276,0.07029770113117645

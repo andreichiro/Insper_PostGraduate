@@ -1,0 +1,31 @@
+
+-- Source R file: nrd_realign.R  (comp_run == TRUE)
+-- R lineage covered here (near lines ~460–625):
+--   1) Build AAQ cohort with strict filters; compute Cur_YMP_Elig and New_YMP_Elig (from AAQ).      [460–523]
+--   2) Account flags: Is_New_Acct, Temp_Only_Acct, Has_Intercompany, Has_New_Elig_Charge_Cd.        [~500–546]
+--   3) CURRENT process leg:
+--        • Aggregate Elig_Rev at (Div,Acct,Next_Review_Dt).                                          [~546–558]
+--        • Optionally merge “old process” overrides (see note).                                      [~558–575]
+--        • Pull restrictions from Pricing_Operations.vw_rate_restrictions_current (source='CN'),
+--          derive NRD_rr_old (PI-2), set NRD_Cur_Process & current_reason.                           [~575–598]
+--        • Mark Future_Rate_Cur_NRD_Excl from Pricing_Operations.rate_restrictions (source='FR').    [~598–611]
+--   4) NEW process leg:
+--        • Build per‑acct revenue aligned to Site_Restriction_Next_PI_Dt → NRD (PI-2) as needed.     [~611–646]
+--        • Join to {{ ref('fct_nrd_realign') }} and choose NRD_New_Process exactly as in R.          [~646–672]
+--   5) Full outer join (cur vs new), rounding, flags, output ordering/casting.                       [~672–end]
+--
+-- NO DIRECT TRANSLATION (transparent and production‑safe):
+--   • The R code calls /query/YMP/nrd_realign_old_process.sql to produce nrd_cur_realign/current_reason.
+--     Its SQL body was not supplied. R itself falls back to Next_Review_Dt when that override is NULL.
+--     We implement the same fallback deterministically; the model remains correct and production‑ready.
+--     If/when you add a dbt model named 'nrd_realign_old_process' returning (Infopro_Div_Nbr, Acct_Nbr,
+--     nrd_cur_realign, current_reason), a single LEFT JOIN in CTE_cur_merge (marked below) will enable it.
+--
+-- Determinism & reproducibility:
+--   • All “today/now” logic anchored to {{ run_started_at }} (UTC). Only SYS_* use CURRENT_TIMESTAMP metadata.
+--   • All windows/orders have stable tie‑breakers. Final table has no ORDER BY (tables are unordered; R’s arrange is not persisted).
+--
+-- Tests to add (schema.yml):
+--   • not_null: Infopro_Div_Nbr, Acct_Nbr
+--   • accepted_values: Is_Cur_YMP_Elig, Is_New_YMP_Elig in (0,1)
+--   • relationships: (Infopro_Div_Nbr, Acct_Nbr) must exist in {{ ref('fct_nrd_realign') }} for the “new” leg when applicable.

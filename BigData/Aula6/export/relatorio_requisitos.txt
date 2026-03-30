@@ -1,0 +1,36 @@
+Banco DuckDB existente: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/movies.duckdb
+Tabela exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/tabelas/movies.parquet
+Tabela exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/tabelas/actors.parquet
+Tabela exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/tabelas/genres.parquet
+Tabela exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/tabelas/tags.parquet
+Tabela exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/tabelas/tag_names.parquet
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/01_daniel_craig_subconsulta.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/01_daniel_craig_subconsulta.txt
+Linhas retornadas na consulta 01_daniel_craig_subconsulta: 19
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/02_daniel_craig_inner_join.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/02_daniel_craig_inner_join.txt
+Linhas retornadas na consulta 02_daniel_craig_inner_join: 19
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/03_elenco_the_dark_knight.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/03_elenco_the_dark_knight.txt
+Linhas retornadas na consulta 03_elenco_the_dark_knight: 91
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/04_generos_min_1000.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/04_generos_min_1000.txt
+Linhas retornadas na consulta 04_generos_min_1000: 7
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/05_top_filmes_num_avaliacoes.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/05_top_filmes_num_avaliacoes.txt
+Linhas retornadas na consulta 05_top_filmes_num_avaliacoes: 25
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/06_filme_maior_elenco.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/06_filme_maior_elenco.txt
+Linhas retornadas na consulta 06_filme_maior_elenco: 1
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/07_registro_phantom_of_the_opera.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/07_registro_phantom_of_the_opera.txt
+Linhas retornadas na consulta 07_registro_phantom_of_the_opera: 6
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/08_top_tags.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/08_top_tags.txt
+Linhas retornadas na consulta 08_top_tags: 25
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/09_ator_mais_papeis_principais.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/09_ator_mais_papeis_principais.txt
+Linhas retornadas na consulta 09_ator_mais_papeis_principais: 1
+Consulta exportada: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/10_genero_maior_media.parquet
+Arquivo de pergunta e resposta: OK  /Users/akatsurada/Documents/INSPER/BigData/Aula6/export/consultas/qa/10_genero_maior_media.txt
+Linhas retornadas na consulta 10_genero_maior_media: 1

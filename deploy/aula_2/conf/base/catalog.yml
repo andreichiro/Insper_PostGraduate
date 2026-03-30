@@ -1,0 +1,117 @@
+# ── Raw ───────────────────────────────────────────────────────────────
+raw_data:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/diabetes-dataset-modelling.csv
+
+raw_data_inference:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/diabetes-dataset-inference.csv
+
+# ── Intermediate ─────────────────────────────────────────────────────
+cleaned_data:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/cleaned_data.parquet
+
+featured_data:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/featured_data.parquet
+
+cleaned_inference:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/cleaned_inference.parquet
+
+featured_inference:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/featured_inference.parquet
+
+# ── Primary ──────────────────────────────────────────────────────────
+split_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/split_data.parquet
+
+encoded_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/encoded_data.parquet
+
+production_encoded_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/production_encoded_data.parquet
+
+encoded_inference:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/encoded_inference.parquet
+
+# ── Feature ──────────────────────────────────────────────────────────
+master_table:
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/master_table.parquet
+
+production_master_table:
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/production_master_table.parquet
+
+scaled_inference:
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/scaled_inference.parquet
+
+# ── Models / Artifacts ───────────────────────────────────────────────
+encoders:
+  type: pickle.PickleDataset
+  filepath: data/06_models/encoders.pkl
+
+scalers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/scalers.pkl
+
+baseline_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/baseline_model.pkl
+
+optimized_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/optimized_model.pkl
+
+xgboost_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/xgboost_model.pkl
+
+production_encoders:
+  type: pickle.PickleDataset
+  filepath: data/06_models/production_encoders.pkl
+
+production_scalers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/production_scalers.pkl
+
+raw_production_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/raw_production_model.pkl
+
+production_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/production_model.pkl
+
+# ── Model Output ─────────────────────────────────────────────────────
+baseline_metrics:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/baseline_metrics.pkl
+
+optimized_metrics:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/optimized_metrics.pkl
+
+xgboost_metrics:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/xgboost_metrics.pkl
+
+best_model_config:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/best_model_config.pkl
+
+test_report:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/test_report.pkl
+
+predictions:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/predictions.parquet

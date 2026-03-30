@@ -1,0 +1,14 @@
+{
+  "code": "def predict(\n    model_artifact: dict[str, Any],\n    inference_data: pd.DataFrame,\n) -> list[dict[str, Any]]:\n    \"\"\"Score a fully-processed DataFrame and return predictions with probabilities.\n\n    Args:\n        model_artifact: Model artifact dict containing ``estimator`` and\n            ``feature_columns`` keys.\n        inference_data: Encoded and scaled DataFrame ready for scoring.\n\n    Returns:\n        List of dictionaries, each with ``index`` (int, row number),\n        ``prediction`` (int), and ``probability`` (float, positive-class\n        score).\n    \"\"\"\n    estimator = model_artifact[\"estimator\"]\n    feature_cols = model_artifact[\"feature_columns\"]\n\n    X = inference_data[feature_cols]\n    predictions = estimator.predict(X)\n    probabilities = estimator.predict_proba(X)[:, 1]\n\n    result = [\n        {\"index\": idx, \"prediction\": int(p), \"probability\": float(prob)}\n        for idx, (p, prob) in enumerate(zip(predictions, probabilities))\n    ]\n\n    logger.info(\"Generated predictions for %d samples\", len(result))\n    return result\n",
+  "filepath": "churn/src/churn/pipelines/inference/nodes.py",
+  "parameters": {},
+  "run_command": "kedro run --to-nodes='predict'",
+  "inputs": [
+    "production_model",
+    "scaled_inference_data"
+  ],
+  "outputs": [
+    "inference_predictions"
+  ],
+  "preview": null
+}

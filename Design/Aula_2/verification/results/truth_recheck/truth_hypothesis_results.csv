@@ -1,0 +1,16 @@
+hypothesis_id,status,evidence,p_value,effect_size,n_obs
+H1,validated,median_diff=4.000; p=0,0.0,4.0,137475.0
+H2,validated,chi2=75175.04; p=0; v=0.347,0.0,0.34653841881909647,16.0
+H3,inconclusive,rho=-0.016; p=2.01e-09,2.0139229151670072e-09,-0.01616916955291907,137530.0
+H4,validated,significant_segments=5,0.0,0.7055549318474128,158000.0
+H5,validated,p_churn=2.43e-27; p_conv=1.27e-12; p_inter=2.6e-300,2.5999759363536545e-300,0.030596463294437822,125348.0
+H6,not_testable,No search events found; click_events=1127,,,
+H7,not_testable,No overlap between mari_help and dim (help_users=9843),,,
+H8,validated,significant_segments=1,0.0,0.4382659029288129,137530.0
+H9,not_testable,No onboarding/experiment/variant columns found,,,
+H10,validated,best_k=2; silhouette=0.504,,0.5044961046806451,50000.0
+H11,validated,chi2=907.44; p=8.94e-198; v=0.081,8.938047806204195e-198,0.08122897459037248,137530.0
+H12,rejected,"heavy:-0.017,p=8.63e-47 | interessado:-0.002,p=0.0225 | medio:-0.003,p=1.58e-08",8.632146816803479e-47,0.017217005423229126,137530.0
+H13,validated,median_diff=25.000; p=0,0.0,25.0,158000.0
+H14,inconclusive,rho=0.098; p=9.8e-260,9.802047710245354e-260,0.09789132964151673,123095.0
+H15,not_testable,Hotjar rows=803; repeat_hotjar_users=2; no identity bridge,,,

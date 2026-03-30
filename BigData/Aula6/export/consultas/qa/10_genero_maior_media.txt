@@ -1,0 +1,14 @@
+Pergunta
+Qual o gênero com maior nota média sem filtro de quantidade mínima de filmes retornando apenas o primeiro
+
+Resposta
+genre	avg_rating	n_registros
+Documentary	2.8230024163428578	430
+
+SQL utilizada
+SELECT g.genre, AVG(m.rating) AS avg_rating, COUNT(*) AS n_registros
+        FROM genres g
+        JOIN movies m ON m.mid = g.mid
+        GROUP BY g.genre
+        ORDER BY avg_rating DESC, n_registros DESC, g.genre
+        LIMIT 1

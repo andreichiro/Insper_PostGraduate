@@ -1,0 +1,36 @@
+Pergunta
+Quais os filmes com maior número de avaliações top 25
+
+Resposta
+title	year	num_ratings
+Pirates of the Caribbean: At World's End	2007	1768593
+Pirates of the Caribbean: At World's End	2007	1768593
+Harry Potter and the Order of the Phoenix	2007	1449179
+Sweeney Todd: The Demon Barber of Fleet Street	2007	1391688
+Shrek the Third	2007	1369685
+The Bourne Ultimatum	2007	1312487
+The Simpsons Movie	2007	1305720
+National Treasure: Book of Secrets	2007	1237906
+National Treasure: Book of Secrets	2007	1237906
+Spider-Man 3	2007	1192712
+Live Free or Die Hard	2007	1145097
+Live Free or Die Hard	2007	1145097
+Wanted	2008	934918
+I Now Pronounce You Chuck & Larry	2007	920014
+Ocean's Thirteen	2007	846364
+Ocean's Thirteen	2007	846364
+Disturbia	2007	701373
+American Gangster	2007	673602
+Blades of Glory	2007	665973
+I Am Legend	2007	597704
+Sydney White	2007	526699
+300	2006	476879
+4: Rise of the Silver Surfer	2007	470350
+4: Rise of the Silver Surfer	2007	470350
+Titanic	1997	464576
+
+SQL utilizada
+SELECT m.title, m.year, m.num_ratings
+        FROM movies m
+        ORDER BY m.num_ratings DESC NULLS LAST, m.title
+        LIMIT 25

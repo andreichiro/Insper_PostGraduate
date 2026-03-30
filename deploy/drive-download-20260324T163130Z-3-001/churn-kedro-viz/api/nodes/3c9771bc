@@ -1,0 +1,14 @@
+{
+  "parameters": {
+    "refit_scalers": {
+      "columns": [
+        "numerical"
+      ],
+      "split_to_fit": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  }
+}

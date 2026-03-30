@@ -1,0 +1,11 @@
+rank,job_id,company_name,job_title,industry,experience_level,employment_type,location,salary_range_usd,score
+1,1662,"Anderson, Tucker and Phillips",Data Scientist,Healthcare,Mid,Remote,"Jenniferborough, CO",76395-94209,0.33446769256344167
+2,1720,Grimes-Cruz,Data Analyst,Healthcare,Entry,Contract,"West Nicolefurt, US",145486-222351,0.3203128964183659
+3,345,"Anthony, Miller and Russell",Data Analyst,E-commerce,Senior,Internship,"East Linda, NZ",120234-139093,0.3083856087997802
+4,780,Harris and Sons,Data Analyst,E-commerce,Entry,Internship,"Amandabury, GW",142504-235377,0.30389436275815257
+5,1198,Woods-French,AI Researcher,Healthcare,Mid,Internship,"South Meagan, GQ",81361-133784,0.29607596181609713
+6,984,Garcia-Smith,Data Scientist,Automotive,Entry,Contract,"North Kevin, YE",47150-124312,0.27467504091633627
+7,998,Anderson LLC,ML Engineer,Tech,Senior,Full-time,"Elizabethton, PW",141251-152764,0.25900930636599984
+8,426,"Edwards, Jackson and Baker",Data Analyst,Automotive,Entry,Contract,"Sullivanshire, WS",147219-223596,0.24867605302730722
+9,1038,"Ramirez, Sanchez and Lucas",NLP Engineer,Retail,Senior,Internship,"Johnsonfurt, GQ",147851-188241,0.24392167729115993
+10,1458,Bush Inc,AI Researcher,Education,Entry,Full-time,"New Christophermouth, MC",89994-162981,0.2267440053203207

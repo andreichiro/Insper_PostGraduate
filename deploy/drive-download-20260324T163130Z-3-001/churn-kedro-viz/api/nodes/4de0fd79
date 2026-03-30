@@ -1,0 +1,8 @@
+{
+  "type": "pickle.pickle_dataset.PickleDataset",
+  "filepath": "/datascience/data/30_insper/04_productive_data_science/instructor/code/churn/data/06_models/optimized_model.pkl",
+  "run_command": "kedro run --to-outputs=optimized_model",
+  "preview": null,
+  "preview_type": null,
+  "stats": null
+}

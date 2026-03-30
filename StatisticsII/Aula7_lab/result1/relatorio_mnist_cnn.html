@@ -1,0 +1,148 @@
+<!DOCTYPE html><html lang='pt-br'><head><meta charset='utf-8'><title>Relatório CNN — MNIST</title><style>
+      :root{--fg:#222;--muted:#555;--line:#e6e6e6;--bg:#fff}
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px;color:var(--fg);background:var(--bg)}
+      h1,h2,h3{margin:1.0em 0 .5em}
+      p{margin:.6em 0;line-height:1.45}
+      table{border-collapse:collapse;width:100%;margin:8px 0 16px}
+      th,td{border:1px solid var(--line);padding:6px 8px}
+      th{text-align:left;background:#f7f7f7;position:sticky;top:0}
+      td.num{text-align:right;font-variant-numeric:tabular-nums}
+      tbody tr:nth-child(even){background:#fbfbfb}
+      ul{margin:.2em 0 .8em 1.2em}
+      .small{color:var(--muted);font-size:.9em}
+    </style></head><body>
+<h1>Relatório CNN — MNIST</h1>
+<h2>Busca de hiperparâmetros — top 10 configs (por val_acc)</h2>
+<table><thead><tr><th>l2_reg</th><th>dropout_conv</th><th>dropout_dense</th><th>rotation_deg</th><th>translation</th><th>zoom</th><th>dense_units</th><th>optimizer</th><th>learning_rate</th><th>weight_decay</th><th>batch_size</th><th>best_val_acc</th><th>best_val_top3</th></tr></thead><tbody>
+<tr><td class='num'>1e-04</td><td class='num'>0.3</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>128</td><td>lion</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.752900004386902</td><td class='num'>0.961199998855591</td></tr>
+<tr><td class='num'>1e-04</td><td class='num'>0.3</td><td class='num'>0.6</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>256</td><td>adam</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.643599987030029</td><td class='num'>0.807099997997284</td></tr>
+<tr><td class='num'>1e-04</td><td class='num'>0.3</td><td class='num'>0.6</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>256</td><td>lion</td><td class='num'>0.001</td><td class='num'>0</td><td class='num'>256</td><td class='num'>0.543799996376038</td><td class='num'>0.898599982261658</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.25</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>256</td><td>adamw</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.533999979496002</td><td class='num'>0.879599988460541</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.25</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>128</td><td>adamw</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.483500003814697</td><td class='num'>0.787800014019012</td></tr>
+<tr><td class='num'>1e-04</td><td class='num'>0.25</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>256</td><td>lion</td><td class='num'>3e-04</td><td class='num'>0</td><td class='num'>256</td><td class='num'>0.461699992418289</td><td class='num'>0.776400029659271</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.3</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>128</td><td>adamw</td><td class='num'>0.001</td><td class='num'>0</td><td class='num'>256</td><td class='num'>0.440699994564056</td><td class='num'>0.80919998884201</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.25</td><td class='num'>0.6</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>256</td><td>adam</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.429300010204315</td><td class='num'>0.829699993133545</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.3</td><td class='num'>0.6</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>128</td><td>adamw</td><td class='num'>0.001</td><td class='num'>0</td><td class='num'>256</td><td class='num'>0.428700000047684</td><td class='num'>0.708500027656555</td></tr>
+<tr><td class='num'>5e-04</td><td class='num'>0.3</td><td class='num'>0.5</td><td class='num'>10</td><td class='num'>0.1</td><td class='num'>0.1</td><td class='num'>128</td><td>adam</td><td class='num'>0.001</td><td class='num'>1e-04</td><td class='num'>256</td><td class='num'>0.354699999094009</td><td class='num'>0.642300009727478</td></tr>
+</tbody></table>
+<h2>Melhor configuração encontrada</h2>
+<table><thead><tr><th>l2_reg</th><th>dropout_conv</th><th>dropout_dense</th><th>rotation_deg</th><th>translation</th><th>zoom</th><th>dense_units</th><th>optimizer</th><th>learning_rate</th><th>weight_decay</th><th>batch_size</th><th>best_val_acc</th><th>best_val_top3</th></tr></thead><tbody><tr><td>1e-04</td><td>0.3</td><td>0.5</td><td>10</td><td>0.1</td><td>0.1</td><td>128</td><td>lion</td><td>0.001</td><td>1e-04</td><td>256</td><td>0.752900004386902</td><td>0.961199998855591</td></tr></tbody></table>
+<h2>Desempenho no conjunto de teste (MNIST)</h2>
+<ul>
+<li>Loss: 0.0563</li>
+<li>Acurácia: 0.9946</li>
+<li>Top-3 acc: 0.9996</li>
+</ul>
+<h3>Matriz de confusão (teste)</h3>
+<table><thead><tr><th>Pred \ Real</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr></thead><tbody>
+<tr><th>0</th><td class='num'>979</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>5</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td></tr>
+<tr><th>1</th><td class='num'>0</td><td class='num'>1135</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>5</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td></tr>
+<tr><th>2</th><td class='num'>0</td><td class='num'>0</td><td class='num'>1025</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
+<tr><th>3</th><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>1005</td><td class='num'>0</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td></tr>
+<tr><th>4</th><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>978</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>8</td></tr>
+<tr><th>5</th><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td><td class='num'>886</td><td class='num'>2</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td></tr>
+<tr><th>6</th><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>944</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
+<tr><th>7</th><td class='num'>1</td><td class='num'>0</td><td class='num'>5</td><td class='num'>1</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>1025</td><td class='num'>0</td><td class='num'>2</td></tr>
+<tr><th>8</th><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td><td class='num'>0</td><td class='num'>1</td><td class='num'>1</td><td class='num'>2</td><td class='num'>0</td><td class='num'>970</td><td class='num'>0</td></tr>
+<tr><th>9</th><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>2</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td><td class='num'>999</td></tr>
+</tbody></table>
+<h2>Avaliação em base_avaliacao.rds</h2>
+<p>Dataset: base_avaliacao.rds (sem rótulos)</p>
+<p>N = 6000 amostras</p>
+<h3>Base sem rótulos — distribuição de classes preditas</h3>
+<table><thead><tr><th>Classe</th><th>Contagem</th></tr></thead><tbody>
+<tr><td>0</td><td class='num'>600</td></tr>
+<tr><td>1</td><td class='num'>684</td></tr>
+<tr><td>2</td><td class='num'>567</td></tr>
+<tr><td>3</td><td class='num'>636</td></tr>
+<tr><td>4</td><td class='num'>538</td></tr>
+<tr><td>5</td><td class='num'>553</td></tr>
+<tr><td>6</td><td class='num'>578</td></tr>
+<tr><td>7</td><td class='num'>654</td></tr>
+<tr><td>8</td><td class='num'>592</td></tr>
+<tr><td>9</td><td class='num'>598</td></tr>
+</tbody></table>
+<h2>Resumo do modelo (best_model)</h2>
+<pre>
+Model: "sequential"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Layer (type)                  ┃ Output Shape           ┃     Param # ┃ Trai… ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━┩
+│ random_rotation               │ (None, 28, 28, 1)      │           0 │   -   │
+│ (RandomRotation)              │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ random_translation            │ (None, 28, 28, 1)      │           0 │   -   │
+│ (RandomTranslation)           │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ random_zoom (RandomZoom)      │ (None, 28, 28, 1)      │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ conv2d (Conv2D)               │ (None, 28, 28, 32)     │         320 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization           │ (None, 28, 28, 32)     │         128 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation (Activation)       │ (None, 28, 28, 32)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ conv2d_1 (Conv2D)             │ (None, 28, 28, 32)     │       9,248 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization_1         │ (None, 28, 28, 32)     │         128 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation_1 (Activation)     │ (None, 28, 28, 32)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ max_pooling2d (MaxPooling2D)  │ (None, 14, 14, 32)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dropout (Dropout)             │ (None, 14, 14, 32)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ conv2d_2 (Conv2D)             │ (None, 14, 14, 64)     │      18,496 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization_2         │ (None, 14, 14, 64)     │         256 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation_2 (Activation)     │ (None, 14, 14, 64)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ conv2d_3 (Conv2D)             │ (None, 14, 14, 64)     │      36,928 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization_3         │ (None, 14, 14, 64)     │         256 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation_3 (Activation)     │ (None, 14, 14, 64)     │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ max_pooling2d_1               │ (None, 7, 7, 64)       │           0 │   -   │
+│ (MaxPooling2D)                │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dropout_1 (Dropout)           │ (None, 7, 7, 64)       │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ conv2d_4 (Conv2D)             │ (None, 7, 7, 128)      │      73,856 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization_4         │ (None, 7, 7, 128)      │         512 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation_4 (Activation)     │ (None, 7, 7, 128)      │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ max_pooling2d_2               │ (None, 3, 3, 128)      │           0 │   -   │
+│ (MaxPooling2D)                │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dropout_2 (Dropout)           │ (None, 3, 3, 128)      │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ global_average_pooling2d      │ (None, 128)            │           0 │   -   │
+│ (GlobalAveragePooling2D)      │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dense (Dense)                 │ (None, 128)            │      16,512 │   Y   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ batch_normalization_5         │ (None, 128)            │         512 │   Y   │
+│ (BatchNormalization)          │                        │             │       │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ activation_5 (Activation)     │ (None, 128)            │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dropout_3 (Dropout)           │ (None, 128)            │           0 │   -   │
+├───────────────────────────────┼────────────────────────┼─────────────┼───────┤
+│ dense_1 (Dense)               │ (None, 10)             │       1,290 │   Y   │
+└───────────────────────────────┴────────────────────────┴─────────────┴───────┘
+ Total params: 315,990 (1.21 MB)
+ Trainable params: 157,546 (615.41 KB)
+ Non-trainable params: 896 (3.50 KB)
+ Optimizer params: 157,548 (615.43 KB) 
+</pre>
+</body></html>

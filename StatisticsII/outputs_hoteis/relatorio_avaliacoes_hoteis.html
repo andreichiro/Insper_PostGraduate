@@ -1,0 +1,76 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Análise de Avaliações de Hotéis — Chicago</title><style>
+      :root{--fg:#222;--muted:#555;--line:#e6e6e6;--bg:#fff;--note:#f9fbff;--note-b:#9bbcff;--warn:#fff9f0;--warn-b:#ffb155}
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px;color:var(--fg);background:var(--bg)}
+      h1,h2,h3{margin:1.0em 0 .5em}
+      p{margin:.6em 0;line-height:1.45}
+      table{border-collapse:collapse;width:100%;margin:8px 0 16px}
+      th,td{border:1px solid var(--line);padding:6px 8px}
+      th{text-align:left;background:#f7f7f7;position:sticky;top:0}
+      td.num{text-align:right;font-variant-numeric:tabular-nums}
+      tbody tr:nth-child(even){background:#fbfbfb}
+      .small{color:var(--muted);font-size:.9em}
+      .note{background:var(--note);border-left:4px solid var(--note-b);padding:.6em .8em;margin:.6em 0}
+      .warn{background:var(--warn);border-left:4px solid var(--warn-b);padding:.6em .8em;margin:.6em 0}
+      img{max-width:100%;height:auto;border:1px solid #eee;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+      ul{margin:.2em 0 .8em 1.2em}
+      .pill{display:inline-block;background:#eef;border:1px solid #dde;padding:2px 8px;border-radius:999px;margin:2px}
+      .kpi{display:inline-block;margin:.2em .6em .2em 0;padding:.2em .6em;background:#f5f7ff;border:1px solid #dfe6ff;border-radius:6px}
+      .hr{height:1px;background:var(--line);margin:16px 0}
+    </style></head><body>
+<h1>Relatório de NLP — Rede de Hotéis (Chicago)</h1>
+<p> Objetivos: (i) identificar tópicos que explicam positividade/negatividade; (ii) encontrar sinais linguísticos que diferenciem avaliações verdadeiras de falsas; (iii) traduzir tudo em ações de marketing e moderação. Todas as decisões são data‑driven. </p>
+<h2>Parte 1 — Preparação do corpus e análise descritiva</h2>
+<h3>Distribuição por autenticidade e polaridade</h3>
+<table><thead><tr><th>deceptive</th><th>polarity</th><th>n</th></tr></thead><tbody>
+<tr> <td>truthful</td><td>positive</td><td class='num'>400</td> </tr>
+<tr> <td>deceptive</td><td>negative</td><td class='num'>400</td> </tr>
+<tr> <td>deceptive</td><td>positive</td><td class='num'>400</td> </tr>
+<tr> <td>truthful</td><td>negative</td><td class='num'>396</td> </tr>
+</tbody></table>
+<p> Leitura: a distribuição serve como 'baseline' de acurácia de um classificador ingênuo (sempre escolher a classe majoritária). Neste conjunto, a baseline de acurácia (maioria) é de <b>50.1%</b>; qualquer modelo deve superar (teoricamente) um resultado similar a uma coin toss </p>
+<h3>Estatísticas de comprimento de texto</h3>
+<table><thead><tr><th>documentos</th><th>chars_mediana</th><th>chars_p95</th><th>palavras_mediana</th><th>palavras_p95</th></tr></thead><tbody>
+<tr> <td class='num'>1596</td><td class='num'>700</td><td class='num'>1690</td><td class='num'>128</td><td class='num'>312</td> </tr>
+</tbody></table>
+<p> Leitura: mediana e P95 de caracteres/palavras indicam cauda longa (textos extensos), justificando TF‑IDF e regularização na modelagem para mitigar termos oportunistas. </p>
+<h3>Impacto da limpeza no vocabulário</h3>
+<table><thead><tr><th>etapa</th><th>n_docs</th><th>n_termos</th></tr></thead><tbody>
+<tr> <td>DFM inicial</td><td class='num'>1596</td><td class='num'>6477</td> </tr>
+<tr> <td>Após remover certos termos (hotel/source)</td><td class='num'>1596</td><td class='num'>6477</td> </tr>
+<tr> <td>Após corte usando hapax + ubiquidade</td><td class='num'>1596</td><td class='num'>3102</td> </tr>
+</tbody></table>
+<p class='note'> Racional: remoção de termos evita vazamento de rótulo; trimming corta ruído. Reduzimos o vocabulário em <b>52.1%</b> aparentemente s/ perder mta cobertura </p>
+<p><b>Nuvem de palavras (após limpeza):</b><br/><img src='parte1_wordcloud.png'></p>
+<p> Leitura: a nuvem é útil para inspeção rápida, mas pode destacar termos frequentes pouco úteis. Por isso validamos relevância com TF‑IDF/Keyness. </p>
+<h3>Top‑10 termos mais frequentes (após limpeza)</h3>
+<table><thead><tr><th>rank</th><th>feature</th><th>frequency</th><th>docfreq</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>credit</td><td class='num'>57</td><td class='num'>35</td> </tr>
+<tr> <td class='num'>2</td><td>cab</td><td class='num'>55</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>3</td><td>dog</td><td class='num'>54</td><td class='num'>36</td> </tr>
+<tr> <td class='num'>4</td><td>space</td><td class='num'>50</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>5</td><td>tini</td><td class='num'>49</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>6</td><td>loud</td><td class='num'>48</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>7</td><td>regenc</td><td class='num'>47</td><td class='num'>39</td> </tr>
+<tr> <td class='num'>7</td><td>general</td><td class='num'>47</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>9</td><td>other</td><td class='num'>46</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>9</td><td>chose</td><td class='num'>46</td><td class='num'>41</td> </tr>
+</tbody></table>
+<p><b>Nuvem refinada (remoção data‑driven de termos pouco discriminativos):</b><br/><img src='parte1_wordcloud_refinada.png'></p>
+<p class='note'> Removemos automaticamente <b>36</b> termos de alta frequência e baixa discriminação (p≥0,20 em keyness para autenticidade e para polaridade). A remoção é apenas visual; o modelo usa o corpus completo já limpo. </p>
+<h2>Parte 2 — Termos relevantes (TF‑IDF) por classe</h2>
+<p><b>TF‑IDF — deceptive vs truthful:</b><br/><img src='parte2_tfidf_deceptive.png'></p>
+<h3>Resumo textual (8 termos por grupo)</h3>
+<table><thead><tr><th>group</th><th>top8</th></tr></thead><tbody>
+<tr> <td>deceptive</td><td>dog, regenc, televis, massag, excit, children, favorit, counter</td> </tr>
+<tr> <td>truthful</td><td>pricelin, cab, credit, tini, closet, cancel, chair, general</td> </tr>
+</tbody></table>
+<p> Leitura: termos em ‘deceptive’ sugerem linguagem genérica/superlativa; em ‘truthful’, menções a elementos específicos do serviço/quarto. Estes indícios alimentam a priorização de moderação (triagem). </p>
+<p><b>TF‑IDF — positive vs negative:</b><br/><img src='parte2_tfidf_polarity.png'></p>
+<h3>Resumo textual (8 termos por polaridade)</h3>
+<table><thead><tr><th>group</th><th>top8</th></tr></thead><tbody>
+<tr> <td>negative</td><td>credit, tini, loud, general, broken, cancel, luggag, inn</td> </tr>
+<tr> <td>positive</td><td>favorit, museum, gorgeous, awesom, comfi, buffet, cozi, north</td> </tr>
+</tbody></table>
+<p> Leitura: positivos destacam conforto/atendimento/valor; negativos tratam de ruído, limpeza, cobranças e atritos de processo. Esse mapa direciona prioridades de operação e comunicação. </p>
+<h2>Parte 3 — Classificação de polaridade (BoW + glmnet)</h2>

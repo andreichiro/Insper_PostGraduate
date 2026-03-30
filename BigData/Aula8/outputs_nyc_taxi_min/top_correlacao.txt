@@ -1,0 +1,1 @@
+Mais correlacionada com fare_amount é passenger_count com 0.010467

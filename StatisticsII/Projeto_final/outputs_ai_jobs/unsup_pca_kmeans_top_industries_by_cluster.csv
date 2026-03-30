@@ -1,0 +1,17 @@
+cluster_kmeans,industry,n
+1,Education,80
+1,E-commerce,78
+1,Automotive,77
+1,Retail,71
+1,Finance,68
+2,Retail,119
+2,Automotive,110
+2,E-commerce,109
+2,Finance,101
+2,Education,96
+2,Tech,96
+3,Education,114
+3,Automotive,106
+3,Tech,106
+3,Finance,105
+3,Healthcare,104

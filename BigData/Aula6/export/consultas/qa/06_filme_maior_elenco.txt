@@ -1,0 +1,18 @@
+Pergunta
+Qual o filme com maior elenco retornando apenas o primeiro considerando desempate por título
+
+Resposta
+mid	title	cast_size
+3246	Malcolm X	220
+
+SQL utilizada
+WITH elenco AS (
+          SELECT m.mid, m.title, COUNT(DISTINCT a.name) AS cast_size
+          FROM movies m
+          JOIN actors a ON a.mid = m.mid
+          GROUP BY m.mid, m.title
+        )
+        SELECT *
+        FROM elenco
+        ORDER BY cast_size DESC, title
+        LIMIT 1

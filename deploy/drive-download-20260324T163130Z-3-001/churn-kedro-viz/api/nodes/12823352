@@ -1,0 +1,52 @@
+{
+  "code": "def fit_scalers(\n    df_in: pd.DataFrame,\n    columns: dict[str, Any],\n    params: dict[str, Any],\n) -> dict[str, StandardScaler]:\n    \"\"\"Fit a StandardScaler for each numerical column on the specified splits.\n\n    Only rows belonging to the splits in ``params[\"split_to_fit\"]`` are used,\n    preventing statistics leakage from test or validation data.\n\n    Args:\n        df_in: DataFrame with a ``split`` column and all feature columns.\n        columns: Column groups dictionary mapping group keys to column names.\n        params: Scaler configuration with keys:\n            - ``columns`` (list[str]): Group keys from ``columns`` to scale.\n            - ``split_to_fit`` (list[str]): Split labels used for fitting.\n\n    Returns:\n        Mapping of column names to their fitted ``StandardScaler`` instances.\n    \"\"\"\n    scalers: dict[str, StandardScaler] = {}\n\n    cols_to_scale = [\n        item\n        for p in params[\"columns\"]\n        for item in (columns[p] if isinstance(columns[p], list) else [columns[p]])\n    ]\n\n    for col in cols_to_scale:\n        scaler = StandardScaler()\n        scaler.fit(df_in.loc[df_in[\"split\"].isin(params[\"split_to_fit\"]), [col]])\n        scalers[col] = scaler\n\n    logger.info(\"Fitted scalers for %d columns\", len(scalers))\n    return scalers\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {
+    "columns": {
+      "target": "Churn",
+      "numerical": [
+        "tenure",
+        "MonthlyCharges",
+        "TotalCharges"
+      ],
+      "categorical": [
+        "PaymentMethod",
+        "Contract",
+        "gender",
+        "SeniorCitizen",
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "MultipleLines",
+        "InternetService",
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
+        "PaperlessBilling"
+      ]
+    },
+    "refit_scalers": {
+      "columns": [
+        "numerical"
+      ],
+      "split_to_fit": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  },
+  "run_command": "kedro run --to-nodes='refit_scalers'",
+  "inputs": [
+    "split_churn_data",
+    "params:columns",
+    "params:refit_scalers"
+  ],
+  "outputs": [
+    "production_scalers"
+  ],
+  "preview": null
+}

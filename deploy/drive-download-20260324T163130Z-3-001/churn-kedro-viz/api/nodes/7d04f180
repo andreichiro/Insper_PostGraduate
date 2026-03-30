@@ -1,0 +1,11 @@
+{
+  "parameters": {
+    "refit_model": {
+      "train_splits": [
+        "train",
+        "test",
+        "validate"
+      ]
+    }
+  }
+}

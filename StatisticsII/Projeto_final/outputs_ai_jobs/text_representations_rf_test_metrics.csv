@@ -1,0 +1,7 @@
+.metric,.estimator,.estimate,model,features
+mae,standard,0.23721507294482297,random_forest,tfidf_lsa
+mae,standard,0.23724258441863919,random_forest,hybrid
+mae,standard,0.23726789809576518,random_forest,embeddings
+rmse,standard,0.28349582096430853,random_forest,tfidf_lsa
+rmse,standard,0.2835391903397864,random_forest,hybrid
+rmse,standard,0.28354387479879856,random_forest,embeddings

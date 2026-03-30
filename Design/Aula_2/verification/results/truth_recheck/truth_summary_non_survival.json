@@ -1,0 +1,13 @@
+{
+  "state_missing_pct": 0.46427215189873416,
+  "utm_missing_pct": 0.20720886075949366,
+  "short_sessions_le_5s": 243319,
+  "short_sessions_rate_le_5s": 0.2632724164421506,
+  "return_gap_median_days": 0.33557450231578617,
+  "return_gap_heavy_median_days": 0.4315382175947781,
+  "return_gap_base_median_days": 0.18820373264037898,
+  "latest_new_users_month": "2025-10-01",
+  "latest_new_users_count": 80,
+  "recent_6m_mau_interactions_slope_users_per_month": -457.9142857142854,
+  "retention_recent_avg_6m": 0.2526148359499601
+}

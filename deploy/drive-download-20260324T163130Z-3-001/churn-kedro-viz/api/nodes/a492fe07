@@ -1,0 +1,14 @@
+{
+  "code": "def evaluate_model(\n    model_artifact: dict[str, Any],\n    master_table: pd.DataFrame,\n) -> dict[str, Any]:\n    \"\"\"Evaluate a fitted model on each split listed in the artifact.\n\n    Args:\n        model_artifact: Dict produced by ``train_model`` or\n            ``optimize_hyperparameters``, containing ``estimator``,\n            ``target_column``, ``feature_columns``, and ``eval_splits``.\n        master_table: Fully-processed DataFrame with a ``split`` column and\n            all feature and target columns.\n\n    Returns:\n        Dict keyed by split name. Each value contains ``accuracy``,\n        ``roc_auc``, ``f1_macro``, ``classification_report``,\n        and ``n_samples``.\n    \"\"\"\n    estimator = model_artifact[\"estimator\"]\n    target = model_artifact[\"target_column\"]\n    feature_cols = model_artifact[\"feature_columns\"]\n    eval_splits = model_artifact[\"eval_splits\"]\n\n    all_metrics: dict[str, Any] = {}\n\n    for split_name in eval_splits:\n        split_df = master_table[master_table[\"split\"] == split_name]\n        X_split = split_df[feature_cols]\n        y_split = split_df[target]\n\n        y_pred = estimator.predict(X_split)\n        y_proba = estimator.predict_proba(X_split)[:, 1]\n\n        split_metrics = {\n            \"accuracy\": float(accuracy_score(y_split, y_pred)),\n            \"roc_auc\": float(roc_auc_score(y_split, y_proba)),\n            \"f1_macro\": float(f1_score(y_split, y_pred, average=\"macro\")),\n            \"classification_report\": classification_report(\n                y_split, y_pred, output_dict=True\n            ),\n            \"n_samples\": int(len(y_split)),\n        }\n\n        logger.info(\n            \"Evaluation '%s' — accuracy: %.4f, roc_auc: %.4f, f1_macro: %.4f\",\n            split_name,\n            split_metrics[\"accuracy\"],\n            split_metrics[\"roc_auc\"],\n            split_metrics[\"f1_macro\"],\n        )\n\n        all_metrics[split_name] = split_metrics\n\n    return all_metrics\n",
+  "filepath": "churn/src/churn/pipelines/modelling/nodes.py",
+  "parameters": {},
+  "run_command": "kedro run --to-nodes='evaluate_baseline_model'",
+  "inputs": [
+    "baseline_model",
+    "master_table"
+  ],
+  "outputs": [
+    "baseline_metrics"
+  ],
+  "preview": null
+}

@@ -1,0 +1,14 @@
+Pergunta
+Qual ator ou atriz possui o maior número de filmes com papel principal considerando cast_position igual a 1
+
+Resposta
+name	filmes_papel_principal
+Robert De Niro	46
+
+SQL utilizada
+SELECT a.name, COUNT(*) AS filmes_papel_principal
+        FROM actors a
+        WHERE a.cast_position = 1
+        GROUP BY a.name
+        ORDER BY filmes_papel_principal DESC, a.name
+        LIMIT 1

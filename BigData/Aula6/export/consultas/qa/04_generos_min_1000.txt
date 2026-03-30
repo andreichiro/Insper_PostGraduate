@@ -1,0 +1,19 @@
+Pergunta
+Exibir os gêneros distintos e o número de filmes por gênero para gêneros com pelo menos 1000 filmes, ordenado de forma crescente pelo número de filmes
+
+Resposta
+genre	num_filmes
+Adventure	1003
+Crime	1086
+Action	1445
+Romance	1644
+Thriller	1664
+Comedy	3566
+Drama	5076
+
+SQL utilizada
+SELECT g.genre, COUNT(DISTINCT g.mid) AS num_filmes
+        FROM genres g
+        GROUP BY g.genre
+        HAVING COUNT(DISTINCT g.mid) >= 1000
+        ORDER BY num_filmes ASC, g.genre

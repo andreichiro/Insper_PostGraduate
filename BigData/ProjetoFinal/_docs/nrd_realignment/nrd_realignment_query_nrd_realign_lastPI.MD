@@ -1,0 +1,59 @@
+{% docs nrd_realign_lastPI %}
+
+-- Source R file(s):          nrd_realign_lastPI.R
+-- Nature of source:          The provided snippet is T‑SQL executed from R; this
+--                            model reproduces that SQL behavior in Snowflake/dbt.
+--
+-- Upstream dependencies:     {{ source('dwcore','fact_sales_activity') }},
+--                            {{ source('dwcore','dim_acct') }},
+--                            {{ source('dwcore','dim_txn_reason_cd') }}
+--
+-- Core logic (R/dplyr view): inner_join(fact_sales_activity, dim_acct, by='acct_sk')
+--                            %>% inner_join(dim_txn_reason_cd, by='txn_reason_cd_sk')
+--                            %>% filter(
+--                                  sales_activity_period_sk BETWEEN @last_PI_start AND @last_PI_end,
+--                                  is_deleted==0, is_updated==0,
+--                                  monthly_sales_change_amt + revenue_expect_disposal_change_amt >= 0,
+--                                  txn_cd == @config_last_pi_trans_cd,
+--                                  reason_cd %in% @config_last_pi_rsn_cd
+--                              )
+--                            %>% group_by(infopro_div_nbr, acct_nbr)
+--                            %>% summarise(Last_PI = max(eff_dt_sk))
+--
+-- Expected grain/PK:         One row per (infopro_div_nbr, acct_nbr)
+--
+-- Consumers (likely):        Downstream realignment/PI reporting & modeling
+--
+-- Materialization:           table (stable snapshot & testing convenience)
+--
+-- Determinism notes:         Business result is deterministic. Two required SYS_* fields
+--                            use CURRENT_TIMESTAMP by your standard (volatile by design);
+--                            documented below. If a stable run anchor is later desired,
+--                            swap to {{ run_started_at }} in those fields (NOT applied).
+--
+-- Config/params (dbt vars):  var('config_last_pi_trans_cd')      -- scalar string
+--                            var('config_last_pi_rsn_cd')        -- string OR list of strings
+--                            var('last_PI_start'), var('last_PI_end')  -- numeric keys
+--
+-- Assumptions:               *_sk fields numeric; flags are numeric 0/1; BETWEEN inclusive.
+--
+-- Optimizations:             -- OPTIMIZATION: Predicate pushdown: filter dim_txn_reason_cd
+--                            before join; filter fact before all joins to minimize volume.
+--
+-- NO DIRECT TRANSLATION:     Original T‑SQL variables (@...) replaced by dbt vars. Types
+--                            cast explicitly where needed. SYS_* fields added per your
+--                            requirement (introduces controlled non‑determinism).
+--
+-- Recommended dbt tests:     unique + not_null on ("Infopro_Div_Nbr","Acct_Nbr")
+--                            not_null on "Last_PI"
+--                            source uniqueness on dim_acct.acct_sk and dim_txn_reason_cd.txn_reason_cd_sk
+--
+-- Lineage status:            Upstream lineage reproduced exactly via sources above.
+--                            Downstream lineage unknown from the snippet; any models
+--                            consuming this dataset should use ref('nrd_realign_lastPI').
+--
+-- Machine learning candidate:
+--   Not applicable. This is deterministic filtering + aggregation; interpretable ML
+--   would not improve accuracy or utility here.
+
+{% enddocs %}

@@ -1,0 +1,7 @@
+.metric,.estimator,.estimate,model,features
+mae,standard,0.23714324698517275,xgboost,hybrid
+mae,standard,0.23724258441863919,random_forest,hybrid
+mae,standard,0.23726208663903878,elastic_net,hybrid
+rmse,standard,0.28348339325785454,xgboost,hybrid
+rmse,standard,0.28352024896345523,elastic_net,hybrid
+rmse,standard,0.2835391903397864,random_forest,hybrid

@@ -1,0 +1,103 @@
+Pergunta
+Exercício o nome de todo o elenco que fez o filme The Dark Knight
+
+Resposta
+name	cast_position
+Christian Bale	1
+Heath Ledger	2
+Aaron Eckhart	3
+Michael Caine	4
+Maggie Gyllenhaal	5
+Gary Oldman	6
+Morgan Freeman	7
+Monique Curnen	8
+Ron Dean	9
+Cillian Murphy	10
+Chin Han	11
+Nestor Carbonell	12
+Eric Roberts	13
+Ritchie Coster	14
+Anthony Michael Hall	15
+Colin McFarlane	16
+Joshua Harto	17
+Melinda McGraw	18
+Nathan Gamble	19
+Michael Vieau	20
+Michael Stoyanov	21
+Bill Smille	22
+Michael Jai White	23
+Matthew O'Neill	24
+William Fichtner	25
+Olumiji Olawumi	26
+Greg Beam	27
+Erik Hellman	28
+Beatrice Rosen	29
+Vincenzo Nicoli	30
+Edison Chen	31
+Nydia Rodriguez Terracina	32
+Andy Luther	33
+James Farruggio	34
+Thomas McElroy	35
+Will Zahrn	36
+James Fierro	37
+Sam Derence	38
+Jennifer Knox	39
+Patrick Clear	40
+Sarah Jayne Dunn	41
+Chucky Venn	42
+Winston Ellis	43
+David Dastmalchian	44
+Sophia Hinshelwood	45
+Keith Kupferer	46
+Joseph Luis Caballero	47
+Richard Dillane	48
+Daryl Satcher	49
+Crhis Perschler	50
+Aidan Feore	51
+Philip Bulcock	52
+Paul Birchard	53
+Walter Lewis	54
+Vincent Riotta	55
+Nancy Crane	56
+K. Todd Freeman	57
+Matt Shallenberger	58
+Michael Andrew Gorman	59
+Lanny Lutz	60
+Peter DeFaria	61
+Matt Rippy	62
+Andrew Bicknell	63
+Ariyon Bakare	64
+Doug Ballard	65
+Helene Wilson	66
+Tommy Campbell	67
+Craig Heaney	68
+Lorna Gayle	69
+Joshua Rollins	70
+Dale RIvera	71
+Matthew Leitch	72
+Tommy 'Tiny' Lister	73
+Thomas Gaitsch	74
+William Armstrong	75
+Adam Kalesperis	76
+Tristan Tait	77
+Bronson Webb	78
+Gertrude Kyles	79
+Jonathan Ryland	80
+James Scales	81
+Nigel Carrington	82
+Ian Pirie	83
+Lateef Lovejoy	84
+Grahame Edwards	85
+Roger Monk	86
+Ronan Summers	87
+Wai Wong	88
+Michael Corey Foster	89
+Hannah Gunn	90
+Brandon Lambdin	91
+
+SQL utilizada
+SELECT a.name, a.cast_position
+        FROM actors a
+        JOIN movies m ON m.mid = a.mid
+        WHERE m.title = 'The Dark Knight'
+        ORDER BY a.cast_position NULLS LAST, a.name

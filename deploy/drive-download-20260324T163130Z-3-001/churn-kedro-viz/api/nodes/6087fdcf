@@ -1,0 +1,21 @@
+{
+  "code": "def add_split_column(\n    df_in: pd.DataFrame,\n    split: dict[str, Any],\n) -> pd.DataFrame:\n    \"\"\"Randomly assign each row to a train, test, or validate split.\n\n    Args:\n        df_in: Cleaned input DataFrame.\n        split: Split configuration with keys:\n            - ``train`` (float): Proportion of rows for training.\n            - ``test`` (float): Proportion of rows for testing.\n            - ``validate`` (float): Proportion of rows for validation.\n            - ``random_state`` (int): Seed for reproducible assignment.\n\n    Returns:\n        Input DataFrame with an added ``split`` column whose values are\n        ``\"train\"``, ``\"test\"``, or ``\"validate\"``.\n\n    Raises:\n        ValueError: If ``train + test + validate`` does not sum to 1.0.\n    \"\"\"\n    total = split[\"train\"] + split[\"test\"] + split[\"validate\"]\n    probs = [split[\"train\"], split[\"test\"], split[\"validate\"]]\n\n    if not np.isclose(total, 1.0):\n        raise ValueError(f\"Split proportions must sum to 1.0, got {total}\")\n\n    rng = np.random.default_rng(split[\"random_state\"])\n\n    labels = rng.choice(\n        a=[\"train\", \"test\", \"validate\"],\n        size=len(df_in),\n        p=probs,\n        replace=True,\n    )\n\n    df_out = df_in.assign(split=labels)\n\n    logger.info(\n        \"Split counts — train: %d, test: %d, validate: %d\",\n        (labels == \"train\").sum(),\n        (labels == \"test\").sum(),\n        (labels == \"validate\").sum(),\n    )\n\n    return df_out\n",
+  "filepath": "churn/src/churn/pipelines/data_engineering/nodes.py",
+  "parameters": {
+    "split": {
+      "train": 0.7,
+      "test": 0.15,
+      "validate": 0.15,
+      "random_state": 42
+    }
+  },
+  "run_command": "kedro run --to-nodes='add_split_column'",
+  "inputs": [
+    "cleaned_churn_data",
+    "params:split"
+  ],
+  "outputs": [
+    "split_churn_data"
+  ],
+  "preview": null
+}

@@ -1,0 +1,203 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Análise de Avaliações de Hotéis — Chicago</title><style>
+      :root{--fg:#222;--muted:#555;--line:#e6e6e6;--bg:#fff;--note:#f9fbff;--note-b:#9bbcff;--warn:#fff9f0;--warn-b:#ffb155}
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px;color:var(--fg);background:var(--bg)}
+      h1,h2,h3{margin:1.0em 0 .5em}
+      p{margin:.6em 0;line-height:1.45}
+      table{border-collapse:collapse;width:100%;margin:8px 0 16px}
+      th,td{border:1px solid var(--line);padding:6px 8px}
+      th{text-align:left;background:#f7f7f7;position:sticky;top:0}
+      td.num{text-align:right;font-variant-numeric:tabular-nums}
+      tbody tr:nth-child(even){background:#fbfbfb}
+      .small{color:var(--muted);font-size:.9em}
+      .note{background:var(--note);border-left:4px solid var(--note-b);padding:.6em .8em;margin:.6em 0}
+      .warn{background:var(--warn);border-left:4px solid var(--warn-b);padding:.6em .8em;margin:.6em 0}
+      img{max-width:100%;height:auto;border:1px solid #eee;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+      ul{margin:.2em 0 .8em 1.2em}
+      .pill{display:inline-block;background:#eef;border:1px solid #dde;padding:2px 8px;border-radius:999px;margin:2px}
+      .kpi{display:inline-block;margin:.2em .6em .2em 0;padding:.2em .6em;background:#f5f7ff;border:1px solid #dfe6ff;border-radius:6px}
+      .hr{height:1px;background:var(--line);margin:16px 0}
+    </style></head><body>
+<h1>Relatório de NLP — Rede de Hotéis (Chicago)</h1>
+<p> Objetivos: (i) identificar tópicos que explicam positividade/negatividade; (ii) encontrar sinais linguísticos que diferenciem avaliações verdadeiras de falsas; (iii) traduzir tudo em ações de marketing e moderação. Todas as decisões são data‑driven. </p>
+<h2>Parte 1 — Preparação do corpus e análise descritiva</h2>
+<h3>Distribuição por autenticidade e polaridade</h3>
+<table><thead><tr><th>deceptive</th><th>polarity</th><th>n</th></tr></thead><tbody>
+<tr> <td>truthful</td><td>positive</td><td class='num'>400</td> </tr>
+<tr> <td>deceptive</td><td>negative</td><td class='num'>400</td> </tr>
+<tr> <td>deceptive</td><td>positive</td><td class='num'>400</td> </tr>
+<tr> <td>truthful</td><td>negative</td><td class='num'>396</td> </tr>
+</tbody></table>
+<p> Leitura: a distribuição serve como 'baseline' de acurácia de um classificador ingênuo (sempre escolher a classe majoritária). Neste conjunto, a baseline de acurácia (maioria) é de <b>50.1%</b>; qualquer modelo deve superar (teoricamente) um resultado similar a uma coin toss </p>
+<h3>Estatísticas de comprimento de texto</h3>
+<table><thead><tr><th>documentos</th><th>chars_mediana</th><th>chars_p95</th><th>palavras_mediana</th><th>palavras_p95</th></tr></thead><tbody>
+<tr> <td class='num'>1596</td><td class='num'>700</td><td class='num'>1690</td><td class='num'>128</td><td class='num'>312</td> </tr>
+</tbody></table>
+<p> Leitura: mediana e P95 de caracteres/palavras indicam cauda longa (textos extensos), justificando TF‑IDF e regularização na modelagem para mitigar termos oportunistas. </p>
+<h3>Impacto da limpeza no vocabulário</h3>
+<table><thead><tr><th>etapa</th><th>n_docs</th><th>n_termos</th></tr></thead><tbody>
+<tr> <td>DFM inicial</td><td class='num'>1596</td><td class='num'>6477</td> </tr>
+<tr> <td>Após remover certos termos (hotel/source)</td><td class='num'>1596</td><td class='num'>6477</td> </tr>
+<tr> <td>Após corte usando hapax + ubiquidade</td><td class='num'>1596</td><td class='num'>3102</td> </tr>
+</tbody></table>
+<p class='note'> Racional: remoção de termos evita vazamento de rótulo; trimming corta ruído. Reduzimos o vocabulário em <b>52.1%</b> aparentemente s/ perder mta cobertura </p>
+<p><b>Nuvem de palavras (após limpeza):</b><br/><img src='parte1_wordcloud.png'></p>
+<p> Leitura: a nuvem é útil para inspeção rápida, mas pode destacar termos frequentes pouco úteis. Por isso validamos relevância com TF‑IDF/Keyness. </p>
+<h3>Top‑10 termos mais frequentes (após limpeza)</h3>
+<table><thead><tr><th>rank</th><th>feature</th><th>frequency</th><th>docfreq</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>credit</td><td class='num'>57</td><td class='num'>35</td> </tr>
+<tr> <td class='num'>2</td><td>cab</td><td class='num'>55</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>3</td><td>dog</td><td class='num'>54</td><td class='num'>36</td> </tr>
+<tr> <td class='num'>4</td><td>space</td><td class='num'>50</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>5</td><td>tini</td><td class='num'>49</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>6</td><td>loud</td><td class='num'>48</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>7</td><td>regenc</td><td class='num'>47</td><td class='num'>39</td> </tr>
+<tr> <td class='num'>7</td><td>general</td><td class='num'>47</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>9</td><td>other</td><td class='num'>46</td><td class='num'>41</td> </tr>
+<tr> <td class='num'>9</td><td>chose</td><td class='num'>46</td><td class='num'>41</td> </tr>
+</tbody></table>
+<p><b>Nuvem refinada (remoção data‑driven de termos pouco discriminativos):</b><br/><img src='parte1_wordcloud_refinada.png'></p>
+<p class='note'> Removemos automaticamente <b>36</b> termos de alta frequência e baixa discriminação (p≥0,20 em keyness para autenticidade e para polaridade). A remoção é apenas visual; o modelo usa o corpus completo já limpo. </p>
+<h2>Parte 2 — Termos relevantes (TF‑IDF) por classe</h2>
+<p><b>TF‑IDF — deceptive vs truthful:</b><br/><img src='parte2_tfidf_deceptive.png'></p>
+<h3>Resumo textual (8 termos por grupo)</h3>
+<table><thead><tr><th>group</th><th>top8</th></tr></thead><tbody>
+<tr> <td>deceptive</td><td>dog, regenc, televis, massag, excit, children, favorit, counter</td> </tr>
+<tr> <td>truthful</td><td>pricelin, cab, credit, tini, closet, cancel, chair, general</td> </tr>
+</tbody></table>
+<p> Leitura: termos em ‘deceptive’ sugerem linguagem genérica/superlativa; em ‘truthful’, menções a elementos específicos do serviço/quarto. Estes indícios alimentam a priorização de moderação (triagem). </p>
+<p><b>TF‑IDF — positive vs negative:</b><br/><img src='parte2_tfidf_polarity.png'></p>
+<h3>Resumo textual (8 termos por polaridade)</h3>
+<table><thead><tr><th>group</th><th>top8</th></tr></thead><tbody>
+<tr> <td>negative</td><td>credit, tini, loud, general, broken, cancel, luggag, inn</td> </tr>
+<tr> <td>positive</td><td>favorit, museum, gorgeous, awesom, comfi, buffet, cozi, north</td> </tr>
+</tbody></table>
+<p> Leitura: positivos destacam conforto/atendimento/valor; negativos tratam de ruído, limpeza, cobranças e atritos de processo. Esse mapa direciona prioridades de operação e comunicação. </p>
+<h2>Parte 3 — Classificação de polaridade (BoW + glmnet)</h2>
+<h3>Amostras (error analysis)</h3>
+<p> <b>Falsos positivos (FP):</b> </p>
+<ul> <li>p=0.711 — My daughter and I were in Chicago for one night after having attended a three-day conference elsewhere in Illinois. We were only in Chicago on our way home. ...</li><li>p=0.699 — Just back from a business trip. The Homewood is in a great location just off the Magnificent Mile, includes a great breakfast, heavy hors d'ouevres for dinne...</li><li>p=0.686 — This is a great hotel! The views are fabulous, the service it friendly and the location is superb. We booked a room on an upper floor and had access to the l...</li><li>p=0.647 — We really enjoyed our brief stay at the Millennium Knickerbocker! From the front desk personnel and bellmen to the housekeeping staff and bartender, everyone...</li><li>p=0.643 — My wife & I celebrated our anniversary at the Knickerbocker & could not have been treated better. Before we were out of our cab, our bags had been loaded on ...</li> </ul>
+<p> <b>Falsos negativos (FN):</b> </p>
+<ul> <li>p=0.372 — My boyfriend and I decided to stay at the Conrad Chicago for our anniversary. The second we walked in, we were immediately won over by the look and feel of t...</li><li>p=0.393 — We paid $75 a night through Priceline, which is excellent for June. Our room had a fantastic view of the Hancock Building and the river. The room was large, ...</li><li>p=0.411 — I asked for a high floor away from the elevator and that is what I got. The room was pleasantly decorated, functional and very clean. I didn't need a whole l...</li><li>p=0.414 — I stayed at the Omni for one night following a business meeting at another downtown Chicago hotel. I was completely impressed by the service; all personnel d...</li><li>p=0.416 — I stayed at the Omni for one night following a business meeting at another downtown Chicago hotel. I was completely impressed by the service; all personnel d...</li> </ul>
+<h3>Métricas out‑of‑fold (v‑fold CV)</h3>
+<table><thead><tr><th>.metric</th><th>.estimator</th><th>.estimate</th></tr></thead><tbody>
+<tr> <td>accuracy</td><td>binary</td><td class='num'>0.9066</td> </tr>
+<tr> <td>precision</td><td>binary</td><td class='num'>0.9074</td> </tr>
+<tr> <td>recall</td><td>binary</td><td class='num'>0.9062</td> </tr>
+<tr> <td>f_meas</td><td>binary</td><td class='num'>0.9068</td> </tr>
+<tr> <td>kap</td><td>binary</td><td class='num'>0.8133</td> </tr>
+<tr> <td>roc_auc</td><td>binary</td><td class='num'>0.9568</td> </tr>
+</tbody></table>
+<h3>Matriz de confusão (predições out‑of‑fold)</h3>
+<table><thead><tr><th>Prediction</th><th>Truth</th><th>Freq</th></tr></thead><tbody>
+<tr> <td>negative</td><td>negative</td><td class='num'>722</td> </tr>
+<tr> <td>positive</td><td>negative</td><td class='num'>74</td> </tr>
+<tr> <td>negative</td><td>positive</td><td class='num'>75</td> </tr>
+<tr> <td>positive</td><td>positive</td><td class='num'>725</td> </tr>
+</tbody></table>
+<h3>Leituras complementares do desempenho</h3>
+<table><thead><tr><th>metric</th><th>value</th></tr></thead><tbody>
+<tr> <td>TPR (sensibilidade)+</td><td class='num'>0.9062</td> </tr>
+<tr> <td>TNR (especificidade)</td><td class='num'>0.9070</td> </tr>
+<tr> <td>FPR</td><td class='num'>0.0930</td> </tr>
+<tr> <td>FNR</td><td class='num'>0.0938</td> </tr>
+<tr> <td>Balanced Accuracy</td><td class='num'>0.9066</td> </tr>
+<tr> <td>Baseline Accuracy (majoritária)</td><td class='num'>0.5013</td> </tr>
+</tbody></table>
+<p><b>Curva ROC:</b><br/><img src='parte3_roc.png'></p>
+<p class='note'> Interpretação data‑driven do modelo: o AUC supera substancialmente a baseline (50.1%). O limiar τ foi escolhido pelo índice de Youden (max s+e), equilibrando falsos positivos e falsos negativos. O parâmetro elástico α (mediana dos folds) para o ajuste final foi <b>0</b>. </p>
+<p><b>Importância de termos (interpretação do modelo):</b><br/> <img src='parte3_top_terms_positive.png'><br/> <img src='parte3_top_terms_negative.png'></p>
+<p> Leitura: pesos positivos aumentam a chance de ‘positive’; negativos elevam ‘negative’. Direcionamento: reforçar termos positivos nas campanhas e tratar operacionalmente os termos negativos recorrentes. </p>
+<h2>Parte 4 — Modelagem de tópicos (LDA) com escolha de k por métricas</h2>
+<h3>Métricas por k (perplexidade ↓, JS‑divergência ↑, score combinado ↑)</h3>
+<table><thead><tr><th>k</th><th>perplexity</th><th>js_div</th><th>z_perp</th><th>z_js</th><th>score</th></tr></thead><tbody>
+<tr> <td class='num'>3</td><td class='num'>2321.193</td><td class='num'>0.5310</td><td class='num'>-2.5726</td><td class='num'>1.8965</td><td class='num'>-0.6761</td> </tr>
+<tr> <td class='num'>4</td><td class='num'>2290.544</td><td class='num'>0.5214</td><td class='num'>-2.1389</td><td class='num'>1.6893</td><td class='num'>-0.4496</td> </tr>
+<tr> <td class='num'>5</td><td class='num'>2274.628</td><td class='num'>0.5123</td><td class='num'>-1.9137</td><td class='num'>1.4944</td><td class='num'>-0.4193</td> </tr>
+<tr> <td class='num'>6</td><td class='num'>2229.126</td><td class='num'>0.5048</td><td class='num'>-1.2698</td><td class='num'>1.3324</td><td class='num'>0.0626</td> </tr>
+<tr> <td class='num'>7</td><td class='num'>2219.932</td><td class='num'>0.4969</td><td class='num'>-1.1397</td><td class='num'>1.1619</td><td class='num'>0.0222</td> </tr>
+<tr> <td class='num'>8</td><td class='num'>2198.004</td><td class='num'>0.4902</td><td class='num'>-0.8294</td><td class='num'>1.0170</td><td class='num'>0.1876</td> </tr>
+<tr> <td class='num'>9</td><td class='num'>2182.987</td><td class='num'>0.4825</td><td class='num'>-0.6169</td><td class='num'>0.8517</td><td class='num'>0.2348</td> </tr>
+<tr> <td class='num'>10</td><td class='num'>2177.344</td><td class='num'>0.4761</td><td class='num'>-0.5371</td><td class='num'>0.7151</td><td class='num'>0.1781</td> </tr>
+<tr> <td class='num'>11</td><td class='num'>2153.199</td><td class='num'>0.4705</td><td class='num'>-0.1954</td><td class='num'>0.5945</td><td class='num'>0.3991</td> </tr>
+<tr> <td class='num'>12</td><td class='num'>2133.798</td><td class='num'>0.4641</td><td class='num'>0.0792</td><td class='num'>0.4552</td><td class='num'>0.5344</td> </tr>
+<tr> <td class='num'>13</td><td class='num'>2126.319</td><td class='num'>0.4582</td><td class='num'>0.1850</td><td class='num'>0.3292</td><td class='num'>0.5142</td> </tr>
+<tr> <td class='num'>14</td><td class='num'>2117.218</td><td class='num'>0.4529</td><td class='num'>0.3138</td><td class='num'>0.2142</td><td class='num'>0.5280</td> </tr>
+<tr> <td class='num'>15</td><td class='num'>2112.944</td><td class='num'>0.4458</td><td class='num'>0.3742</td><td class='num'>0.0617</td><td class='num'>0.4359</td> </tr>
+<tr> <td class='num'>16</td><td class='num'>2119.119</td><td class='num'>0.4416</td><td class='num'>0.2869</td><td class='num'>-0.0288</td><td class='num'>0.2581</td> </tr>
+<tr> <td class='num'>17</td><td class='num'>2108.822</td><td class='num'>0.4357</td><td class='num'>0.4326</td><td class='num'>-0.1556</td><td class='num'>0.2770</td> </tr>
+<tr> <td class='num'>18</td><td class='num'>2099.289</td><td class='num'>0.4312</td><td class='num'>0.5675</td><td class='num'>-0.2530</td><td class='num'>0.3144</td> </tr>
+<tr> <td class='num'>19</td><td class='num'>2096.085</td><td class='num'>0.4239</td><td class='num'>0.6128</td><td class='num'>-0.4101</td><td class='num'>0.2027</td> </tr>
+<tr> <td class='num'>20</td><td class='num'>2092.617</td><td class='num'>0.4202</td><td class='num'>0.6619</td><td class='num'>-0.4896</td><td class='num'>0.1723</td> </tr>
+<tr> <td class='num'>21</td><td class='num'>2102.568</td><td class='num'>0.4141</td><td class='num'>0.5211</td><td class='num'>-0.6203</td><td class='num'>-0.0993</td> </tr>
+<tr> <td class='num'>22</td><td class='num'>2091.005</td><td class='num'>0.4095</td><td class='num'>0.6847</td><td class='num'>-0.7197</td><td class='num'>-0.0350</td> </tr>
+<tr> <td class='num'>23</td><td class='num'>2089.142</td><td class='num'>0.4057</td><td class='num'>0.7111</td><td class='num'>-0.8022</td><td class='num'>-0.0911</td> </tr>
+<tr> <td class='num'>24</td><td class='num'>2077.044</td><td class='num'>0.4009</td><td class='num'>0.8823</td><td class='num'>-0.9057</td><td class='num'>-0.0234</td> </tr>
+<tr> <td class='num'>25</td><td class='num'>2066.634</td><td class='num'>0.3960</td><td class='num'>1.0296</td><td class='num'>-1.0096</td><td class='num'>0.0199</td> </tr>
+<tr> <td class='num'>26</td><td class='num'>2072.575</td><td class='num'>0.3916</td><td class='num'>0.9455</td><td class='num'>-1.1059</td><td class='num'>-0.1604</td> </tr>
+<tr> <td class='num'>27</td><td class='num'>2077.266</td><td class='num'>0.3877</td><td class='num'>0.8791</td><td class='num'>-1.1886</td><td class='num'>-0.3095</td> </tr>
+<tr> <td class='num'>28</td><td class='num'>2091.005</td><td class='num'>0.3827</td><td class='num'>0.6847</td><td class='num'>-1.2973</td><td class='num'>-0.6126</td> </tr>
+<tr> <td class='num'>29</td><td class='num'>2087.183</td><td class='num'>0.3797</td><td class='num'>0.7388</td><td class='num'>-1.3612</td><td class='num'>-0.6224</td> </tr>
+<tr> <td class='num'>30</td><td class='num'>2095.371</td><td class='num'>0.3749</td><td class='num'>0.6229</td><td class='num'>-1.4652</td><td class='num'>-0.8423</td> </tr>
+</tbody></table>
+<p> Decisão: escolhemos k que maximiza o score z(−perplexidade) + z(JS). Ponto ótimo encontrado: <b>k* = 12</b>, onde há bom trade-off entre ajuste e separação entre tópicos. </p>
+<p><b>Seleção de k (LDA):</b><br/><img src='parte4_k_selection.png'></p>
+<p><b>Top termos por tópico:</b><br/><img src='parte4_lda_top_terms.png'></p>
+<h3>Rótulos sugeridos e termos principais por tópico</h3>
+<table><thead><tr><th>topic</th><th>topic_label</th><th>top_10</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>alimentos e bebidas</td><td>luggag, tini, item, bother, bare, ladi, holiday, compar, discount, frequent</td> </tr>
+<tr> <td class='num'>2</td><td>tópico 2</td><td>loud, queen, pass, type, basic, seen, pm, delux, overpr, annoy</td> </tr>
+<tr> <td class='num'>3</td><td>preço e valor</td><td>obvious, cheap, bell, stuff, tip, advertis, chain, report, featur, save</td> </tr>
+<tr> <td class='num'>4</td><td>tópico 4</td><td>along, super, superb, chose, rush, convent, neighborhood, cozi, other, charm</td> </tr>
+<tr> <td class='num'>5</td><td>preço e valor</td><td>favorit, museum, base, gorgeous, secur, tour, menu, often, follow, note</td> </tr>
+<tr> <td class='num'>6</td><td>tópico 6</td><td>credit, mistak, cancel, date, amount, fail, taken, correct, miss, email</td> </tr>
+<tr> <td class='num'>7</td><td>preço e valor</td><td>pricelin, world, step, massag, twice, write, indoor, polit, met, kimpton</td> </tr>
+<tr> <td class='num'>8</td><td>tópico 8</td><td>space, dog, moment, mean, getaway, closet, averag, ice, woman, updat</td> </tr>
+<tr> <td class='num'>9</td><td>preço e valor</td><td>girl, previous, daughter, excit, downstair, broken, yes, connect, flight, son</td> </tr>
+<tr> <td class='num'>10</td><td>preço e valor</td><td>cab, glass, loung, select, continu, snack, doorman, valu, store, checkout</td> </tr>
+<tr> <td class='num'>11</td><td>transporte e estacionamento</td><td>chair, inn, buffet, airport, list, taxi, notch, wireless, main, switch</td> </tr>
+<tr> <td class='num'>12</td><td>tópico 12</td><td>regenc, wi, fi, comput, sink, imagin, televis, clear, job, head</td> </tr>
+</tbody></table>
+<p><b>Prevalência por tópico:</b><br/><img src='parte4_topic_prevalence_topics.png'></p>
+<p><b>Prevalência por rótulo (agregado):</b><br/><img src='parte4_topic_prevalence_labels.png'></p>
+<h3>Tópico dominante por documento (contagem e %)</h3>
+<table><thead><tr><th>topic_label</th><th>docs</th><th>perc</th></tr></thead><tbody>
+<tr> <td>preço e valor</td><td class='num'>628</td><td class='num'>39.5</td> </tr>
+<tr> <td>alimentos e bebidas</td><td class='num'>214</td><td class='num'>13.5</td> </tr>
+<tr> <td>tópico 2</td><td class='num'>186</td><td class='num'>11.7</td> </tr>
+<tr> <td>tópico 4</td><td class='num'>146</td><td class='num'>9.2</td> </tr>
+<tr> <td>tópico 6</td><td class='num'>132</td><td class='num'>8.3</td> </tr>
+<tr> <td>tópico 8</td><td class='num'>108</td><td class='num'>6.8</td> </tr>
+<tr> <td>transporte e estacionamento</td><td class='num'>98</td><td class='num'>6.2</td> </tr>
+<tr> <td>tópico 12</td><td class='num'>77</td><td class='num'>4.8</td> </tr>
+</tbody></table>
+<p> Leitura: os tópicos com maior γ médio e maior dominância merecem mais atenção.Ex.: se 'preço e valor' domina, propostas de valor e transparência de taxas devem liderar o plano de ação. </p>
+<h2>Parte 5 — Interpretações e plano de ação</h2>
+<h3>Drivers de positividade e negatividade (TF‑IDF)</h3>
+<p> Principais drivers <b>positivos</b>: </p>
+<ul> <li>gorgeous</li><li>comfi</li><li>favorit</li><li>museum</li><li>superb</li><li>pump</li><li>awesom</li><li>defin</li><li>cozi</li><li>breathtak</li><li>product</li><li>spotless</li> </ul>
+<p> Principais drivers <b>negativos</b>: </p>
+<ul> <li>credit</li><li>tini</li><li>broken</li><li>loud</li><li>general</li><li>inn</li><li>mistak</li><li>avoid</li><li>overpr</li><li>discov</li><li>luggag</li><li>cancel</li> </ul>
+<p class='note'> Ações rápidas: (i) transformar drivers positivos em planos de ação; (ii) endereçar drivers negativos com SLAs (ex.: ruído/limpeza) e revisão de políticas internas(ex.: taxas/cobranças). </p>
+<h3>Sinais linguísticos (deceptive vs truthful) — TF‑IDF</h3>
+<p> <b>Falsas (deceptive)</b> — termos característicos: </p>
+<ul> <li>dog</li><li>regenc</li><li>televis</li><li>massag</li><li>counter</li><li>cigarett</li><li>children</li><li>indoor</li><li>settl</li><li>windi</li><li>pamper</li><li>excit</li> </ul>
+<p> <b>Verdadeiras (truthful)</b> — termos característicos: </p>
+<ul> <li>pricelin</li><li>cab</li><li>tini</li><li>closet</li><li>sofa</li><li>credit</li><li>doorman</li><li>fridg</li><li>prior</li><li>separ</li><li>chair</li><li>older</li> </ul>
+<p class='warn'> Recomendação de moderação: usar esses termos como features de triagem (priorização) e manter revisão humana como decisão final. </p>
+<h3>Ações sugeridas por tópico (com base em rótulos e termos)</h3>
+<table><thead><tr><th>topic</th><th>topic_label</th><th>ação</th><th>top_10</th></tr></thead><tbody>
+<tr> <td class='num'>1</td><td>alimentos e bebidas</td><td>Padronizar tempos; reforço de equipe em picos; menu enxuto</td><td>luggag, tini, item, bother, bare, ladi, holiday, compar, discount, frequent</td> </tr>
+<tr> <td class='num'>2</td><td>tópico 2</td><td>Monitorar e criar playbooks específicos para o tópico</td><td>loud, queen, pass, type, basic, seen, pm, delux, overpr, annoy</td> </tr>
+<tr> <td class='num'>3</td><td>preço e valor</td><td>Ofertas com valor agregado e transparência de taxas; revisar políticas percebidas como ocultas</td><td>obvious, cheap, bell, stuff, tip, advertis, chain, report, featur, save</td> </tr>
+<tr> <td class='num'>4</td><td>tópico 4</td><td>Monitorar e criar playbooks específicos para o tópico</td><td>along, super, superb, chose, rush, convent, neighborhood, cozi, other, charm</td> </tr>
+<tr> <td class='num'>5</td><td>preço e valor</td><td>Ofertas com valor agregado e transparência de taxas; revisar políticas percebidas como ocultas</td><td>favorit, museum, base, gorgeous, secur, tour, menu, often, follow, note</td> </tr>
+<tr> <td class='num'>6</td><td>tópico 6</td><td>Monitorar e criar playbooks específicos para o tópico</td><td>credit, mistak, cancel, date, amount, fail, taken, correct, miss, email</td> </tr>
+<tr> <td class='num'>7</td><td>preço e valor</td><td>Ofertas com valor agregado e transparência de taxas; revisar políticas percebidas como ocultas</td><td>pricelin, world, step, massag, twice, write, indoor, polit, met, kimpton</td> </tr>
+<tr> <td class='num'>8</td><td>tópico 8</td><td>Monitorar e criar playbooks específicos para o tópico</td><td>space, dog, moment, mean, getaway, closet, averag, ice, woman, updat</td> </tr>
+<tr> <td class='num'>9</td><td>preço e valor</td><td>Ofertas com valor agregado e transparência de taxas; revisar políticas percebidas como ocultas</td><td>girl, previous, daughter, excit, downstair, broken, yes, connect, flight, son</td> </tr>
+<tr> <td class='num'>10</td><td>preço e valor</td><td>Ofertas com valor agregado e transparência de taxas; revisar políticas percebidas como ocultas</td><td>cab, glass, loung, select, continu, snack, doorman, valu, store, checkout</td> </tr>
+<tr> <td class='num'>11</td><td>transporte e estacionamento</td><td>Parcerias com estacionamentos; comunicação clara de tarifas; alternativas de transporte</td><td>chair, inn, buffet, airport, list, taxi, notch, wireless, main, switch</td> </tr>
+<tr> <td class='num'>12</td><td>tópico 12</td><td>Monitorar e criar playbooks específicos para o tópico</td><td>regenc, wi, fi, comput, sink, imagin, televis, clear, job, head</td> </tr>
+</tbody></table>
+<p> Priorizar os 2‑3 tópicos mais prevalentes e com maior impacto nos drivers negativos para ciclos de melhoria de 60‑90 dias. KPIs sugeridos: NPS pós‑estadia, incidência de termos negativos/100 reviews e tempo de resposta em canais digitais. </p>

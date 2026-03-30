@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Amazon Review Polarity · Guia Completo do Projeto</title>
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel-2: rgba(255,255,255,.09);
+      --border: rgba(255,255,255,.14);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.72);
+      --faint: rgba(255,255,255,.56);
+      --accent: #7dd3fc;
+      --accent-2: #a7f3d0;
+      --warn: #fbbf24;
+      --shadow: 0 14px 50px rgba(0,0,0,.35);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --radius: 16px;
+      --radius-sm: 12px;
+      --focus: 0 0 0 3px rgba(125,211,252,.35);
+      --maxw: 1200px;
+    }
+    .theme-light{
+      --bg: #f7f7fb;
+      --panel: rgba(0,0,0,.04);
+      --panel-2: rgba(0,0,0,.06);
+      --border: rgba(0,0,0,.10);
+      --text: rgba(0,0,0,.88);
+      --muted: rgba(0,0,0,.62);
+      --faint: rgba(0,0,0,.48);
+      --accent: #0ea5e9;
+      --accent-2: #10b981;
+      --shadow: 0 16px 55px rgba(0,0,0,.12);
+      --focus: 0 0 0 3px rgba(14,165,233,.25);
+    }
+
+    *{ box-sizing: border-box; }
+    html{ scroll-behavior: smooth; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      background: radial-gradient(1100px 600px at 10% -10%, rgba(125,211,252,.22), transparent 55%),
+                  radial-gradient(1100px 600px at 110% 10%, rgba(167,243,208,.18), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    a{ color: var(--accent); text-decoration: none; }
+    a:hover{ text-decoration: underline; }
+    a:focus-visible, button:focus-visible{ outline: none; box-shadow: var(--focus); border-radius: 10px; }
+    .container{ max-width: var(--maxw); margin: 0 auto; padding: 22px; }
+
+    .skip-link{
+      position: absolute;
+      left: -999px;
+      top: 10px;
+      padding: 10px 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      z-index: 999;
+    }
+    .skip-link:focus{ left: 14px; }
+
+    header{
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), transparent);
+      backdrop-filter: blur(10px);
+    }
+    .header-inner{
+      display:flex;
+      gap: 18px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    h1{
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .subtitle{
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 72ch;
+    }
+    .btn{
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 22px rgba(0,0,0,.12);
+      user-select: none;
+    }
+    .btn:hover{ background: var(--panel-2); }
+    .btn small{ color: var(--muted); font-weight: 600; }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 18px;
+    }
+
+    .card{
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .toc{
+      position: sticky;
+      top: 14px;
+      padding: 16px;
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+    }
+    .toc h2{
+      font-size: 1rem;
+      margin: 0 0 10px;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .toc ol{
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+    .toc li{ margin: 8px 0; }
+    .toc a{
+      color: var(--muted);
+      text-decoration: none;
+      display: inline-block;
+      padding: 3px 6px;
+      border-radius: 8px;
+    }
+    .toc a:hover{ color: var(--text); background: var(--panel-2); text-decoration: none; }
+    .toc a.active{
+      color: var(--text);
+      background: linear-gradient(90deg, rgba(125,211,252,.16), rgba(167,243,208,.10));
+      border: 1px solid rgba(125,211,252,.18);
+    }
+
+    .toc-mobile{ display: none; margin-top: 14px; }
+    .toc-mobile details{ border-radius: var(--radius); overflow: clip; }
+    .toc-mobile summary{
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .toc-mobile summary::-webkit-details-marker{ display:none; }
+    .toc-mobile .toc-body{ padding: 14px 16px; }
+
+    main{
+      padding: 18px;
+    }
+
+    h2{
+      margin: 34px 0 10px;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+    h3{
+      margin: 20px 0 8px;
+      font-size: 1.12rem;
+      letter-spacing: -0.01em;
+    }
+    h4{
+      margin: 14px 0 6px;
+      font-size: 1.0rem;
+    }
+    p{ margin: 10px 0; }
+    ul, ol{ margin: 10px 0; padding-left: 20px; }
+    li{ margin: 6px 0; }
+
+    code, kbd{
+      font-family: var(--mono);
+      font-size: 0.95em;
+      background: rgba(125,211,252,.12);
+      border: 1px solid rgba(125,211,252,.16);
+      padding: 0.15em 0.45em;
+      border-radius: 10px;
+    }
+    pre{
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      overflow: auto;
+      box-shadow: 0 10px 26px rgba(0,0,0,.16);
+    }
+    pre code{
+      background: transparent;
+      border: none;
+      padding: 0;
+      border-radius: 0;
+      font-size: .92em;
+      color: var(--text);
+    }
+
+    blockquote{
+      margin: 14px 0;
+      padding: 14px 14px 14px 16px;
+      border-left: 4px solid rgba(125,211,252,.55);
+      background: linear-gradient(90deg, rgba(125,211,252,.12), transparent 70%);
+      border-radius: 14px;
+      color: var(--muted);
+    }
+
+    .callout{
+      margin: 14px 0;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .callout .icon{ font-size: 1.15rem; line-height: 1.2; }
+    .callout.warning{ border-color: rgba(251,191,36,.35); background: linear-gradient(90deg, rgba(251,191,36,.16), var(--panel-2) 55%); }
+    .callout .content{ color: var(--muted); }
+
+    table{
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 12px 0 18px;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+    }
+    thead th{
+      text-align: left;
+      font-weight: 800;
+      color: var(--text);
+      background: linear-gradient(180deg, var(--panel-2), transparent);
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+    tbody td{
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      vertical-align: top;
+      color: var(--muted);
+    }
+    .theme-light tbody td{ border-bottom: 1px solid rgba(0,0,0,.06); }
+    tbody tr:nth-child(even) td{ background: rgba(255,255,255,.03); }
+    .theme-light tbody tr:nth-child(even) td{ background: rgba(0,0,0,.02); }
+    tbody tr:last-child td{ border-bottom: none; }
+
+    figure{
+      margin: 14px 0 18px;
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+    }
+    figure img{
+      width: 100%;
+      height: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(0,0,0,.12);
+      display:block;
+    }
+    figcaption{
+      margin-top: 10px;
+      color: var(--faint);
+      font-size: .92rem;
+    }
+
+    .muted{ color: var(--muted); }
+    .faint{ color: var(--faint); }
+
+    .heading{
+      display:flex;
+      align-items: baseline;
+      gap: 10px;
+      scroll-margin-top: 92px;
+    }
+    .heading .anchor{
+      opacity: .0;
+      transform: translateY(1px);
+      font-weight: 800;
+      color: var(--faint);
+      border: 1px solid transparent;
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+    .heading:hover .anchor{ opacity: .9; }
+    .heading .anchor:hover{
+      text-decoration: none;
+      background: var(--panel-2);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .placeholder{
+      border: 1px dashed rgba(255,255,255,.20);
+      background: rgba(255,255,255,.03);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      margin: 14px 0 18px;
+    }
+    .theme-light .placeholder{
+      border-color: rgba(0,0,0,.18);
+      background: rgba(0,0,0,.02);
+    }
+
+    .footer{
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      color: var(--faint);
+      font-size: .92rem;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .fab{
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: all .18s ease;
+    }
+    .fab.show{
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .fab:hover{ background: var(--panel-2); }
+
+    @media (max-width: 980px){
+      .layout{ grid-template-columns: 1fr; }
+      aside{ display:none; }
+      .toc-mobile{ display:block; }
+      header .header-inner{ flex-direction: column; }
+      .btn{ width: fit-content; }
+      main{ padding: 16px; }
+    }
+
+    @media print{
+      .btn, .fab, aside, .toc-mobile, .skip-link { display:none !important; }
+      body{ background: white; color: black; }
+      .card{ box-shadow: none; }
+      a{ color: black; text-decoration: underline; }
+    }
+  </style>
+</head>
+
+<body>
+  <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+  <header>
+    <div class="container header-inner">
+      <div>
+        <h1>Amazon Review Polarity · Guia do Projeto</h1>
+      </div>
+      <div>
+        <button class="btn" id="themeToggle" type="button" aria-pressed="false" title="Alternar tema">
+          🌗 <span>Tema</span> <small id="themeLabel">Auto</small>
+        </button>
+      </div>
+    </div>
+
+    <div class="container toc-mobile">
+      <div class="card">
+        <details>
+          <summary>📚 Sumário <span class="faint">↕</span></summary>
+          <div class="toc-body">
+            <ol>
+              <li><a href="#1-visao-geral-do-dataset">Visão Geral do Dataset</a></li>
+              <li><a href="#2-objetivos-do-notebook">Objetivos do Notebook</a></li>
+              <li><a href="#3-esquema-final-do-dataset">Esquema Final do Dataset</a></li>
+              <li><a href="#4-modos-de-execucao-amazon_nlp_run_profile">Modos de Execução (<code>AMAZON_NLP_RUN_PROFILE</code>)</a></li>
+              <li><a href="#5-boas-praticas-em-spark">Boas Práticas em Spark</a></li>
+              <li><a href="#6-modelos-supervisionados">Modelos Supervisionados</a></li>
+              <li><a href="#7-clustering">Clustering</a></li>
+              <li><a href="#8-modernbert">ModernBERT</a></li>
+              <li><a href="#10-metricas-geradas">Métricas Geradas</a></li>
+              <li><a href="#11-artefatos-e-estrutura-de-saida">Artefatos e Estrutura de Saída</a></li>
+            </ol>
+          </div>
+        </details>
+      </div>
+    </div>
+  </header>
+
+  <div class="container layout">
+    <aside>
+      <nav class="card toc" aria-label="Sumário">
+        <h2>📚 Sumário</h2>
+        <ol>
+          <li><a href="#1-visao-geral-do-dataset">Visão Geral do Dataset</a></li>
+          <li><a href="#2-objetivos-do-notebook">Objetivos do Notebook</a></li>
+          <li><a href="#3-esquema-final-do-dataset">Esquema Final do Dataset</a></li>
+          <li><a href="#4-modos-de-execucao-amazon_nlp_run_profile">Modos de Execução (<code>AMAZON_NLP_RUN_PROFILE</code>)</a></li>
+          <li><a href="#5-boas_práticas">Boas práticas de Spark</a></li>
+          <li><a href="#6-eda">EDA inicial</a></li>
+          <li><a href="#7-modelos-supervisionados">Modelos Supervisionados</a></li>
+          <li><a href="#8-clustering">Clustering</a></li>
+          <li><a href="#9-modernbert">ModernBERT</a></li>
+          <li><a href="#10-metricas-geradas">Métricas Geradas</a></li>
+        </ol>
+      </nav>
+    </aside>
+
+    <main id="conteudo" class="card">
+      <article>
+
+        <section id="1-visao-geral-do-dataset">
+          <div class="heading">
+            <h2>1. Visão Geral do Dataset</h2>
+            <a class="anchor" href="#1-visao-geral-do-dataset" aria-label="Link para 1. Visão Geral do Dataset">#</a>
+          </div>
+
+          <ul>
+            <li><strong>Origem:</strong> Benchmark <em>Amazon Review Polarity</em> (~35M reviews, 6.6M users, 2.4M products até 03/2013).</li>
+            <li><strong>Tarefa:</strong> Classificação binária de sentimento (negativo vs positivo).</li>
+            <li><strong>Volume:</strong>
+              <ul>
+                <li><code>train</code>: 1.800.000 exemplos por classe (3.600.000 total).</li>
+                <li><code>test</code>: 200.000 exemplos por classe (400.000 total).</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>Estrutura bruta de cada linha</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Campo</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>polarity</code></td>
+                <td>1 = negativo (nota 1 ou 2), 2 = positivo (nota 4 ou 5); notas 3 foram omitidas.</td>
+              </tr>
+              <tr>
+                <td><code>title</code></td>
+                <td>Título curto da review.</td>
+              </tr>
+              <tr>
+                <td><code>text</code></td>
+                <td>Corpo completo da review.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout warning" role="note" aria-label="Aviso">
+            <div class="icon">⚠️</div>
+            <div class="content"><strong>csv com aspas escapadas</strong> (<code>"</code> vira <code>""</code>) e <code>\n</code> literais</div>
+          </div>
+        </section>
+
+        <section id="2-objetivos-do-notebook">
+          <div class="heading">
+            <h2>2. Objetivos do Notebook</h2>
+            <a class="anchor" href="#2-objetivos-do-notebook" aria-label="Link para 2. Objetivos do Notebook">#</a>
+          </div>
+
+          <p>Construir um pipeline determinístico que:</p>
+          <ul>
+            <li>Ingere e padroniza o CSV em um DataFrame confiável.</li>
+            <li>Realiza EDA detalhada (tamanho dos textos, tokens, dados faltantes etc.).</li>
+            <li>Treina e compara modelos supervisionados (TF‑IDF + Logistic Regression, Random Forest e XGBoost).</li>
+            <li>Salva um <code>PipelineModel</code> Spark pronto para scoring.</li>
+            <li>Executa clustering TF‑IDF → Normalização → (PCA) → KMeans.</li>
+            <li>Treina ModernBERT fora do Spark com o mesmo split.</li>
+          </ul>
+        </section>
+
+        <section id="3-esquema-final-do-dataset">
+          <div class="heading">
+            <h2>3. Esquema Final do Dataset</h2>
+            <a class="anchor" href="#3-esquema-final-do-dataset" aria-label="Link para 3. Esquema Final do Dataset">#</a>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Coluna</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>review_id</code></td>
+                <td><code>monotonically_increasing_id()</code> gerado pelo Spark.</td>
+              </tr>
+              <tr>
+                <td><code>dataset_split</code></td>
+                <td><code>"train"</code> ou <code>"test"</code>; caso haja apenas um CSV, o split é derivado por hash determinístico.</td>
+              </tr>
+              <tr>
+                <td><code>sentiment</code></td>
+                <td>Rótulo binário final (<code>0 = negativo</code>, <code>1 = positivo</code>).</td>
+              </tr>
+              <tr>
+                <td><code>text_full</code></td>
+                <td>Concatenação segura <code>title + " " + text</code>, tratando valores nulos.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="4-modos-de-execucao-amazon_nlp_run_profile">
+          <div class="heading">
+            <h2>4. Modos de Execução (<code>AMAZON_NLP_RUN_PROFILE</code>)</h2>
+            <a class="anchor" href="#4-modos-de-execucao-amazon_nlp_run_profile" aria-label="Link para 4. Modos de Execução">#</a>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Run profile</th>
+                <th>O que faz</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>dev</code></td>
+                <td>Roda ingestão completa, EDA, CV de modelos, clustering, ModernBERT, gera plots e relatório HTML.</td>
+              </tr>
+              <tr>
+                <td><code>score_only</code></td>
+                <td>Carrega pipelines já treinados, executa apenas scoring (e atribui clusters), escrevendo saídas em Parquet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="5-boas-praticas-em-spark">
+          <div class="heading">
+            <h2>5. Boas Práticas em Spark</h2>
+            <a class="anchor" href="#9-boas-praticas-em-spark" aria-label="Link para 9. Boas Práticas em Spark">#</a>
+          </div>
+
+          <h3>Performance e estabilidade</h3>
+          <ul>
+            <li><strong>Cache em Parquet:</strong> evita reler CSVs gigantes a cada execução.</li>
+            <li><strong><code>persist</code>/<code>unpersist</code> explícitos:</strong>
+              <ul>
+                <li><code>MEMORY_AND_DISK</code> durante feature engineering mantém resultados “quentes” sem estourar RAM.</li>
+                <li><code>DISK_ONLY</code> no <code>train_full</code> suporta volumes enormes.</li>
+              </ul>
+            </li>
+            <li><strong>Particionamento (<code>spark.sql.shuffle.partitions</code>):</strong> número adequado de partições evita tanto CPU ociosa quanto shuffles excessivos. Quando o dataset é dividido em partições, cada partição vira 1 task em cada stage. Poucas partições (ex.: 2 partições e 10 cores) → CPU ociosa, tasks grandes, memória pesada vs Muitas partições (ex.: 2.000 partições para 100k linhas num notebook) → serialização, shuffle files, etc.
+            </li>
+            <li><strong>AQE (Adaptive Query Execution):</strong> Spark ajusta planos dinamicamente, coalescendo partições e reduzindo custo de shuffle.</li>
+            <li><strong><code>KryoSerializer</code>:</strong> serializer binário compacto que reduz overhead de rede/memória; converte objetos (dataframe, rdd) em stream de bytes</li>
+            <li><strong>Parâmetros de paralelismo: dita o mínimo de partições do seu df em dev (<code>spark.default.parallelism</code>:</strong> alinhar esses valores ao hardware mantém o cluster saturado sem fila exagerada.</li>
+            <li><strong>Broadcast join:</strong> Usado no join de uma tabela grande com uma pequena, enviando uma cópia da tabela pequena para todos os nodes que possuem alguma parte da tabela grande</li>
+          </ul>
+
+          <h3>Reprodutibilidade e consistência</h3>
+          <ul>
+            <li><strong>Split determinístico (<code>xxhash64</code>)</strong> garante que o mesmo texto sempre caia no mesmo lado quando apenas um CSV é fornecido.</li>
+            <li><strong><code>random_state</code> fixo</strong> em amostragens e splits torna experimentos repetíveis e auditáveis.</li>
+          </ul>
+
+          <h3>Pipelines deployáveis</h3>
+          <ul>
+            <p><strong>Pipeline:</strong> Uma forma de encadear isso num grafo linear</p>
+
+            <p>Se for Transformer, chama transform(df) e passa o DF transformado para o próximo stage.</p>    
+            <p>Se for Estimator, chama fit(df), obtém um Transformer treinado (*_Model)</p>
+
+            <li><strong><code>PipelineModel:</code></strong> encapsula pré-processamento + modelo, evitando divergências entre treino e produção.</li>
+            <p>Um objeto que contém uma lista de Transformers já treinados, em ordem</p>
+          </ul>
+
+          <h3>Proteções extras</h3>
+          <ul>
+            <li><strong><code>TOKENIZERS_PARALLELISM=false</code>:</strong> previne deadlocks conhecidos dos tokenizers HF em ambientes multi-thread.</li>
+            <li><strong>ModernBERT fora do Spark:</strong> roda em processo separado (pode ser forçado a CPU via env-var), reduzindo contenção de recursos com o cluster Spark.</li>
+          </ul>
+
+          <section id="6-eda">
+            <div class="heading">
+              <h3>6. EDA</h3>
+              <a class="anchor" href="#103-eda" aria-label="Link para 10.3 EDA">#</a>
+            </div>
+
+            <ul>
+              <li>Quantis de tamanho de texto (tokens) → base para definir <code>modernbert_max_seq_len</code> (ex.: <code>p95</code>).</li>
+              <li>Estimativa de vocabulário + sugestão de <code>hashing_num_features</code> para reduzir colisões.</li>
+              <li>Top tokens e wordclouds por classe → revelam termos característicos e possíveis ruídos.</li>
+            </ul>
+
+            <h4>Visualizações principais</h4>
+
+            <figure>
+              <img src="../../models_output/eda/eda_sentiment_counts.png" alt="Distribuição de sentimentos" loading="lazy" />
+              <figcaption>Distribuição de sentimentos</figcaption>
+            </figure>
+
+            <figure>
+              <img src="../../models_output/eda/eda_text_len_hist.png" alt="Histograma de comprimentos de texto" loading="lazy" />
+              <figcaption>Histograma de comprimentos de texto</figcaption>
+            </figure>
+
+            <figure>
+              <img src="../../models_output/eda/eda_wordcloud_pos.png" alt="Wordcloud — classe positiva" loading="lazy" />
+              <figcaption>Wordcloud — classe positiva</figcaption>
+            </figure>
+
+            <figure>
+              <img src="../../models_output/eda/eda_wordcloud_neg.png" alt="Wordcloud — classe negativa" loading="lazy" />
+              <figcaption>Wordcloud — classe negativa</figcaption>
+            </figure>
+          </section>
+        </section>
+
+        <section id="7-modelos-supervisionados">
+          <div class="heading">
+            <h2>7. Modelos Supervisionados</h2>
+            <a class="anchor" href="#7-modelos-supervisionados" aria-label="Link para 7. Modelos Supervisionados">#</a>
+          </div>
+
+          <h3>7.1 Features: TF‑IDF com HashingTF</h3>
+          <p>Pipeline de pré-processamento (Spark):</p>
+          <ol>
+            <li><code>RegexTokenizer</code> (<code>pattern = \W+</code>, <code>toLowercase = true</code>).</li>
+            <li><code>StopWordsRemover(locale = "en_US")</code>.</li>
+            <li><code>HashingTF(numFeatures = hashing_num_features)</code>.</li>
+            <li><code>IDF</code> → gera <code>tfidf_features</code>.</li>
+          </ol>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Componente</th>
+                <th>O que é</th>
+                <th>Por que usar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>RegexTokenizer</code></td>
+                <td>Tokenizador com regex <code>\W+</code> que divide o texto por caracteres não alfanuméricos.</td>
+                <td>Remove pontuação e normaliza palavras, entregando tokens limpos para as etapas seguintes.</td>
+              </tr>
+              <tr>
+                <td><code>StopWordsRemover</code></td>
+                <td>Filtro de palavras muito frequentes em inglês.</td>
+                <td>Reduz ruído ao descartar termos pouco informativos para sentimento (ex.: “the”, “and”, “but”).</td>
+              </tr>
+              <tr>
+                <td><code>HashingTF</code></td>
+                <td>Vetorizador que aplica hashing nos tokens e gera vetores esparsos de tamanho fixo.</td>
+                <td>Escala para milhões de documentos sem construir vocabulários gigantes, mantendo custo de memória previsível.</td>
+              </tr>
+              <tr>
+                <td><code>IDF</code></td>
+                <td>Calcula peso inverso da frequência dos termos.</td>
+                <td>Valoriza termos raros (mais informativos) e deprime termos excessivamente comuns, melhorando a discriminação.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>7.2 Baseline de maioria</h3>
+          <ul>
+            <li><code>pos_rate = positivos / total</code>.</li>
+            <li><code>prediction_base = 1</code> se <code>pos_rate &gt;= 0.5</code>, senão <code>0</code>.</li>
+            <li>Serve como referência mínima para validar se modelos supervisionados aprenderam algo útil.</li>
+          </ul>
+
+          <h3>7.3 Logistic Regression (modelo principal)</h3>
+          <ul>
+            <li>Treinada em <code>tfidf_features</code>.</li>
+            <li>Grid Search em <code>regParam</code> e <code>elasticNetParam</code> (0 = L2, 1 = L1, valores intermediários = Elastic Net).</li>
+            <li>Seleção via <code>BinaryClassificationEvaluator</code> (AUC ROC).</li>
+          </ul>
+
+          <figure>
+            <img src="../../models_output/metrics/plots/confusion_logreg_cv.png" alt="Matriz de confusão da Regressão Logística" loading="lazy" />
+            <figcaption>Matriz de confusão para o pipeline TF-IDF + Logistic Regression.</figcaption>
+          </figure>
+
+          <ul>
+            <li>canto superior esquerdo: 8.401 reviews negativas acertadas como negativas (TN)</li>
+            <li>superior direito: 1.617reviews negativas que o modelo errou, prevendo como positivas (FP)</li>
+            <li>inferior esquerdo: 1.218 reviews positivas que o modelo errou, prevendo como negativas (FN)</li>
+            <li>inferir direito: 8.931 reviews positivas previstas corretamente como positivas (TP)</li>
+          </ul>
+          
+          <h3>7.4 Random Forest</h3>
+          <ul>
+            <li><code>RandomForestClassifier</code> com Cross-Validation.</li>
+            <li>Safeguards:
+              <ul>
+                <li><code>rf_max_train_rows</code> limita volume de treino.</li>
+                <li>Grade explora <code>numTrees</code> e <code>maxDepth</code>.</li>
+              </ul>
+            </li>
+            <li>Modelo final é escolhido pelo melhor AUC ROC no conjunto de teste.</li>
+          </ul>
+
+          <figure>
+            <img src="../../models_output/metrics/plots/confusion_random_forest_cv.png" alt="Matriz de confusão do Random Forest" loading="lazy" />
+            <figcaption>Matriz de confusão do Random Forest com os mesmos recursos TF-IDF.</figcaption>
+          </figure>
+          <li>7.018 TN</li>
+          <li>3.000 FP</li>
+          <li>910 FN</li>
+          <li>9.239 TP</li>
+          <h3>7.5 XGBoost</h3>
+          <ul>
+            <li><code>XGBoost</code> com Cross-Validation.</li>
+          </ul>
+
+          <h3>7.6 Pipeline de produção</h3>
+          <p><span class="muted">tokenizer → stopwords → hashingTF → idf_model → modelo final (LR ou RF ou XGB)</span></p>
+
+          <figure>
+            <img src="../../models_output/metrics/plots/supervised_metric_comparison.png" alt="Comparação das métricas dos modelos supervisionados" loading="lazy" />
+            <figcaption>Comparação direta das principais métricas entre os modelos supervisionados.</figcaption>
+          </figure>
+        </section>
+
+        <section id="8-clustering">
+          <div class="heading">
+            <h2>8. Clustering</h2>
+            <a class="anchor" href="#8-clustering" aria-label="Link para 8. Clustering">#</a>
+          </div>
+
+          <h3>Objetivo</h3>
+          <p>Agrupar reviews por similaridade sem usar rótulos, para explorar temas dominantes.</p>
+
+          <h3>Pipeline</h3>
+          <ol>
+            <li>TF‑IDF (HashingTF + IDF)</li>
+            <li><code>Normalizer(p = 2)</code></li>
+            <li>PCA(k)</li>
+            <li><code>KMeans(k)</code></li>
+          </ol>
+
+          <h3>Seleções automáticas</h3>
+          <ul>
+            <li><strong>PCA (<code>k</code>):</strong> escolhido pela curva de variância acumulada até atingir <code>pca_var_target</code> (ex.: 90%).</li>
+            <li><strong>KMeans (<code>k</code>):</strong> escolhe o melhor valor dentro de <code>[k_min, k_max]</code> usando <code>silhouette</code> em amostras.</li>
+          </ul>
+
+          <figure>
+            <img src="../../models_output/eda/cluster_silhouette_by_k.png" alt="Silhouette médio por número de clusters" loading="lazy" />
+            <figcaption>Silhouette médio por número de clusters.</figcaption>
+          </figure>
+
+          <li>Clusters com silhouette baixo, ou seja, clusters que não são bem definidos.</li>
+
+          <figure>
+            <img src="../../models_output/eda/cluster_pca_cumvar.png" alt="Variância acumulada da PCA aplicada nos vetores TF-IDF" loading="lazy" />
+            <figcaption>Variância acumulada da PCA orienta a escolha mínima de componentes.</figcaption>
+          </figure>
+
+          <li>Diminuiu de 4096 p/ 256 componentes, mas ainda assim mantém a variância acumulada acima de 90% (apenas 27% explicado por esses componentes)</li>
+
+          <figure>
+            <img src="../../models_output/eda/cluster_sizes.png" alt="Distribuição do tamanho dos clusters" loading="lazy" />
+            <figcaption>Tamanho relativo de cada cluster encontrado.</figcaption>
+          </figure>
+
+          <figure>
+            <img src="../../models_output/metrics/plots/cluster_mean_sentiment.png" alt="Sentimento médio por cluster" loading="lazy" />
+            <figcaption>Sentimento médio por cluster evidencia polaridades predominantes.</figcaption>
+          </figure>
+        </section>
+
+        <li>Clusters 3 e 6 -> sentimentos predominantemente positivos (0.6)</li>
+        <li>Clusters 7 -> sentimentos predominantemente negativos (0.1)</li>
+        <li>Clusters 8 e 4 -> mix de sentimentos (0.5)</li>
+
+        <section id="8-modernbert">
+          <div class="heading">
+            <h2>9. ModernBERT</h2>
+            <a class="anchor" href="#8-modernbert" aria-label="Link para 8. ModernBERT">#</a>
+          </div>
+
+          <h3>Objetivo</h3>
+          <p>Comparar um modelo neural contemporâneo com o pipeline TF‑IDF tradicional.</p>
+          <p>ModernBERT é um transformer encoder-only, ou seja, é especializado em entender representações, usado geralmente em classificação, NER e QA.</p>
+          <h3>Setup</h3>
+          <ul>
+            <li>Modelo: <code>answerdotai/ModernBERT-base</code> (Transformers).</li>
+            <li>Executa após o Spark finalizar (evita disputa de memória/threads).</li>
+            <li>Usa o mesmo split <code>train/test</code> do Spark e amostragens limitadas por <code>torch_max_rows</code>.</li>
+          </ul>
+
+          <h3>Técnicas empregadas</h3>
+          <ul>
+            <li><code>AutoTokenizer</code> com truncamento/padding até <code>modernbert_max_seq_len</code>.</li>
+            <li><code>AutoModelForSequenceClassification(num_labels = 2)</code>.</li>
+            <li>Otimizador <code>AdamW</code> + AMP (quando CUDA disponível).</li>
+            <li>Melhor checkpoint escolhido via <code>val_acc</code>.</li>
+            <li>Gera curvas de treino (loss/métricas) e relatório completo no teste.</li>
+          </ul>
+        </section>
+
+        <section id="9-metricas-geradas">
+          <div class="heading">
+            <h2>10. Métricas Geradas</h2>
+            <a class="anchor" href="#10-metricas-geradas" aria-label="Link para 9. Métricas Geradas">#</a>
+          </div>
+
+          <h3>10.1 Classificação (Spark + ModernBERT)</h3>
+          <ul>
+            <li><strong>AUC ROC:</strong> separação global de classes.</li>
+            <li><strong>AUC PR:</strong> robusto quando classes estão desbalanceadas.</li>
+            <li><strong>Accuracy:</strong> porcentagem de acertos total (comparar com baseline de maioria).</li>
+            <li><strong>F1 / Precision / Recall:</strong> detalham equilíbrio entre erros positivos/negativos.</li>
+            <li><strong>Confusion Matrix:</strong> explicita tipos de erro (FP alto = otimismo excessivo; FN alto = conservador demais).</li>
+            <li><strong>Brier Score:</strong> verifica calibração das probabilidades (quanto menor, melhor).</li>
+            <li><strong>Curva de calibração:</strong> compara probabilidades previstas vs observadas em bins.</li>
+            <li><strong>F1 vs threshold:</strong> sugere thresholds alternativos a 0.5 conforme objetivo.</li>
+            <li><strong>Plots + JSONs:</strong> ROC, PR, calibração, matriz de confusão e manifestos são salvos para auditoria.</li>
+          </ul>
+
+          <ul>
+            <li><strong>Silhouette:</strong> qualidade dos clusters (1 = bem definidos, 0 = confusos, &lt;0 = ruim).</li>
+            <li><strong>Curva silhouette vs k:</strong> auxilia a escolher <code>k</code>.</li>
+            <li><strong>Variância explicada (PCA):</strong> indica quanta informação é preservada ao reduzir dimensão.</li>
+            <li><strong>Perfil por cluster:</strong> <code>n</code> e <code>mean_sentiment</code> ajudam a interpretar grupos.</li>
+          </ul>
+        </section>
+
+
+      </article>
+    </main>
+  </div>
+
+  <button class="fab" id="backToTop" type="button" aria-label="Voltar ao topo">↑ Topo</button>
+
+  <script>
+    (function(){
+      const root = document.documentElement;
+      const btn = document.getElementById('themeToggle');
+      const label = document.getElementById('themeLabel');
+      const backToTop = document.getElementById('backToTop');
+
+      function applyTheme(mode){
+        root.classList.remove('theme-light', 'theme-dark');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        let effective = mode;
+        if (!mode || mode === 'auto') effective = prefersDark ? 'dark' : 'light';
+
+        root.classList.add(effective === 'dark' ? 'theme-dark' : 'theme-light');
+        btn.setAttribute('aria-pressed', effective === 'dark' ? 'true' : 'false');
+
+        const labelText = (mode === 'auto' || !mode) ? 'Auto' : (effective === 'dark' ? 'Dark' : 'Light');
+        label.textContent = labelText;
+      }
+
+      function nextMode(current){
+        if (!current || current === 'auto') return 'dark';
+        if (current === 'dark') return 'light';
+        return 'auto';
+      }
+
+      const stored = localStorage.getItem('themeMode') || 'auto';
+      applyTheme(stored);
+
+      btn.addEventListener('click', () => {
+        const curr = localStorage.getItem('themeMode') || 'auto';
+        const next = nextMode(curr);
+        localStorage.setItem('themeMode', next);
+        applyTheme(next);
+      });
+
+      if (window.matchMedia){
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+          const curr = localStorage.getItem('themeMode') || 'auto';
+          if (curr === 'auto') applyTheme('auto');
+        });
+      }
+
+      // Back-to-top visibility
+      const onScroll = () => {
+        const y = window.scrollY || document.documentElement.scrollTop;
+        backToTop.classList.toggle('show', y > 600);
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      backToTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      // Active TOC link (IntersectionObserver)
+      const tocLinks = Array.from(document.querySelectorAll('.toc a, .toc-mobile a'));
+      const headings = Array.from(document.querySelectorAll('section[id] > .heading, section[id] > h2, section[id] > h3'))
+        .map(el => el.closest('section[id]'))
+        .filter(Boolean);
+
+      const seen = new Set();
+      const observed = [];
+      for (const s of headings){
+        if (!s.id || seen.has(s.id)) continue;
+        seen.add(s.id);
+        observed.push(s);
+      }
+
+      function setActive(id){
+        tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }
+
+      if ('IntersectionObserver' in window){
+        const io = new IntersectionObserver((entries) => {
+          const visible = entries
+            .filter(e => e.isIntersecting)
+            .sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (visible && visible.target && visible.target.id) setActive(visible.target.id);
+        }, { rootMargin: '-18% 0px -72% 0px', threshold: [0.05, 0.12, 0.2, 0.35, 0.5] });
+
+        observed.forEach(s => io.observe(s));
+      }
+    })();
+  </script>
+</body>
+</html>

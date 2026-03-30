@@ -1,0 +1,16 @@
+Pergunta
+Registro completo do filme The Phantom of the Opera
+
+Resposta
+mid	title	year	rating	num_ratings
+1655	The Phantom of the Opera	2004	3.7	70849
+3936	The Phantom of the Opera	2004	3.7	70849
+4794	The Phantom of the Opera	1925	3.7	6169
+25755	The Phantom of the Opera	2004	3.7	70849
+30816	The Phantom of the Opera	2004	3.7	70849
+31026	The Phantom of the Opera	2004	3.7	70849
+
+SQL utilizada
+SELECT *
+        FROM movies
+        WHERE title = 'The Phantom of the Opera'
