@@ -1,23 +1,24 @@
-"""DE nodes -- fit/transform pattern. Fit on train, transform all splits."""
+"""Nodes de data engineering — fit/transform com classes sklearn declaradas no YAML."""
 
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.base import BaseEstimator
+
+from insper_deploy_kedro.class_loading import load_callable, load_class
+from insper_deploy_kedro.constants import SPLIT_COLUMN
 
 logger = logging.getLogger(__name__)
-
-SPLIT_COLUMN = "split"
 
 
 def _flatten_column_groups(
     column_groups: dict[str, list[str]],
 ) -> list[str]:
-    """Flatten {group: [cols]} into a single list."""
+    """Achata {grupo: [colunas]} numa lista única."""
     return [
         column_name
         for group_columns in column_groups.values()
@@ -31,14 +32,14 @@ def _validate_columns_exist(
     *,
     caller: str,
 ) -> None:
-    """Blow up early if columns are missing."""
+    """Estoura erro cedo se tiver colunas faltando."""
     missing = set(required_columns) - set(dataframe.columns)
     if missing:
         raise KeyError(f"{caller}: columns not found in dataframe: {sorted(missing)}")
 
 
 def add_features(cleaned_dataframe: pd.DataFrame) -> pd.DataFrame:
-    """Derive new features from cleaned columns."""
+    """Cria features derivadas a partir das colunas limpas."""
     featured = cleaned_dataframe.copy()
     featured["glucose_bmi_interaction"] = (
         featured["Glucose"] * featured["BMI"] / 1000
@@ -51,7 +52,7 @@ def clean_data(
     raw_data: pd.DataFrame,
     columns: dict[str, list[str]],
 ) -> pd.DataFrame:
-    """Pick columns from params and coerce numerics. Non-numeric values become 0."""
+    """Seleciona colunas do config e converte numéricas — valores inválidos viram 0."""
     selected_columns = _flatten_column_groups(columns)
     _validate_columns_exist(raw_data, selected_columns, caller="clean_data")
 
@@ -85,21 +86,36 @@ def add_split_column(
     cleaned_dataframe: pd.DataFrame,
     split_ratio: dict[str, float],
     random_state: int,
-    stratify_column: str | None = None,
+    stratify_column: str | None,
+    preprocessing: dict[str, Any],
 ) -> pd.DataFrame:
-    """Add a ``split`` column (train/validation/test) based on split_ratio.
-
-    When ``stratify_column`` is provided and exists in the data, uses
-    stratified sampling to preserve class proportions across splits.
-    """
+    """Split train/val/test — `train_test_split` e limiares vêm do YAML."""
     split_dataframe = cleaned_dataframe.copy()
     split_names = list(split_ratio.keys())
+    min_strat = int(preprocessing.get("min_rows_for_stratify", 20))
+    tts_path = preprocessing.get(
+        "train_test_split_function",
+        "sklearn.model_selection.train_test_split",
+    )
+    train_test_split = load_callable(tts_path)
 
     use_stratified = (
         stratify_column is not None
         and stratify_column in split_dataframe.columns
-        and len(split_dataframe) >= 20  # noqa: PLR2004
+        and len(split_dataframe) >= min_strat
     )
+
+    if stratify_column is not None and not use_stratified:
+        reason = (
+            f"coluna '{stratify_column}' não encontrada"
+            if stratify_column not in split_dataframe.columns
+            else f"dataset muito pequeno ({len(split_dataframe)} linhas < {min_strat})"
+        )
+        logger.warning(
+            "add_split_column: estratificação solicitada mas desativada — %s. "
+            "Usando split aleatório.",
+            reason,
+        )
 
     if use_stratified:
         stratify_values = split_dataframe[stratify_column]
@@ -151,29 +167,32 @@ def fit_encoders(
     split_dataframe: pd.DataFrame,
     columns: dict[str, list[str]],
     fit_transform_params: dict[str, list[str]],
-) -> dict[str, OrdinalEncoder]:
-    """Fit one OrdinalEncoder per categorical column, train split only."""
+    preprocessing: dict[str, Any],
+) -> dict[str, BaseEstimator]:
+    """Fita encoder categórico por coluna (classe + init_args no YAML)."""
     categorical_columns = columns["categorical"]
     _validate_columns_exist(split_dataframe, categorical_columns, caller="fit_encoders")
 
+    enc_cfg = preprocessing["categorical_encoder"]
+    encoder_class = load_class(enc_cfg["class_path"])
+    encoder_init = dict(enc_cfg.get("init_args") or {})
+
     splits_to_fit: list[str] = fit_transform_params["split_to_fit"]
     training_mask = split_dataframe[SPLIT_COLUMN].isin(splits_to_fit)
-    fitted_encoders: dict[str, OrdinalEncoder] = {}
+    fitted_encoders: dict[str, BaseEstimator] = {}
 
     for column_name in categorical_columns:
-        encoder = OrdinalEncoder(
-            handle_unknown="use_encoded_value",
-            unknown_value=-1,
-            dtype=int,
-        )
+        encoder = encoder_class(**encoder_init)
         training_values = split_dataframe.loc[training_mask, [column_name]].astype(str)
         encoder.fit(training_values)
         fitted_encoders[column_name] = encoder
 
+        n_cat = len(encoder.categories_[0]) if hasattr(encoder, "categories_") else 0
         logger.info(
-            "fit_encoders: %s -> %d categories",
+            "fit_encoders: %s -> %d categories (%s)",
             column_name,
-            len(encoder.categories_[0]),
+            n_cat,
+            enc_cfg["class_path"],
         )
 
     return fitted_encoders
@@ -181,9 +200,9 @@ def fit_encoders(
 
 def transform_encoders(
     split_dataframe: pd.DataFrame,
-    encoders: dict[str, OrdinalEncoder],
+    encoders: dict[str, BaseEstimator],
 ) -> pd.DataFrame:
-    """Apply fitted OrdinalEncoders to all splits. Unseen categories become -1."""
+    """Aplica encoders fitados em todos os splits."""
     encoded_dataframe = split_dataframe.copy()
 
     for column_name, encoder in encoders.items():
@@ -200,26 +219,34 @@ def fit_scalers(
     encoded_dataframe: pd.DataFrame,
     columns: dict[str, list[str]],
     fit_transform_params: dict[str, list[str]],
-) -> dict[str, StandardScaler]:
-    """Fit one StandardScaler per numerical column, train split only."""
+    preprocessing: dict[str, Any],
+) -> dict[str, BaseEstimator]:
+    """Fita scaler numérico por coluna (classe + init_args no YAML)."""
     numerical_columns = columns["numerical"]
     _validate_columns_exist(encoded_dataframe, numerical_columns, caller="fit_scalers")
 
+    sc_cfg = preprocessing["numerical_scaler"]
+    scaler_class = load_class(sc_cfg["class_path"])
+    scaler_init = dict(sc_cfg.get("init_args") or {})
+
     splits_to_fit: list[str] = fit_transform_params["split_to_fit"]
     training_mask = encoded_dataframe[SPLIT_COLUMN].isin(splits_to_fit)
-    fitted_scalers: dict[str, StandardScaler] = {}
+    fitted_scalers: dict[str, BaseEstimator] = {}
 
     for column_name in numerical_columns:
-        standard_scaler = StandardScaler()
+        scaler = scaler_class(**scaler_init)
         training_values = encoded_dataframe.loc[training_mask, [column_name]]
-        standard_scaler.fit(training_values)
-        fitted_scalers[column_name] = standard_scaler
+        scaler.fit(training_values)
+        fitted_scalers[column_name] = scaler
 
+        mean_v = float(scaler.mean_[0]) if hasattr(scaler, "mean_") else 0.0
+        scale_v = float(scaler.scale_[0]) if hasattr(scaler, "scale_") else 1.0
         logger.info(
-            "fit_scalers: %s -> mean=%.4f, std=%.4f",
+            "fit_scalers: %s (%s) -> mean=%.4f, std=%.4f",
             column_name,
-            standard_scaler.mean_[0],
-            standard_scaler.scale_[0],
+            sc_cfg["class_path"],
+            mean_v,
+            scale_v,
         )
 
     return fitted_scalers
@@ -227,13 +254,13 @@ def fit_scalers(
 
 def transform_scalers(
     encoded_dataframe: pd.DataFrame,
-    scalers: dict[str, StandardScaler],
+    scalers: dict[str, BaseEstimator],
 ) -> pd.DataFrame:
-    """Apply fitted scalers to all splits. Zero mean, unit var on train."""
+    """Aplica scalers fitados em todos os splits."""
     scaled_dataframe = encoded_dataframe.copy()
 
-    for column_name, standard_scaler in scalers.items():
-        scaled_dataframe[column_name] = standard_scaler.transform(
+    for column_name, scaler in scalers.items():
+        scaled_dataframe[column_name] = scaler.transform(
             scaled_dataframe[[column_name]]
         )
 

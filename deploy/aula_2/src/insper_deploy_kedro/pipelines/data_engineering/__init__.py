@@ -1,4 +1,4 @@
-"""DE pipeline -- fit/transform pattern for telco churn."""
+"""Pipeline DE — padrão fit/transform pra diabetes."""
 
 from .pipeline import create_pipeline
 

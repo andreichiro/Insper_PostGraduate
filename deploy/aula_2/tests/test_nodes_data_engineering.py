@@ -1,4 +1,4 @@
-"""Unit tests for data-engineering nodes."""
+"""Testes unitários dos nodes de DE """
 
 from __future__ import annotations
 
@@ -58,35 +58,75 @@ class TestAddFeatures:
 
 
 class TestAddSplitColumn:
-    def test_adds_split_column(self, sample_raw_data, raw_columns_config, split_ratio):
+    def test_adds_split_column(
+        self, sample_raw_data, raw_columns_config, split_ratio, preprocessing_config
+    ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        result = add_split_column(featured, split_ratio, random_state=42)
+        result = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
         assert "split" in result.columns
 
     def test_split_names_match_config(
-        self, sample_raw_data, raw_columns_config, split_ratio
+        self,
+        sample_raw_data,
+        raw_columns_config,
+        split_ratio,
+        preprocessing_config,
     ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        result = add_split_column(featured, split_ratio, random_state=42)
+        result = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
         assert set(result["split"].unique()).issubset(set(split_ratio.keys()))
 
     def test_reproducible_with_seed(
-        self, sample_raw_data, raw_columns_config, split_ratio
+        self,
+        sample_raw_data,
+        raw_columns_config,
+        split_ratio,
+        preprocessing_config,
     ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        r1 = add_split_column(featured, split_ratio, random_state=42)
-        r2 = add_split_column(featured, split_ratio, random_state=42)
+        r1 = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
+        r2 = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
         pd.testing.assert_frame_equal(r1, r2)
 
-    def test_stratified_split(self, sample_raw_data, raw_columns_config, split_ratio):
+    def test_stratified_split(
+        self, sample_raw_data, raw_columns_config, split_ratio, preprocessing_config
+    ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
         bigger = pd.concat([featured] * 5, ignore_index=True)
         result = add_split_column(
-            bigger, split_ratio, random_state=42, stratify_column="Outcome"
+            bigger,
+            split_ratio,
+            random_state=42,
+            stratify_column="Outcome",
+            preprocessing=preprocessing_config,
         )
         assert "split" in result.columns
         assert set(result["split"].unique()) == set(split_ratio.keys())
@@ -100,12 +140,21 @@ class TestFitTransformEncoders:
         columns_config,
         split_ratio,
         fit_transform_config,
+        preprocessing_config,
     ):
-        """Diabetes has no categorical columns, so encoders dict should be empty."""
+        """Diabetes não tem colunas categóricas, então o dict de encoders fica vazio."""
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        split = add_split_column(featured, split_ratio, random_state=42)
-        encoders = fit_encoders(split, columns_config, fit_transform_config)
+        split = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
+        encoders = fit_encoders(
+            split, columns_config, fit_transform_config, preprocessing_config
+        )
         assert encoders == {}
 
     def test_transform_is_noop_without_encoders(
@@ -115,11 +164,20 @@ class TestFitTransformEncoders:
         columns_config,
         split_ratio,
         fit_transform_config,
+        preprocessing_config,
     ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        split = add_split_column(featured, split_ratio, random_state=42)
-        encoders = fit_encoders(split, columns_config, fit_transform_config)
+        split = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
+        encoders = fit_encoders(
+            split, columns_config, fit_transform_config, preprocessing_config
+        )
         encoded = transform_encoders(split, encoders)
         pd.testing.assert_frame_equal(encoded, split)
 
@@ -132,13 +190,24 @@ class TestFitTransformScalers:
         columns_config,
         split_ratio,
         fit_transform_config,
+        preprocessing_config,
     ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        split = add_split_column(featured, split_ratio, random_state=42)
-        encoders = fit_encoders(split, columns_config, fit_transform_config)
+        split = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
+        encoders = fit_encoders(
+            split, columns_config, fit_transform_config, preprocessing_config
+        )
         encoded = transform_encoders(split, encoders)
-        scalers = fit_scalers(encoded, columns_config, fit_transform_config)
+        scalers = fit_scalers(
+            encoded, columns_config, fit_transform_config, preprocessing_config
+        )
         assert set(scalers.keys()) == set(columns_config["numerical"])
 
     def test_transform_changes_scale(
@@ -148,13 +217,24 @@ class TestFitTransformScalers:
         columns_config,
         split_ratio,
         fit_transform_config,
+        preprocessing_config,
     ):
         cleaned = clean_data(sample_raw_data, raw_columns_config)
         featured = add_features(cleaned)
-        split = add_split_column(featured, split_ratio, random_state=42)
-        encoders = fit_encoders(split, columns_config, fit_transform_config)
+        split = add_split_column(
+            featured,
+            split_ratio,
+            random_state=42,
+            stratify_column=None,
+            preprocessing=preprocessing_config,
+        )
+        encoders = fit_encoders(
+            split, columns_config, fit_transform_config, preprocessing_config
+        )
         encoded = transform_encoders(split, encoders)
-        scalers = fit_scalers(encoded, columns_config, fit_transform_config)
+        scalers = fit_scalers(
+            encoded, columns_config, fit_transform_config, preprocessing_config
+        )
         scaled = transform_scalers(encoded, scalers)
         for col in columns_config["numerical"]:
             assert scaled[col].std() != encoded[col].std() or len(scaled) == 1

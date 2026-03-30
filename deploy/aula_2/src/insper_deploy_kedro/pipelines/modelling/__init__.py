@@ -1,4 +1,4 @@
-"""Modelling pipeline -- train, evaluate, optimize."""
+"""Pipeline de modelagem: treinar, avaliar, otimizar"""
 
 from .pipeline import create_pipeline
 

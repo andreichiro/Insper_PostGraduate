@@ -1,161 +1,131 @@
-# Diabetes Prediction — Production ML Pipeline
+# Predição de Diabetes: Pipeline ML
 
 [![Powered by Kedro](https://img.shields.io/badge/powered_by-kedro-ffc900?logo=kedro)](https://kedro.org)
 
-End-to-end ML project that predicts diabetes outcome using a Kedro pipeline
-and serves predictions via FastAPI.
+Projeto ML que prevê diabetes usando um pipeline Kedro
+e serve predições via FastAPI + dashboard Streamlit
 
-## Quick Start
+## Início 
 
 ```bash
-# 1. Install dependencies (requires Python 3.13+ and uv)
+# 1 Instalar dependências (Python 3.13+ e uv)
 uv sync
 
-# 2. Train the full pipeline (data engineering → modelling → refit)
+# 2 Treinar o pipeline data engineering -> modelagem -> refit
 uv run kedro run
 
-# 3. Start the API server
+# 3 Dashboard Streamlit (métricas + inferência)
+uv run streamlit run src/insper_deploy_kedro/dashboard.py
+
+# 4 Subir o server da API
 uv run uvicorn insper_deploy_kedro.api:app --host 0.0.0.0 --port 8000
 
-# 4. Open Swagger docs
+# 5 Abrir doc swagger
 open http://localhost:8000/docs
 ```
 
-### Docker (one command)
+### Docker (1 comando, tudo sobe)
 
 ```bash
 docker compose up --build
 ```
 
-The container trains the model (if not already trained) and starts the API
-on port 8000.
+Sobe dois serviços:
+- **api** (porta 8000) — treina o modelo se necessário + FastAPI
+- **dashboard** (porta 8501) — Streamlit com métricas e inferência ao vivo
 
-## Project Structure
+## CI/CD — Um Comando e Pronto
+
+O workflow do GitHub Actions roda tudo de ponta a ponta: lint, testes, treino,
+quality gate, deploy da API **e** do dashboard.
+
+```bash
+# rodar tudo c/ 1 comando (API + dashboard deployados)
+gh workflow run aula-2-ci.yml
+
+# só treinar sem deployar
+gh workflow run aula-2-ci.yml -f deploy=false
+
+# rodar só o refit (sem retreinar tudo do zero)
+gh workflow run aula-2-ci.yml -f pipeline=refit
+
+# ex c/ thresholds customizados
+gh workflow run aula-2-ci.yml -f min_roc_auc=0.80 -f min_f1=0.60
+```
+
+O que acontece por baixo:
+1. `ruff check` + `pytest` (lint e testes)
+2. Pipeline Kedro completo + quality gate (roc_auc ≥ 0.75, f1 ≥ 0.50, mape ≤ 150%)
+3. Upload artefatos pro GCS
+4. Deploy da **API** + **Dashboard** pro Cloud Run
+
+Secrets necessários no GitHub:
+`GCP_SA_KEY`, `GCP_PROJECT`, `GCS_BUCKET`, `API_KEY`
+
+## Validação de Dados (Great Expectations)
+
+O pipeline DE roda validações automáticas com Great Expectations em 2 pontos críticos:
+
+1. **Pós-limpeza** — verifica schema, ausência de NaN, ranges médicos (ex: Glicose 0-300, IMC 0-80)
+2. **Pós-split** — verifica que cada split tem amostras suficientes e balanço de classes aceitável
+
+Se uma validação crítica falha, o pipeline para. Warnings são logados mas não bloqueiam.
+
+## Config declarativa (sklearn, XGBoost, CatBoost, Optuna)
+
+Quase tudo que é “classe + hiperparâmetro” vem do YAML — mesmo padrão do `class_path` / `init_args` da modelagem:
+
+| Arquivo | O que controla |
+|---------|----------------|
+| `parameters/data_engineering.yml` → `preprocessing` | `train_test_split`, `OrdinalEncoder`, `StandardScaler`, limiar de estratificação |
+| `parameters/modelling.yml` → `ml_runtime` | `LabelEncoder`, `StratifiedKFold`, sampler/study do Optuna |
+| `parameters/modelling.yml` → `evaluation` | funções de métrica (`sklearn.metrics.*`), matriz de confusão, derivados (r2, mape) |
+| `parameters/modelling.yml` → `baseline` / `optimization` / `xgboost` | modelos e grids Optuna (já existia) |
+| `parameters/refit.yml` → `calibration` | `CalibratedClassifierCV` + `init_args` |
+| `parameters/data_quality.yml` | classes GX + ranges (já documentado acima) |
+
+O código só instancia via `insper_deploy_kedro.class_loading` (`load_class` / `load_callable`).
+
+## Estrutura do Projeto
 
 ```
 ├── conf/
-│   ├── base/               # Shared config (committed)
-│   │   ├── catalog.yml      # Data Catalog (I/O definitions)
-│   │   └── parameters/      # Pipeline parameters (YAML)
-│   └── local/               # Environment-specific (gitignored)
-│       └── credentials.yml  # Secrets — NEVER committed
+│   ├── base/               # Config compartilhada 
+│   │   ├── catalog.yml      # Data Catalog 
+│   │   └── parameters/      # Parâmetros dos pipelines
+│   └── local/               # Config local (gitignored)
+│       └── credentials.yml  # Secrets
 ├── data/
-│   └── 01_raw/              # Raw input CSVs
+│   └── 01_raw/              # CSVs de entrada
 ├── src/insper_deploy_kedro/
-│   ├── api.py               # FastAPI serving layer
+│   ├── api.py               # Camada serving FastAPI
+│   ├── class_loading.py     # load_class / load_callable (YAML → objeto)
+│   ├── dashboard.py         # Dashboard Streamlit (métricas + inferência)
+│   ├── constants.py         # Constantes e tipos compartilhados
 │   └── pipelines/
-│       ├── data_engineering/ # clean → split → encode → scale
-│       ├── modelling/        # train → evaluate → optimize
-│       ├── inference/        # transform-only → predict
-│       └── refit/            # refit on all data for production
-├── tests/                   # Unit, integration, and e2e tests
+│       ├── data_engineering/ # limpar -> validar(GE) -> features -> split -> validar(GE) -> encode -> scale
+│       ├── modelling/        # treinar -> avaliar -> otimizar
+│       ├── inference/        # só transform -> predição
+│       └── refit/            # retreinar c/ todos os dados pra produção
+├── tests/                   # Testes unitários, integração e e2e
 ├── Dockerfile
-├── docker-compose.yml
-└── pyproject.toml           # Dependencies + tool config
+├── docker-compose.yml       # API (8000) + Dashboard (8501)
+└── pyproject.toml           # Dependências + config
 ```
 
-## Development
+## Dashboard Streamlit
 
-### Linting and Formatting (Ruff)
+O dashboard mostra métricas comparativas dos 3 modelos, confusion matrix 
+e tem uma aba de predição:
 
 ```bash
-uv run ruff check src/      # lint (F, I, UP, PL, T201 rules)
-uv run ruff format src/     # format (replaces black + isort)
+# local
+uv run streamlit run src/insper_deploy_kedro/dashboard.py
+
+# via Docker (sobe junto com a API)
+docker compose up --build
+# → API: http://localhost:8000
+# → Dashboard: http://localhost:8501
 ```
 
-### Testing (pytest)
-
-```bash
-uv run pytest                # run all tests with coverage
-uv run pytest -v             # verbose output
-uv run pytest tests/test_api.py  # e2e API tests only
-```
-
-Test pyramid:
-- **Unit tests** — individual node functions (`test_nodes_*.py`)
-- **Integration tests** — pipeline DAG assembly
-- **E2E tests** — FastAPI endpoints (`test_api.py`)
-
-### Logging
-
-All node functions use `logging.getLogger(__name__)` (never `print()`).
-The logging configuration (`conf/logging.yml`) provides:
-- **Rich console output** via Kedro's RichHandler
-- **Rotating file handler** — `info.log`, 10 MB max, 20 backups
-
-### Kedro Environments
-
-| Directory     | Purpose                    | Git      |
-|---------------|----------------------------|----------|
-| `conf/base/`  | Shared config              | Committed |
-| `conf/local/` | Machine-specific overrides | Ignored  |
-
-Credentials go in `conf/local/credentials.yml` — **never committed**.
-
-## Pipelines
-
-| Pipeline           | Command                                        |
-|--------------------|-------------------------------------------------|
-| All (default)      | `uv run kedro run`                              |
-| Data engineering   | `uv run kedro run --pipeline data_engineering`  |
-| Modelling          | `uv run kedro run --pipeline modelling`         |
-| Refit (production) | `uv run kedro run --pipeline refit`             |
-| Inference          | `uv run kedro run --pipeline inference`         |
-
-## Kedro Commands
-
-### Visualization
-
-```bash
-uv run kedro viz run                              # open pipeline DAG in browser (localhost:4141)
-```
-
-### Registry & Catalog
-
-```bash
-uv run kedro registry list                        # list all registered pipelines
-uv run kedro catalog list                         # list all datasets in the catalog
-uv run kedro catalog resolve                      # show resolved catalog (with interpolation)
-```
-
-### Running Specific Nodes
-
-```bash
-uv run kedro run --nodes optimize_baseline_node   # run a single node by name
-uv run kedro run --nodes "optimize_baseline_node,evaluate_baseline_node"  # multiple nodes
-uv run kedro run --from-nodes select_best_model_node   # from a node onward
-uv run kedro run --to-nodes evaluate_baseline_node     # up to a node (inclusive)
-uv run kedro run --tags training                  # run nodes with a specific tag
-```
-
-### Pipeline-Level Execution
-
-```bash
-uv run kedro run                                  # full pipeline (all stages)
-uv run kedro run --pipeline data_engineering      # clean → features → split → encode → scale
-uv run kedro run --pipeline modelling             # optimize 3 models → evaluate → select → test report
-uv run kedro run --pipeline refit                 # refit winner on all data → calibrate
-uv run kedro run --pipeline inference             # transform inference CSV → predict
-```
-
-### Environment & Configuration
-
-```bash
-uv run kedro run --env cloud                      # use conf/cloud/ overlay
-uv run kedro run --params "random_state:123"      # override a parameter at runtime
-```
-
-### Project Info
-
-```bash
-uv run kedro info                                 # project metadata (name, version, source dir)
-uv run kedro cheatsheet                           # print all project commands (custom)
-```
-
-## API Endpoints
-
-| Method | Path         | Description                           |
-|--------|--------------|---------------------------------------|
-| GET    | `/health`    | Liveness / readiness probe            |
-| POST   | `/inference` | Batch diabetes predictions (JSON)     |
-| GET    | `/docs`      | Interactive Swagger documentation     |
+Precisa ter rodado `uv run kedro run` antes (ou usar Docker, que treina automaticamente).

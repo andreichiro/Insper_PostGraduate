@@ -39,3 +39,17 @@ stratify_column: Outcome
 fit_transform:
   split_to_fit:
     - train
+
+# Pré-processamento sklearn 100% declarativo (class_path + init_args).
+preprocessing:
+  train_test_split_function: sklearn.model_selection.train_test_split
+  min_rows_for_stratify: 20
+  categorical_encoder:
+    class_path: sklearn.preprocessing.OrdinalEncoder
+    init_args:
+      handle_unknown: use_encoded_value
+      unknown_value: -1
+      dtype: int
+  numerical_scaler:
+    class_path: sklearn.preprocessing.StandardScaler
+    init_args: {}

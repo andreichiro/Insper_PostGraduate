@@ -1,4 +1,4 @@
-"""FastAPI serving layer — diabetes prediction with API-key security."""
+"""Camada de serving FastAPI, predição de diabetes"""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import yaml
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,18 +32,16 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 def _verify_api_key(
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str | None:
-    """Validate API key when API_KEY env var is set."""
+    """Valida API key quando a env var API_KEY tá setada."""
     expected = os.getenv("API_KEY")
     if expected and api_key != expected:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return api_key
 
 
-# ── Pydantic schemas ─────────────────────────────────────────────────
-
-
+#Schema
 class DiabetesFeatures(BaseModel):
-    """Input features for a single patient."""
+    """Features de entrada pra um paciente."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -59,7 +56,7 @@ class DiabetesFeatures(BaseModel):
 
 
 class InferenceRequest(BaseModel):
-    """Batch inference request."""
+    """Request de inferência em batch."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -67,70 +64,69 @@ class InferenceRequest(BaseModel):
 
 
 class PredictionResult(BaseModel):
-    """Single prediction output."""
+    """Resultado de uma predição."""
 
     prediction: str
     prediction_proba: float | None = None
 
 
 class InferenceResponse(BaseModel):
-    """Batch inference response."""
+    """Response de inferência em batch."""
 
     predictions: list[PredictionResult]
 
 
 class HealthResponse(BaseModel):
-    """Health-check response."""
+    """Response do health check."""
 
     status: str
     model_loaded: bool
     model_version: str | None = None
 
 
-# ── Artifact loading ─────────────────────────────────────────────────
-
+#Artefatos (treinados localmente, inferencia pode ser pelo google cloud run)
 
 def _load_pickle(path: Path) -> Any:
     with open(path, "rb") as fh:
-        return pickle.load(fh)  # noqa: S301
+        return pickle.load(fh)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Load production artifacts once on startup."""
+    """Carrega artefatos de produção uma vez na inicialização."""
     project_root = Path.cwd()
     models_dir = project_root / "data" / "06_models"
-    conf_path = project_root / "conf" / "base" / "parameters" / "inference.yml"
 
-    with open(conf_path) as fh:
-        inference_params = yaml.safe_load(fh)
+    try:
+        _artifacts["encoders"] = _load_pickle(models_dir / "production_encoders.pkl")
+        _artifacts["scalers"] = _load_pickle(models_dir / "production_scalers.pkl")
+        _artifacts["model"] = _load_pickle(models_dir / "production_model.pkl")
+        _artifacts["inference_raw_columns"] = {
+            "categorical": [],
+            "numerical": list(DiabetesFeatures.model_fields.keys()),
+        }
+        _artifacts["model_version"] = _artifacts["model"].get("class_path", "unknown")
+        logger.info("Artefatos de produção carregados de %s", models_dir)
+    except FileNotFoundError:
+        logger.warning("Artefatos não encontrados em %s — rode kedro run primeiro", models_dir)
 
-    _artifacts["encoders"] = _load_pickle(models_dir / "production_encoders.pkl")
-    _artifacts["scalers"] = _load_pickle(models_dir / "production_scalers.pkl")
-    _artifacts["model"] = _load_pickle(models_dir / "production_model.pkl")
-    _artifacts["inference_raw_columns"] = inference_params["inference_raw_columns"]
-
-    model_info = _artifacts["model"]
-    _artifacts["model_version"] = model_info.get("class_path", "unknown")
-
-    logger.info("Production artifacts loaded from %s", models_dir)
     yield
     _artifacts.clear()
 
 
-# ── Application ──────────────────────────────────────────────────────
+# Camada de Aplicação
 
 app = FastAPI(
-    title="Diabetes Prediction API",
-    description="Predict diabetes outcome using a production ML pipeline.",
+    title="API de Predição de Diabetes",
+    description="Prever diabetes usando um pipeline ML de produção.",
     version="0.2.0",
     lifespan=lifespan,
 )
 
-
+# Health check q estava faltando
 @app.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
-    """Liveness / readiness probe."""
+    """Probe de liveness / readiness."""
     return HealthResponse(
         status="healthy",
         model_loaded=bool(_artifacts),
@@ -143,7 +139,7 @@ def run_inference(
     request: InferenceRequest,
     _key: str | None = Depends(_verify_api_key),
 ) -> InferenceResponse:
-    """Run the full inference pipeline on a batch of patients."""
+    """Roda o pipeline completo de inferência num batch de pacientes"""
     if not _artifacts:
         raise HTTPException(status_code=503, detail="Model artifacts not loaded")
 
@@ -170,5 +166,5 @@ def run_inference(
         return InferenceResponse(predictions=predictions)
 
     except Exception as exc:
-        logger.exception("Inference failed")
+        logger.exception("Inferência falhou")
         raise HTTPException(status_code=422, detail=str(exc)) from exc

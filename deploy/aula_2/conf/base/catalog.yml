@@ -78,10 +78,12 @@ xgboost_model:
 production_encoders:
   type: pickle.PickleDataset
   filepath: data/06_models/production_encoders.pkl
+  versioned: true
 
 production_scalers:
   type: pickle.PickleDataset
   filepath: data/06_models/production_scalers.pkl
+  versioned: true
 
 raw_production_model:
   type: pickle.PickleDataset
@@ -90,6 +92,7 @@ raw_production_model:
 production_model:
   type: pickle.PickleDataset
   filepath: data/06_models/production_model.pkl
+  versioned: true
 
 # ── Model Output ─────────────────────────────────────────────────────
 baseline_metrics:
@@ -111,7 +114,9 @@ best_model_config:
 test_report:
   type: pickle.PickleDataset
   filepath: data/07_model_output/test_report.pkl
+  versioned: true
 
 predictions:
   type: pandas.ParquetDataset
   filepath: data/07_model_output/predictions.parquet
+  versioned: true

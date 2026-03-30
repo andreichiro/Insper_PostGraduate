@@ -1,9 +1,0 @@
-refit_fit_transform:
-  split_to_fit:
-    - train
-    - validation
-    - test
-
-calibration:
-  method: sigmoid
-  cv: prefit

@@ -1,5 +1,6 @@
 baseline:
   class_path: sklearn.linear_model.LogisticRegression
+  random_state: ${random_state}
   train_splits:
     - train
   init_args:
@@ -20,6 +21,7 @@ baseline:
 
 optimization:
   class_path: catboost.CatBoostClassifier
+  random_state: ${random_state}
   init_args:
     verbose: 0
     auto_class_weights: Balanced
@@ -47,6 +49,7 @@ optimization:
 
 xgboost:
   class_path: xgboost.XGBClassifier
+  random_state: ${random_state}
   train_splits:
     - train
   init_args:
@@ -83,8 +86,62 @@ xgboost:
   cv: 5
   scoring: roc_auc
 
+# Runtime compartilhado (target encoder, CV, Optuna) — troca de classe sem código.
+ml_runtime:
+  target_encoder:
+    class_path: sklearn.preprocessing.LabelEncoder
+    init_args: {}
+  cross_validation:
+    class_path: sklearn.model_selection.StratifiedKFold
+    init_args:
+      shuffle: true
+      random_state: ${random_state}
+  optuna_study:
+    direction: maximize
+  optuna_sampler:
+    class_path: optuna.samplers.TPESampler
+    init_args:
+      seed: ${random_state}
+
 evaluation:
   split: validation
+  confusion_matrix:
+    function_path: sklearn.metrics.confusion_matrix
+    kwargs: {}
+  metrics:
+    - key: accuracy
+      function_path: sklearn.metrics.accuracy_score
+      prediction_input: y_pred
+      kwargs: {}
+    - key: precision
+      function_path: sklearn.metrics.precision_score
+      prediction_input: y_pred
+      kwargs:
+        zero_division: 0
+    - key: recall
+      function_path: sklearn.metrics.recall_score
+      prediction_input: y_pred
+      kwargs:
+        zero_division: 0
+    - key: f1
+      function_path: sklearn.metrics.f1_score
+      prediction_input: y_pred
+      kwargs:
+        zero_division: 0
+    - key: roc_auc
+      function_path: sklearn.metrics.roc_auc_score
+      prediction_input: y_proba
+      kwargs: {}
+  derived:
+    r2:
+      function_path: sklearn.metrics.r2_score
+      prediction_input: y_proba
+    mape:
+      type: mae_as_percent_of_mean_label
 
 model_selection:
   metric: roc_auc
+  refit_train_splits:
+    - train
+    - validation
+    - test

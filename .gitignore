@@ -1,4 +1,3 @@
-# ── Virtual environments ──────────────────────────────────────────────
 .venv/
 venv/
 env/
@@ -7,19 +6,16 @@ __pycache__/
 *.pyo
 *.egg-info/
 
-# ── IDE / editor ─────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
 
-# ── R artifacts ──────────────────────────────────────────────────────
 .RData
 .Rhistory
 .Rproj.user/
 
-# ── Caches & generated ──────────────────────────────────────────────
 .pytest_cache/
 .ruff_cache/
 .coverage
@@ -28,7 +24,6 @@ __pycache__/
 .ipynb_checkpoints/
 .mypy_cache/
 
-# ── Large data files (GitHub 100MB limit) ────────────────────────────
 *.parquet
 *.duckdb
 *.safetensors
@@ -37,11 +32,7 @@ __pycache__/
 *.feather
 *.h5
 *.hdf5
-
-# ── Large archives ──────────────────────────────────────────────────
 *.zip
-
-# ── Large CSVs (>50MB) — keep small ones, exclude huge datasets ─────
 BigData/checkpoint/*.csv
 BigData/Aula4/Lab/*.csv
 BigData/Aula8/*.csv
@@ -55,14 +46,8 @@ Design/Aula_2/analysis_output_v3_tmp/
 Design/Aula_8/
 Design/Aula_9/
 
-# ── Kedro (each project has its own .gitignore for data/ and conf/local/) ──
-
-# ── Misc loose files ────────────────────────────────────────────────
 Rplots.pdf
 mydask.png
 fct_teachers_contents_interactions.csv
 aulas.aprendizap.com.br
 teacher_interactions ~11.5%
-
-# ── Lock files (keep for reproducibility) ───────────────────────────
-# uv.lock is NOT ignored — committed for reproducibility

@@ -1,4 +1,4 @@
-"""Inference pipeline -- transform + predict, no fitting."""
+"""Pipeline de inferência — transform + predict, sem fit."""
 
 from .pipeline import create_pipeline
 

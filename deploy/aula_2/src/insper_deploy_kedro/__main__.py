@@ -1,4 +1,4 @@
-"""main for insper-deploy-kedro project"""
+"""main p/ insper-deploy-kedro """
 
 import sys
 from pathlib import Path

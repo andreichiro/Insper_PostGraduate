@@ -8,20 +8,19 @@ name = "insper_deploy_kedro"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    "ipython>=8.10",
-    "jupyterlab>=3.0",
-    "notebook",
     "kedro[jupyter]~=1.2.0",
     "kedro-datasets[pandas-csvdataset, pandas-exceldataset, pandas-parquetdataset, plotly-plotlydataset, plotly-jsondataset, matplotlib-matplotlibdataset, pickle-pickledataset]>=9.1",
     "kedro-viz>=6.7.0",
     "scikit-learn~=1.5.1",
     "catboost>=1.2",
     "xgboost>=2.0",
-    "seaborn~=0.12.1",
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
     "pyyaml>=6.0",
     "optuna>=3.0",
+    "streamlit>=1.30",
+    "matplotlib>=3.7",
+    "great-expectations>=1.0",
 ]
 
 [project.scripts]
@@ -42,9 +41,13 @@ docs = [
     "myst-parser>=1.0,<2.1"
 ]
 dev = [
+    "ipython>=8.10",
+    "jupyterlab>=3.0",
+    "notebook",
+    "seaborn~=0.12.1",
     "pytest-cov>=3,<7",
-    "pytest-mock>=1.7.1, <2.0",
-    "pytest~=7.2",
+    "pytest-mock>=3.10",
+    "pytest>=8.0",
     "ruff~=0.12.0",
     "httpx>=0.24",
     "datasets>=2.0",
@@ -95,7 +98,8 @@ select = [
 ignore = ["E501"]  # Ruff format takes care of line-too-long
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["PLR2004"]
+"tests/**" = ["PLR2004", "PLC0415", "E402", "PLR0913"]
+"src/insper_deploy_kedro/settings.py" = ["E402"]
 
 [tool.kedro_telemetry]
 project_id = "cae58a8dd37748ddad7287703b474f18"

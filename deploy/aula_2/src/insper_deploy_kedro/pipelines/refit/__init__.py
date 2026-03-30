@@ -1,4 +1,4 @@
-"""Refit pipeline -- refit on ALL data for production artifacts."""
+"""Pipeline de refit, ou seja, retreinar c/ todos os dados"""
 
 from .pipeline import create_pipeline
 

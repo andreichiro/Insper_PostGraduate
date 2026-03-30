@@ -1,4 +1,4 @@
-"""Modelling pipeline: optimize 3 models → evaluate → select best → test report."""
+"""Pipeline de modelagem: otimizar 3 modelos -> avaliar -> selecionar melhor -> relatório de teste."""
 
 from typing import Any
 
@@ -13,15 +13,20 @@ from .nodes import (
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
-    """Wire up optimize/evaluate/select/test-report DAG."""
+    """Monta o DAG de otimização/avaliação/seleção/relatório."""
     return pipeline(
         [
-            # ── Optimize all models with Optuna ─────────────────────────
             node(
                 func=optimize_model,
-                inputs=["master_table", "params:columns", "params:baseline"],
+                inputs=[
+                    "master_table",
+                    "params:columns",
+                    "params:baseline",
+                    "params:ml_runtime",
+                ],
                 outputs="baseline_model",
                 name="optimize_baseline_node",
+                tags=["modelling", "training"],
             ),
             node(
                 func=evaluate_model,
@@ -33,6 +38,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                 ],
                 outputs="baseline_metrics",
                 name="evaluate_baseline_node",
+                tags=["modelling", "evaluation"],
             ),
             node(
                 func=optimize_model,
@@ -40,9 +46,11 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                     "master_table",
                     "params:columns",
                     "params:optimization",
+                    "params:ml_runtime",
                 ],
                 outputs="optimized_model",
                 name="optimize_catboost_node",
+                tags=["modelling", "training"],
             ),
             node(
                 func=evaluate_model,
@@ -54,12 +62,19 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                 ],
                 outputs="optimized_metrics",
                 name="evaluate_optimized_node",
+                tags=["modelling", "evaluation"],
             ),
             node(
                 func=optimize_model,
-                inputs=["master_table", "params:columns", "params:xgboost"],
+                inputs=[
+                    "master_table",
+                    "params:columns",
+                    "params:xgboost",
+                    "params:ml_runtime",
+                ],
                 outputs="xgboost_model",
                 name="optimize_xgboost_node",
+                tags=["modelling", "training"],
             ),
             node(
                 func=evaluate_model,
@@ -71,8 +86,8 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                 ],
                 outputs="xgboost_metrics",
                 name="evaluate_xgboost_node",
+                tags=["modelling", "evaluation"],
             ),
-            # ── Select best model ───────────────────────────────────────
             node(
                 func=select_best_model,
                 inputs=[
@@ -86,8 +101,8 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                 ],
                 outputs="best_model_config",
                 name="select_best_model_node",
+                tags=["modelling", "selection"],
             ),
-            # ── Final held-out test evaluation ──────────────────────────
             node(
                 func=evaluate_all_on_test,
                 inputs=[
@@ -96,9 +111,11 @@ def create_pipeline(**kwargs: Any) -> Pipeline:  # noqa: ARG001
                     "optimized_model",
                     "xgboost_model",
                     "params:columns",
+                    "params:evaluation",
                 ],
                 outputs="test_report",
                 name="test_evaluation_node",
+                tags=["modelling", "evaluation"],
             ),
         ]
     )

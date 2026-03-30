@@ -11,9 +11,9 @@ COPY src/ src/
 COPY conf/ conf/
 COPY data/01_raw/ data/01_raw/
 
-EXPOSE 8000
+EXPOSE 8000 8501
 
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+COPY entrypoint.sh dashboard-entrypoint.sh ./
+RUN chmod +x entrypoint.sh dashboard-entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]

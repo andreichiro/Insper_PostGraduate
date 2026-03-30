@@ -1,0 +1,175 @@
+name: "Aula 2 — Diabetes: Build, Test & Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: "Qual pipeline rodar"
+        type: choice
+        options: [full, modelling, refit]
+        default: full
+      deploy:
+        description: "Fazer deploy pro Cloud Run depois?"
+        type: boolean
+        default: true
+      min_roc_auc:
+        description: "roc_auc mínimo"
+        type: string
+        default: "0.75"
+      min_f1:
+        description: "F1 score mínimo"
+        type: string
+        default: "0.50"
+      max_mape:
+        description: "MAPE máximo (%)"
+        type: string
+        default: "150.0"
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/aula_2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - run: uv sync --all-extras
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Testes unitários
+        run: uv run pytest --no-cov -x --ignore=tests/test_clean_data_hf.py
+
+  train-and-validate:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/aula_2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - run: uv sync --all-extras
+
+      - name: Rodar pipeline Kedro
+        run: |
+          if [ "${{ inputs.pipeline }}" = "full" ]; then
+            uv run kedro run
+          else
+            uv run kedro run --pipeline ${{ inputs.pipeline }}
+          fi
+
+      - name: Quality gate (todas as métricas)
+        run: |
+          uv run python - <<'PYEOF'
+          import pickle, sys
+
+          report = pickle.load(open("data/07_model_output/test_report.pkl", "rb"))
+
+          thresholds = {
+              "roc_auc": (">=", ${{ inputs.min_roc_auc }}),
+              "f1":      (">=", ${{ inputs.min_f1 }}),
+              "mape":    ("<=", ${{ inputs.max_mape }}),
+          }
+
+          print("=" * 65)
+          print(f"{'Modelo':<12} {'roc_auc':>8} {'f1':>8} {'r2':>8} {'mape':>8}  {'CM'}")
+          print("-" * 65)
+
+          all_passed = True
+          for name, m in report.items():
+              cm = m.get("confusion_matrix", [])
+              print(
+                  f"{name:<12} {m['roc_auc']:>8.4f} {m['f1']:>8.4f} "
+                  f"{m['r2']:>8.4f} {m['mape']:>7.2f}%  {cm}"
+              )
+
+          best = max(report.values(), key=lambda m: m["roc_auc"])
+          print("=" * 65)
+          print(f"Melhor modelo: roc_auc={best['roc_auc']:.4f}, f1={best['f1']:.4f}, "
+                f"r2={best['r2']:.4f}, mape={best['mape']:.2f}%")
+          print()
+
+          failures = []
+          for metric, (op, threshold) in thresholds.items():
+              value = best[metric]
+              if op == ">=" and value < threshold:
+                  failures.append(f"{metric}={value:.4f} < {threshold}")
+              elif op == "<=" and value > threshold:
+                  failures.append(f"{metric}={value:.2f}% > {threshold}%")
+
+          if failures:
+              print("QUALITY GATE FALHOU:")
+              for f in failures:
+                  print(f"  - {f}")
+              sys.exit(1)
+          else:
+              print("QUALITY GATE PASSOU")
+          PYEOF
+
+      - name: Salvar artefatos
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            deploy/aula_2/data/06_models/production_*.pkl
+            deploy/aula_2/data/07_model_output/test_report.pkl
+
+  deploy:
+    needs: train-and-validate
+    if: ${{ inputs.deploy }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/aula_2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
+          path: deploy/aula_2/data/
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Subir artefatos pro GCS
+        run: |
+          gsutil -m cp data/06_models/production_*.pkl gs://${{ secrets.GCS_BUCKET }}/diabetes/models/
+          gsutil -m cp data/07_model_output/test_report.pkl gs://${{ secrets.GCS_BUCKET }}/diabetes/reports/
+
+      - name: Build imagem Docker
+        run: |
+          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT }}/diabetes-api:${{ github.sha }}
+
+      - name: Deploy API pro cloud run
+        run: |
+          gcloud run deploy diabetes-api \
+            --image gcr.io/${{ secrets.GCP_PROJECT }}/diabetes-api:${{ github.sha }} \
+            --set-env-vars KEDRO_ENV=cloud,GCS_BUCKET=${{ secrets.GCS_BUCKET }},API_KEY=${{ secrets.API_KEY }} \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --memory 1Gi
+
+      - name: Deploy dashboard pro cloud Run
+        run: |
+          gcloud run deploy diabetes-dashboard \
+            --image gcr.io/${{ secrets.GCP_PROJECT }}/diabetes-api:${{ github.sha }} \
+            --command ./dashboard-entrypoint.sh \
+            --set-env-vars KEDRO_ENV=cloud,GCS_BUCKET=${{ secrets.GCS_BUCKET }} \
+            --region us-central1 \
+            --port 8501 \
+            --allow-unauthenticated \
+            --memory 1Gi

@@ -1,4 +1,4 @@
-"""Inference nodes -- only new functions (to_dataframe, predict)."""
+"""Nodes de inferência — só funções novas (to_dataframe, predict)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,13 @@ from typing import Any
 
 import pandas as pd
 
+from insper_deploy_kedro.constants import ModelArtifact
+
 logger = logging.getLogger(__name__)
 
 
 def to_dataframe(raw_input: dict[str, Any] | list[dict[str, Any]]) -> pd.DataFrame:
-    """Convert raw input (single dict or list of dicts) into a DataFrame."""
+    """Converte input bruto (dict ou lista de dicts) em DataFrame."""
     if isinstance(raw_input, dict):
         raw_input = [raw_input]
     dataframe = pd.DataFrame(raw_input)
@@ -23,9 +25,9 @@ def to_dataframe(raw_input: dict[str, Any] | list[dict[str, Any]]) -> pd.DataFra
 
 def predict(
     features_dataframe: pd.DataFrame,
-    model_artifact: dict[str, Any],
+    model_artifact: ModelArtifact,
 ) -> pd.DataFrame:
-    """Run production model on prepared features. Returns predictions with decoded labels."""
+    """Roda o modelo nas features preparadas e decodifica os labels"""
     estimator = model_artifact["estimator"]
     target_encoder = model_artifact["target_encoder"]
     feature_columns = model_artifact["feature_columns"]

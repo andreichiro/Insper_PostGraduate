@@ -1,7 +1,7 @@
-"""Unit tests for clean_data using real data from HuggingFace.
+"""Testes unitários de clean_data usando dados reais do HuggingFace
 
-Uses the ``Genius-Society/Pima`` dataset (Pima Indians Diabetes)
-so we validate against a realistic distribution, not just hand-crafted rows.
+Usa o dataset Genius-Society/Pima (Pima Indians Diabetes) pra validar
+contra uma distribuição realista, não só linhas fabricadas na mão
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import pytest
 
 datasets = pytest.importorskip("datasets", reason="pip install datasets")
 
-from insper_deploy_kedro.pipelines.data_engineering.nodes import (  # noqa: E402
+from insper_deploy_kedro.pipelines.data_engineering.nodes import (
     add_features,
     clean_data,
 )
@@ -36,7 +36,7 @@ RAW_COLUMNS: dict[str, list[str]] = {
 
 @pytest.fixture(scope="module")
 def hf_dataframe() -> pd.DataFrame:
-    """Load the first 200 rows from HuggingFace (cached after first download)."""
+    """Carrega as primeiras 200 linhas do HF (c/ cache)."""
     ds = datasets.load_dataset(HF_DATASET, split="train[:200]")
     return ds.to_pandas()
 
