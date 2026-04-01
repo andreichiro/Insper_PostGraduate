@@ -10,15 +10,17 @@ from pathlib import Path
 
 import pandas as pd
 
+# Support direct `streamlit run .../streamlit_app.py` execution without
+# requiring the project to be pre-installed as a package.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 try:
     import streamlit as st
 except ImportError:  # pragma: no cover - optional dependency
     st = None
 
-from targeted_ml.config.loader import render_resolved_spec_yaml
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "build"
 DEFAULT_DATASET_ROOT = PROJECT_ROOT / "data"
 DEFAULT_SPEC_NAME = "activity.yaml"
@@ -52,6 +54,12 @@ def _ensure_streamlit() -> None:
             "streamlit is not installed. Install the optional app dependencies first: "
             "pip install -e .[app]"
         )
+
+
+def _render_resolved_spec_yaml(selected_spec: Path) -> str:
+    from targeted_ml.config.loader import render_resolved_spec_yaml
+
+    return render_resolved_spec_yaml(selected_spec)
 
 
 def _read_json(path: Path) -> dict:
@@ -188,7 +196,7 @@ def _render_latest_high_risk_preview(paths: dict[str, Path]) -> None:
 
 def _render_training_tab(paths: dict[str, Path], selected_spec: Path) -> None:
     source_text = selected_spec.read_text(encoding="utf-8")
-    resolved_text = render_resolved_spec_yaml(selected_spec)
+    resolved_text = _render_resolved_spec_yaml(selected_spec)
     spec_key = f"spec_text::{selected_spec.name}"
     if spec_key not in st.session_state:
         st.session_state[spec_key] = resolved_text
