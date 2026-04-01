@@ -1,0 +1,10 @@
+targeted_ml_lineage:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('TARGETED_ML_BUILD_DUCKDB', '../build/duckdb/build.duckdb') }}"
+      threads: 4
+      attach:
+        - path: "{{ env_var('TARGETED_ML_MODELLED_DUCKDB', '../build/modelled/duckdb/base_modelada_v2.duckdb') }}"
+          alias: modelled_base

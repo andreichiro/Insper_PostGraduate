@@ -1,0 +1,13 @@
+defaults:
+  - base
+
+analysis_name: targeted_ml_churn_m1
+analysis_kind: churn
+
+label:
+  definition_b:
+    definition_name: definition_b
+    metric_name: future_business_active_weeks
+    operator: <=
+    threshold: 0.0
+    rule_text: future_business_active_weeks <= 0

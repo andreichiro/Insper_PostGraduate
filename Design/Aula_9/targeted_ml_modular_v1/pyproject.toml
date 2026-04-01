@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "targeted-ml-modular-v1"
+version = "0.1.0"
+description = "Spec-driven, batch-first targeted ML pipeline for Aula_9"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "catboost",
+  "duckdb",
+  "jinja2",
+  "joblib",
+  "numpy",
+  "omegaconf",
+  "pandas",
+  "plotly",
+  "pydantic>=2",
+  "pydantic-settings",
+  "pyarrow",
+  "scikit-learn",
+  "typer",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+app = [
+  "streamlit>=1.44",
+]
+lineage = [
+  "dbt-core>=1.10,<1.11",
+  "dbt-duckdb>=1.9,<1.10",
+]
+
+[project.scripts]
+targeted-ml = "targeted_ml.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["targeted_ml*"]

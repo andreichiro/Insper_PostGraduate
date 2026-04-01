@@ -1,0 +1,123 @@
+{
+  "analysis_name": "targeted_ml_activity",
+  "analysis_kind": "activity",
+  "dataset_root": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/data",
+  "spec_hash": "9f39725e0581b8253860ddc1642eb00ade62a184694f6ab6867331dc3ed00532",
+  "git_revision": "7a70b211c09a3b30ad046f9ff2cc2f9c32776e6c",
+  "stage_name": "score_modelled",
+  "runtime_overrides": {
+    "label_window_days": 30,
+    "post_label_block_days": 30,
+    "post_label_block_count": 3,
+    "external_validators": [
+      "returned_active_post_label_m1",
+      "returned_active_post_label_m2",
+      "returned_active_post_label_m3",
+      "active_days_post_label_3m",
+      "sustained_active_2of3_post_label"
+    ],
+    "enabled_tracks": [
+      "S1",
+      "S7",
+      "S1_PLUS_S7",
+      "STRICT_CONTEXT"
+    ],
+    "analysis_kind": "activity",
+    "data_modeled_source": "auto",
+    "data_raw_relative_path": "raw/base_aprendizap",
+    "data_modeled_duckdb_relative_path": "data/modelled/duckdb/base_modelada_v2.duckdb",
+    "definition_b": {
+      "definition_name": "definition_b",
+      "metric_name": "future_business_active_weeks",
+      "operator": ">=",
+      "threshold": 1.0,
+      "rule_text": "future_business_active_weeks >= 1",
+      "sql_file": null,
+      "python_strategy": null
+    },
+    "definition_a_enabled": true,
+    "definition_a_strategy": "univariate_exact",
+    "definition_a_candidate_metrics": [
+      "future_business_active_weeks",
+      "future_sessions",
+      "future_session_minutes",
+      "future_interactions",
+      "future_activity_events",
+      "future_active_days",
+      "future_distinct_actions",
+      "future_downloads",
+      "future_content_views",
+      "future_mapped_lessons",
+      "future_formation_events"
+    ],
+    "definition_a_sql_file": "",
+    "definition_a_python_strategy": "",
+    "definition_b_sql_file": "",
+    "definition_b_python_strategy": "",
+    "max_outer_test_months": 5,
+    "min_official_valid_outer_folds": 2,
+    "min_official_test_rows": 50,
+    "min_official_test_positives": 5,
+    "min_official_test_negatives": 20,
+    "tuning_enabled": true,
+    "tuning_n_iter": 8,
+    "tuning_max_inner_splits": 3,
+    "tuning_scoring": "neg_brier_score",
+    "model_family_scope": [
+      "logistic_regression",
+      "random_forest",
+      "catboost"
+    ],
+    "model_comparison_workers": 5,
+    "calibration_method": "sigmoid",
+    "feature_importance_permutation_repeats": 5,
+    "cluster_k_candidates": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "cluster_bootstrap_iterations": 20,
+    "cluster_sample_size": 10000,
+    "registered_band_policies": [
+      {
+        "policy_name": "top_10_percent",
+        "policy_type": "quantile_risk_cutoff",
+        "parameter_json": "{\"top_share\": 0.1}",
+        "description": "Marca como alto risco os 10% maiores valores de risk_score."
+      },
+      {
+        "policy_name": "tercis",
+        "policy_type": "tertile_risk_band",
+        "parameter_json": "{\"q_high\": 0.6666666666666666, \"q_low\": 0.3333333333333333}",
+        "description": "Separa risk_score em baixo, medio e alto pelos tercis empiricos."
+      },
+      {
+        "policy_name": "score_ge_0_70",
+        "policy_type": "fixed_risk_cutoff",
+        "parameter_json": "{\"risk_threshold\": 0.7}",
+        "description": "Marca como alto risco os casos com risk_score maior ou igual a 0.70."
+      }
+    ],
+    "heavy_user_percentile_policies": [
+      {
+        "policy_name": "heavy_top_10_percent",
+        "policy_type": "percentile_cutoff",
+        "parameter_json": "{\"top_share\": 0.10}",
+        "description": "Marca como heavy user os 10% maiores valores do heavy_intensity_score."
+      },
+      {
+        "policy_name": "heavy_top_20_percent",
+        "policy_type": "percentile_cutoff",
+        "parameter_json": "{\"top_share\": 0.20}",
+        "description": "Marca como heavy user os 20% maiores valores do heavy_intensity_score."
+      }
+    ]
+  },
+  "inference_run_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/final_modelled_latest",
+  "modelled_duckdb": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/modelled/duckdb/base_modelada_v2.duckdb",
+  "problem_keys": [],
+  "model_names": [],
+  "run_name": "final_modelled_latest"
+}

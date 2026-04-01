@@ -1,0 +1,21 @@
+name: targeted_ml_lineage
+version: 1.0.0
+config-version: 2
+
+profile: targeted_ml_lineage
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  targeted_ml_lineage:
+    +materialized: view
+    modeled:
+      +tags: ["lineage", "modeled"]
+    ml_inputs:
+      +tags: ["lineage", "modeled_to_ml_inputs"]
+    ml_outputs:
+      +tags: ["lineage", "ml_outputs"]

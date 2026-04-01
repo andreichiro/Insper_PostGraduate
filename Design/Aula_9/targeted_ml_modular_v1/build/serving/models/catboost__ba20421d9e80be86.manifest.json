@@ -1,0 +1,400 @@
+{
+  "export_id": "20260401_182455",
+  "artifact_id": "catboost__ba20421d9e80be86",
+  "problem_key": "definition_a::((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)__S1_PLUS_S7",
+  "definition_name": "definition_a::((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)",
+  "definition_group": "definition_a",
+  "track_name": "S1_PLUS_S7",
+  "label_col": "definition_a::((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)",
+  "model_name": "catboost",
+  "selection_reason": "serving_primary::all_frontier_candidates::probability_then_variability_then_information",
+  "serving_rank": 1,
+  "score_window_end_day": 7,
+  "feature_schema": [
+    {
+      "feature_name": "months_after_entry",
+      "feature_type": "numeric",
+      "feature_class": "context",
+      "behavior_family": "time_since_entry",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "data_entrada_month",
+        "first_month"
+      ]
+    },
+    {
+      "feature_name": "teacher_population_status",
+      "feature_type": "categorical",
+      "feature_class": "context",
+      "behavior_family": "registration_context",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "teacher_population_status"
+      ]
+    },
+    {
+      "feature_name": "utm_group",
+      "feature_type": "categorical",
+      "feature_class": "context",
+      "behavior_family": "acquisition_context",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "utm_group"
+      ]
+    },
+    {
+      "feature_name": "first_session_entry_surface",
+      "feature_type": "categorical",
+      "feature_class": "context",
+      "behavior_family": "entry_surface",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_first_event_utm_source",
+        "first_utm_source"
+      ]
+    },
+    {
+      "feature_name": "first_session_device_bucket",
+      "feature_type": "categorical",
+      "feature_class": "context",
+      "behavior_family": "device_context",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_first_event_device",
+        "first_device"
+      ]
+    },
+    {
+      "feature_name": "first_event_missing_flag",
+      "feature_type": "numeric",
+      "feature_class": "context",
+      "behavior_family": "data_quality",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first_event_type"
+      ]
+    },
+    {
+      "feature_name": "first_device_missing_flag",
+      "feature_type": "numeric",
+      "feature_class": "context",
+      "behavior_family": "data_quality",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first_device"
+      ]
+    },
+    {
+      "feature_name": "first_utm_missing_flag",
+      "feature_type": "numeric",
+      "feature_class": "context",
+      "behavior_family": "data_quality",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first_utm_source"
+      ]
+    },
+    {
+      "feature_name": "session_without_interaction_flag",
+      "feature_type": "numeric",
+      "feature_class": "context",
+      "behavior_family": "data_quality",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_interactions"
+      ]
+    },
+    {
+      "feature_name": "first_session_duration_min",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "session_depth",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_duration_min"
+      ]
+    },
+    {
+      "feature_name": "first_session_interactions",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "session_depth",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_interactions"
+      ]
+    },
+    {
+      "feature_name": "first_session_downloads",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_downloads",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_downloads"
+      ]
+    },
+    {
+      "feature_name": "first_session_views",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_views",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_views"
+      ]
+    },
+    {
+      "feature_name": "first_session_other_actions",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_actions",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_other_actions"
+      ]
+    },
+    {
+      "feature_name": "first_session_navigation_events",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_navigation",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_navigation_events"
+      ]
+    },
+    {
+      "feature_name": "first_session_meaningful_events",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_meaningful_use",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_meaningful_events"
+      ]
+    },
+    {
+      "feature_name": "first_session_has_interaction_flag",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_presence",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_interactions"
+      ]
+    },
+    {
+      "feature_name": "first_session_has_meaningful_action_flag",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "early_presence",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_meaningful_events"
+      ]
+    },
+    {
+      "feature_name": "secs_to_first_interaction",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "time_to_action",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_start_ts",
+        "first_session_first_event_ts"
+      ]
+    },
+    {
+      "feature_name": "secs_to_first_meaningful_action",
+      "feature_type": "numeric",
+      "feature_class": "s1",
+      "behavior_family": "time_to_action",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_start_ts",
+        "first_session_first_meaningful_ts"
+      ]
+    },
+    {
+      "feature_name": "first_session_first_event_action_group",
+      "feature_type": "categorical",
+      "feature_class": "s1",
+      "behavior_family": "action_type",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_first_event_action"
+      ]
+    },
+    {
+      "feature_name": "first_session_first_meaningful_action_group",
+      "feature_type": "categorical",
+      "feature_class": "s1",
+      "behavior_family": "action_type",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_first_meaningful_action"
+      ]
+    },
+    {
+      "feature_name": "first_session_exit_state",
+      "feature_type": "categorical",
+      "feature_class": "s1",
+      "behavior_family": "exit_state",
+      "source_table": "mart_first_session_journey_v1",
+      "source_columns": [
+        "first_session_downloads",
+        "first_session_views",
+        "first_session_other_actions",
+        "first_session_navigation_events"
+      ]
+    },
+    {
+      "feature_name": "first7d_events",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_depth",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first7d_events"
+      ]
+    },
+    {
+      "feature_name": "first7d_active_days",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_presence",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first7d_active_days"
+      ]
+    },
+    {
+      "feature_name": "first7d_sessions",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_sessions",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first7d_sessions"
+      ]
+    },
+    {
+      "feature_name": "first7d_session_minutes",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_minutes",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first7d_session_minutes"
+      ]
+    },
+    {
+      "feature_name": "first3_interaction_downloads",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_downloads",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first3_interaction_downloads"
+      ]
+    },
+    {
+      "feature_name": "first3_interaction_views",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_views",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first3_interaction_views"
+      ]
+    },
+    {
+      "feature_name": "first3_interaction_other_actions",
+      "feature_type": "numeric",
+      "feature_class": "s7",
+      "behavior_family": "week_actions",
+      "source_table": "mart_onboarding_population_v1",
+      "source_columns": [
+        "first3_interaction_other_actions"
+      ]
+    }
+  ],
+  "training_rows": 65209,
+  "training_positives": 3100,
+  "training_negatives": 62109,
+  "fit_rows": 65198,
+  "calibration_rows": 11,
+  "tuning_meta": {
+    "tuning_applied_flag": 1,
+    "tuning_status": "searched",
+    "tuning_valid_splits": 3,
+    "tuning_best_score": -0.027974268304665966,
+    "best_params_json": "{\"model__depth\": 6, \"model__iterations\": 700, \"model__l2_leaf_reg\": 3.0, \"model__learning_rate\": 0.02}"
+  },
+  "in_sample_metrics": {
+    "ap": 0.3529715360543236,
+    "roc_auc": 0.8417110345547553,
+    "brier": 0.05107979422945078,
+    "log_loss": 0.21163926011079506,
+    "calibration_slope": 0.9338747983731288,
+    "calibration_intercept": -1.5902628624316302,
+    "calibration_slope_error": 0.06612520162687119,
+    "calibration_intercept_abs": 1.5902628624316302
+  },
+  "spec_hash": "9f39725e0581b8253860ddc1642eb00ade62a184694f6ab6867331dc3ed00532",
+  "git_revision": "7a70b211c09a3b30ad046f9ff2cc2f9c32776e6c",
+  "source_build_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build",
+  "source_build_summary": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/metadata/build_summary_v1.json",
+  "frontier_metrics": {
+    "problem_key": "definition_a::((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)__S1_PLUS_S7",
+    "definition_name": "definition_a::((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)",
+    "track_name": "S1_PLUS_S7",
+    "model_name": "catboost",
+    "pooled_rows": 3291,
+    "pooled_positives": 89,
+    "pooled_negatives": 3202,
+    "pooled_positive_rate": 0.027043451838347006,
+    "mean_ap": 0.1877990465505125,
+    "mean_roc_auc": 0.8106432777267016,
+    "mean_brier": 0.02455924781593052,
+    "mean_log_loss": 0.10631423701501776,
+    "mean_calibration_slope": 0.9947454600287402,
+    "mean_calibration_intercept": 0.03498820179309751,
+    "mean_calibration_slope_error": 0.005254539971259797,
+    "mean_calibration_intercept_abs": 0.03498820179309751,
+    "valid_folds": 4,
+    "fold_mean_ap": 0.19271082322943126,
+    "std_ap": 0.13064216829732828,
+    "fold_mean_roc_auc": 0.8315120820591371,
+    "std_roc_auc": 0.04768275582418235,
+    "fold_mean_brier": 0.02521515616018536,
+    "std_brier": 0.009408082262350495,
+    "fold_mean_log_loss": 0.10878887403067225,
+    "std_log_loss": 0.030947064505046064,
+    "fold_mean_calibration_slope": 1.0276045868859343,
+    "fold_mean_calibration_intercept": 0.20197003852773743,
+    "fold_mean_calibration_slope_error": 0.22200190908744824,
+    "fold_mean_calibration_intercept_abs": 1.190080869736093,
+    "pareto_frontier_flag": 1
+  },
+  "selection_diagnostics": {
+    "mean_brier": 0.02455924781593052,
+    "mean_log_loss": 0.10631423701501776,
+    "mean_calibration_slope_error": 0.005254539971259797,
+    "mean_calibration_intercept_abs": 0.03498820179309751,
+    "mean_ap": 0.1877990465505125,
+    "mean_roc_auc": 0.8106432777267016,
+    "max_probability_metric_std": 0.13064216829732828,
+    "max_operational_metric_std": 0.011453754630236688,
+    "max_operational_metric_jump": 0.023528022955940572,
+    "max_confusion_share_std": 0.2092304829042936,
+    "max_confusion_share_jump": 0.536007292616226
+  },
+  "model_path": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/serving/exports/20260401_182455/models/catboost__ba20421d9e80be86.joblib",
+  "feature_path": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/serving/exports/20260401_182455/models/catboost__ba20421d9e80be86.feature_list.json",
+  "schema_path": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/serving/exports/20260401_182455/models/catboost__ba20421d9e80be86.schema.json",
+  "calibration_audit_path": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/serving/exports/20260401_182455/models/catboost__ba20421d9e80be86.calibration_audit.parquet",
+  "tuning_audit_path": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/serving/exports/20260401_182455/models/catboost__ba20421d9e80be86.tuning_audit.parquet",
+  "exported_at": "2026-04-01T18:24:55"
+}

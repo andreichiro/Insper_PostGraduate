@@ -1,0 +1,9 @@
+.git
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+build
+data
+baseline/build_v2
