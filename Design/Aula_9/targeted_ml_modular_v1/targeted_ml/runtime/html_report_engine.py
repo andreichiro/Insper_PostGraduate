@@ -3,12 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix, f1_score, r2_score
+
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
 
 from targeted_ml.pipelines.modelled_to_ml import analysis_setup as setup
 
@@ -20,7 +25,7 @@ except Exception:
     go = None
 
 
-PROJECT_DIR = Path(__file__).resolve().parent
+RUNTIME_DIR = Path(__file__).resolve().parent
 
 COLOR_INFO = "#3B82F6"
 COLOR_NEUTRAL = "#94A3B8"
@@ -106,6 +111,31 @@ def format_percent(value: Any, digits: int = 1) -> str:
     except Exception:
         return str(value)
     return f"{round(numeric * 100, digits)}%"
+
+
+def format_signed_number(value: Any, digits: int = 3) -> str:
+    if pd.isna(value):
+        return ""
+    try:
+        numeric = float(value)
+    except Exception:
+        return str(value)
+    if numeric != 0 and abs(numeric) < 10 ** (-digits):
+        return f"{numeric:+.2e}"
+    return f"{numeric:+.{digits}f}"
+
+
+def select_primary_permutation_metric_rows(df: pd.DataFrame, preferred_metric: str = "brier") -> pd.DataFrame:
+    if df.empty or "metric_name" not in df.columns:
+        return df.copy()
+    work = df.copy()
+    preferred = work[work["metric_name"].astype(str) == str(preferred_metric)].copy()
+    if not preferred.empty:
+        return preferred
+    available_metrics = sorted(work["metric_name"].dropna().astype(str).unique().tolist())
+    if not available_metrics:
+        return work
+    return work[work["metric_name"].astype(str) == available_metrics[0]].copy()
 
 
 def format_model_name(value: Any) -> str:
@@ -562,6 +592,32 @@ def render_clean_table(df: pd.DataFrame, limit: int | None = None) -> str:
     return show.to_html(index=False, classes="clean-table", border=0, escape=False)
 
 
+def render_chart_card(title: str, chart_html: str, note: str = "") -> str:
+    if not str(chart_html).strip():
+        return ""
+    note_html = f"<p class='section-text'>{note}</p>" if str(note).strip() else ""
+    return f"""
+    <div class="chart-card">
+      <h4>{title}</h4>
+      {note_html}
+      {chart_html}
+    </div>
+    """
+
+
+def render_table_card(title: str, df: pd.DataFrame, note: str = "", limit: int | None = None) -> str:
+    if df.empty:
+        return ""
+    note_html = f"<p class='section-text'>{note}</p>" if str(note).strip() else ""
+    return f"""
+    <div class="chart-card">
+      <h4>{title}</h4>
+      {note_html}
+      {render_clean_table(df, limit=limit)}
+    </div>
+    """
+
+
 def render_intro_table(rows: list[tuple[str, str]]) -> str:
     intro = pd.DataFrame(rows, columns=["Bloco", "Definição"])
     return render_clean_table(intro)
@@ -888,17 +944,22 @@ def render_confusion_matrix_panel(confusion_df: pd.DataFrame) -> str:
     fp = _get_confusion_value(confusion_df, "realiza", "nao_realiza")
     fn = _get_confusion_value(confusion_df, "nao_realiza", "realiza")
     tn = _get_confusion_value(confusion_df, "realiza", "realiza")
+    total_rows = tp + fp + fn + tn
     return f"""
+    <div class="definition-note definition-note-compact">
+      <strong>N total avaliado em tercis</strong>
+      <p>{total_rows} professores no teste futuro concatenado do modelo vencedor.</p>
+    </div>
     <div class="confusion-grid">
       <div class="confusion-head empty-head"></div>
-      <div class="confusion-head top-head-risk">Modelo marcou como inativo</div>
-      <div class="confusion-head top-head-active">Modelo marcou como ativo</div>
-      <div class="confusion-head side-head side-head-risk">Na prática, ficou inativo</div>
-      <div class="confusion-cell tp-cell"><span class="conf-label">Acerto de risco</span><strong>{tp}</strong><small>Ficou inativo e entrou na fila de risco</small></div>
-      <div class="confusion-cell fn-cell"><span class="conf-label">Risco perdido</span><strong>{fn}</strong><small>Ficou inativo, mas ficou fora da fila</small></div>
-      <div class="confusion-head side-head side-head-active">Na prática, continuou ativo</div>
-      <div class="confusion-cell fp-cell"><span class="conf-label">Alarme falso</span><strong>{fp}</strong><small>Entrou na fila de risco, mas continuou ativo</small></div>
-      <div class="confusion-cell tn-cell"><span class="conf-label">Acerto de atividade</span><strong>{tn}</strong><small>Continuou ativo e ficou fora da fila</small></div>
+      <div class="confusion-head top-head-risk">Entrou na fila de risco</div>
+      <div class="confusion-head top-head-active">Ficou fora da fila</div>
+      <div class="confusion-head side-head side-head-risk">Na prática, não atingiu a atividade</div>
+      <div class="confusion-cell tp-cell"><span class="conf-label">Acerto de risco</span><strong>{tp}</strong><small>Não atingiu a atividade e entrou na fila de risco</small></div>
+      <div class="confusion-cell fn-cell"><span class="conf-label">Risco perdido</span><strong>{fn}</strong><small>Não atingiu a atividade, mas ficou fora da fila</small></div>
+      <div class="confusion-head side-head side-head-active">Na prática, atingiu a atividade</div>
+      <div class="confusion-cell fp-cell"><span class="conf-label">Alarme falso</span><strong>{fp}</strong><small>Entrou na fila de risco, mas atingiu a atividade</small></div>
+      <div class="confusion-cell tn-cell"><span class="conf-label">Acerto fora da fila</span><strong>{tn}</strong><small>Atingiu a atividade e ficou fora da fila</small></div>
     </div>
     """
 
@@ -996,6 +1057,7 @@ def render_driver_panel(
     definition_b_feature_block_gain_summary: pd.DataFrame,
 ) -> str:
     bars: list[str] = []
+    feature_importance = select_primary_permutation_metric_rows(feature_importance)
     if not feature_importance.empty:
         grouped = (
             feature_importance.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
@@ -1205,21 +1267,35 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
         return ""
     if kind == "definition":
         plot_df = df.copy()
-        value_cols = [col for col in plot_df.columns if col.startswith("test_gap_")]
+        value_cols = [
+            col
+            for col in plot_df.columns
+            if col.startswith("test_gap_") and "_ci_" not in col
+        ]
         if not value_cols:
             return ""
         plot_df = plot_df.melt(id_vars=["definition_name"], value_vars=value_cols, var_name="validator", value_name="gap")
         plot_df["definition_name"] = plot_df["definition_name"].map(format_definition_name)
         plot_df["validator"] = plot_df["validator"].str.replace("test_gap_", "", regex=False).map(format_external_validator_name)
+        plot_df["winner_flag"] = plot_df.groupby("validator")["gap"].transform("max").eq(plot_df["gap"])
+        plot_df["bar_text"] = plot_df.apply(
+            lambda row: f"{format_number(row['gap'], 3)} ★" if bool(row["winner_flag"]) else f"{format_number(row['gap'], 3)}",
+            axis=1,
+        )
         fig = px.bar(
             plot_df,
-            x="validator",
-            y="gap",
+            x="gap",
+            y="validator",
             color="definition_name",
             barmode="group",
-            title="Validadores externos por definição",
+            text="bar_text",
+            title="Gaps pós-label por definição (★ = melhor gap em cada validador)",
             color_discrete_map={"Definição A": COLOR_INFO, "Definição B": COLOR_NEGATIVE},
+            orientation="h",
         )
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="Gap observado")
+        fig.update_yaxes(title="", automargin=True)
     elif kind == "models":
         plot_df = df.copy()
         if "pareto_frontier_flag" in plot_df.columns:
@@ -1305,23 +1381,56 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
         )
     elif kind == "scenarios_tested":
         plot_df = df.copy()
-        if plot_df.empty:
+        if plot_df.empty or go is None:
             return ""
-        plot_df["definition_name"] = plot_df["definition_name"].map(format_definition_name)
-        plot_df["track_name"] = plot_df["track_name"].map(format_track_name)
-        fig = px.bar(
-            plot_df,
-            x="track_name",
-            y="feature_count",
-            color="definition_name",
-            barmode="group",
-            text="feature_count",
-            title="Definições e trilhas testadas",
-            color_discrete_map={"Definição A": COLOR_INFO, "Definição B": COLOR_NEGATIVE},
+        plot_df["definition_label"] = plot_df["definition_name"].map(format_definition_name)
+        plot_df["track_label"] = plot_df["track_name"].map(format_track_name)
+        plot_df["positive_rate"] = pd.to_numeric(plot_df["positives"], errors="coerce") / pd.to_numeric(plot_df["rows"], errors="coerce").replace(0, np.nan)
+        track_order = [label for label in ["STRICT_CONTEXT", "S1", "S7", "S1+S7"] if label in plot_df["track_name"].astype(str).unique().tolist()]
+        track_order = [format_track_name(x) for x in track_order]
+        definition_order = [label for label in ["Definição A", "Definição B"] if label in plot_df["definition_label"].astype(str).unique().tolist()]
+        z = []
+        text = []
+        custom = []
+        for definition_label in definition_order:
+            row_z: list[float] = []
+            row_text: list[str] = []
+            row_custom: list[str] = []
+            for track_label in track_order:
+                match = plot_df[
+                    (plot_df["definition_label"].astype(str) == definition_label)
+                    & (plot_df["track_label"].astype(str) == track_label)
+                ]
+                if match.empty:
+                    row_z.append(np.nan)
+                    row_text.append("")
+                    row_custom.append("")
+                    continue
+                row = match.iloc[0]
+                row_z.append(float(pd.to_numeric(row.get("positive_rate"), errors="coerce") or 0.0))
+                row_text.append(f"{int(pd.to_numeric(row.get('feature_count'), errors='coerce') or 0)} vars")
+                row_custom.append(str(row.get("problem_key", "")))
+            z.append(row_z)
+            text.append(row_text)
+            custom.append(row_custom)
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=z,
+                x=track_order,
+                y=definition_order,
+                text=text,
+                customdata=custom,
+                texttemplate="%{text}",
+                hovertemplate="Definição=%{y}<br>Trilha=%{x}<br>Problema=%{customdata}<br>Taxa de atividade=%{z:.1%}<extra></extra>",
+                colorscale="Blues",
+                colorbar=dict(title="Taxa de atividade"),
+                zmin=0,
+                zmax=max(0.01, np.nanmax(z)),
+            )
         )
-        fig.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
+        fig.update_layout(title="Cada célula é uma combinação oficial definição + trilha")
         fig.update_xaxes(title="Trilha")
-        fig.update_yaxes(title="Quantidade de variáveis elegíveis")
+        fig.update_yaxes(title="Definição")
     elif kind == "model_selection":
         plot_df = df.copy()
         if plot_df.empty:
@@ -1485,8 +1594,9 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
             title="Como TP, FP, TN e FN variaram entre folds",
         )
     elif kind == "feature_importance":
+        source_df = select_primary_permutation_metric_rows(df)
         plot_df = (
-            df.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
+            source_df.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
             .agg(importance_mean=("importance_mean", "mean"))
             .copy()
         )
@@ -1511,7 +1621,7 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
                 kind="mergesort",
             ).iloc[0]["serie"]
         plot_df = plot_df[plot_df["serie"] == preferred_series].copy()
-        plot_df = plot_df.sort_values("importance_abs", ascending=False, kind="mergesort").head(8).copy()
+        plot_df = plot_df.sort_values("importance_abs", ascending=False, kind="mergesort").head(5).copy()
         plot_df["feature_name"] = plot_df["feature_name"].map(format_feature_name)
         fig = px.bar(
             plot_df.sort_values("importance_abs", ascending=True, kind="mergesort"),
@@ -1519,11 +1629,159 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
             y="feature_name",
             orientation="h",
             text="importance_mean",
-            title=f"Sinais com maior impacto no modelo principal: {preferred_series}",
+            title=f"Sinais com maior impacto no modelo principal (Brier): {preferred_series}",
         )
         fig.update_traces(texttemplate="%{text:.3f}", textposition="outside", cliponaxis=False)
-        fig.update_xaxes(title="Importância média por permutação")
+        fig.update_xaxes(title="Importância média por permutação (Brier)")
         fig.update_yaxes(title="")
+    elif kind == "feature_importance_multimetric":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        metric_order = ["ap", "roc_auc", "brier", "log_loss"]
+        aggregated = (
+            plot_df.groupby(["feature_name", "metric_name"], as_index=False)
+            .agg(importance_mean=("importance_mean", "mean"))
+        )
+        brier_rank = (
+            aggregated[aggregated["metric_name"].astype(str) == "brier"]
+            .sort_values("importance_mean", ascending=False, kind="mergesort")
+        )
+        feature_order = brier_rank["feature_name"].dropna().astype(str).head(10).tolist()
+        if not feature_order:
+            feature_order = (
+                aggregated.groupby("feature_name", as_index=False)["importance_mean"]
+                .mean()
+                .sort_values("importance_mean", ascending=False, kind="mergesort")["feature_name"]
+                .astype(str)
+                .head(10)
+                .tolist()
+            )
+        heat = aggregated[aggregated["feature_name"].astype(str).isin(feature_order)].copy()
+        if heat.empty:
+            return ""
+        pivot = (
+            heat.assign(
+                feature_label=heat["feature_name"].map(format_feature_name),
+                metric_label=heat["metric_name"].map(
+                    {"ap": "AP", "roc_auc": "ROC AUC", "brier": "Brier", "log_loss": "Log loss"}
+                ),
+            )
+            .pivot(index="feature_label", columns="metric_label", values="importance_mean")
+            .reindex(index=[format_feature_name(name) for name in feature_order])
+            .reindex(columns=["AP", "ROC AUC", "Brier", "Log loss"])
+            .fillna(0.0)
+        )
+        fig = px.imshow(
+            pivot,
+            text_auto=".3f",
+            color_continuous_scale="RdBu_r",
+            aspect="auto",
+            origin="lower",
+            zmin=-float(np.nanmax(np.abs(pivot.to_numpy()))) if np.isfinite(np.nanmax(np.abs(pivot.to_numpy()))) else -0.01,
+            zmax=float(np.nanmax(np.abs(pivot.to_numpy()))) if np.isfinite(np.nanmax(np.abs(pivot.to_numpy()))) else 0.01,
+            labels={"x": "Métrica", "y": "Sinal", "color": "Impacto da permutação"},
+            title="Importância por permutação multimétrica do modelo vencedor",
+        )
+        fig.update_xaxes(side="top")
+    elif kind == "feature_set_comparison":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        metric_map = {
+            "mean_ap": "AP",
+            "mean_roc_auc": "ROC AUC",
+            "mean_brier": "Brier",
+            "mean_log_loss": "Log loss",
+        }
+        rows: list[dict[str, Any]] = []
+        for record in plot_df.to_dict(orient="records"):
+            for col, metric_label in metric_map.items():
+                rows.append(
+                    {
+                        "feature_set_variant": {"full": "Completo", "reduced": "Reduzido"}.get(str(record.get("feature_set_variant")), str(record.get("feature_set_variant"))),
+                        "feature_count": record.get("feature_count"),
+                        "metric_label": metric_label,
+                        "metric_value": float(pd.to_numeric(record.get(col), errors="coerce") or 0.0),
+                        "bar_text": f"{format_number(record.get(col), 3)}",
+                    }
+                )
+        compare_df = pd.DataFrame(rows)
+        fig = px.bar(
+            compare_df,
+            x="metric_label",
+            y="metric_value",
+            color="feature_set_variant",
+            barmode="group",
+            text="bar_text",
+            color_discrete_map={"Completo": COLOR_INFO, "Reduzido": COLOR_POSITIVE},
+            title="Modelo completo vs modelo reduzido no mesmo par vencedor",
+        )
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="Valor da métrica")
+    elif kind == "bootstrap_ci":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        fig = px.scatter(
+            plot_df,
+            x="point_estimate",
+            y="metric_label",
+            color="direction_label",
+            error_x="error_plus",
+            error_x_minus="error_minus",
+            text=plot_df["point_estimate"].map(lambda x: format_number(x, 3)),
+            color_discrete_map={"maior é melhor": COLOR_INFO, "menor é melhor": COLOR_NEGATIVE},
+            title="Intervalos de confiança por bootstrap do modelo vencedor",
+        )
+        fig.update_traces(marker=dict(size=12), textposition="top center")
+        fig.update_xaxes(title="Estimativa pontual e intervalo")
+        fig.update_yaxes(title="")
+    elif kind == "confusion_policies":
+        plot_df = build_confusion_policy_frame(df)
+        if plot_df.empty:
+            return ""
+        fig = px.bar(
+            plot_df,
+            x="policy_label",
+            y="rows",
+            color="cell_label",
+            barmode="group",
+            text="rows",
+            color_discrete_map={
+                "Acerto de risco": COLOR_INFO,
+                "Alarme falso": COLOR_NEGATIVE,
+                "Acerto de atividade": COLOR_POSITIVE,
+                "Risco perdido": "#64748B",
+            },
+            title="Matriz completa do modelo vencedor nas 3 políticas de cutoff",
+            category_orders={"policy_label": ["top 10% do risk_score", "tercis do risk_score", "risk_score >= 0,70"]},
+        )
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="Quantidade de professores")
+    elif kind == "train_holdout_test":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        fig = px.bar(
+            plot_df,
+            x="metric_label",
+            y="metric_value",
+            color="split_label",
+            barmode="group",
+            text=plot_df["metric_value"].map(lambda x: format_number(x, 3)),
+            title="Treino aparente, holdout de calibração e teste futuro",
+            color_discrete_map={
+                "Treino aparente": COLOR_NEUTRAL,
+                "Holdout de calibração": COLOR_POSITIVE,
+                "Teste futuro": COLOR_INFO,
+            },
+        )
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="Valor médio por fold")
     elif kind == "final_confusion":
         plot_df = df.copy()
         if plot_df.empty:
@@ -1674,23 +1932,25 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
     else:
         return ""
     default_height = 520
-    if kind in {"feature_importance", "cv_metric_drift", "cv_threshold_drift", "cv_confusion_drift", "score_deciles", "navigation_sequences"}:
+    if kind in {"feature_importance", "feature_importance_multimetric", "cv_metric_drift", "cv_threshold_drift", "cv_confusion_drift", "score_deciles", "navigation_sequences"}:
         default_height = 620
-    if kind in {"band_summary", "monthly_fit", "assumptions", "scenarios_tested", "model_selection", "cluster_summary", "heavy_user_summary"}:
+    if kind in {"band_summary", "monthly_fit", "assumptions", "scenarios_tested", "model_selection", "cluster_summary", "heavy_user_summary", "feature_set_comparison", "train_holdout_test"}:
         default_height = 560
     if kind == "cv_metric_drift":
         default_height = 680
     if kind == "score_deciles":
         default_height = 560
-    if kind == "feature_importance":
+    if kind in {"feature_importance", "feature_importance_multimetric"}:
         default_height = 680
     if kind == "final_confusion":
+        default_height = 520
+    if kind == "bootstrap_ci":
         default_height = 520
     if kind == "assumptions":
         fig.update_layout(height=470, margin=dict(l=40, r=30, t=90, b=78))
     else:
         fig.update_layout(height=default_height, margin=dict(l=40, r=30, t=70, b=60))
-    if kind in {"assumptions", "feature_importance", "score_deciles", "cv_metric_drift", "model_selection"}:
+    if kind in {"assumptions", "feature_importance", "feature_importance_multimetric", "score_deciles", "cv_metric_drift", "model_selection", "feature_set_comparison", "train_holdout_test", "bootstrap_ci"}:
         fig.update_layout(legend_title_text="")
     for annotation in getattr(fig.layout, "annotations", []) or []:
         if isinstance(annotation.text, str):
@@ -2337,10 +2597,15 @@ def filter_to_reference_scope(df: pd.DataFrame, reference_scope: pd.DataFrame) -
     if df.empty or reference_scope.empty:
         return df.copy()
     join_cols = [col for col in ["problem_key", "model_name"] if col in df.columns and col in reference_scope.columns]
-    if not join_cols:
-        return df.copy()
-    keys = reference_scope[join_cols].drop_duplicates()
-    return df.merge(keys, on=join_cols, how="inner")
+    if join_cols:
+        keys = reference_scope[join_cols].drop_duplicates()
+        return df.merge(keys, on=join_cols, how="inner")
+    if "reference_problem_key" in df.columns and "problem_key" in reference_scope.columns:
+        keys = reference_scope[["problem_key", *([col for col in ["model_name"] if col in reference_scope.columns and col in df.columns])]].drop_duplicates().copy()
+        keys = keys.rename(columns={"problem_key": "reference_problem_key"})
+        merge_cols = [col for col in ["reference_problem_key", "model_name"] if col in keys.columns and col in df.columns]
+        return df.merge(keys[merge_cols].drop_duplicates(), on=merge_cols, how="inner")
+    return df.copy()
 
 
 def filter_to_problem_keys(df: pd.DataFrame, scope: pd.DataFrame) -> pd.DataFrame:
@@ -2378,6 +2643,21 @@ def build_primary_scope(reference_scope: pd.DataFrame, serving_manifest: dict[st
     if reference_scope.empty:
         return pd.DataFrame()
     return reference_scope.head(1).copy()
+
+
+def select_best_problems_per_definition(model_frontier: pd.DataFrame) -> pd.DataFrame:
+    if model_frontier.empty or "definition_name" not in model_frontier.columns or "problem_key" not in model_frontier.columns:
+        return model_frontier.copy()
+    chosen_problem_keys: list[str] = []
+    for _, group in model_frontier.groupby("definition_name", dropna=False):
+        best = group.sort_values(
+            ["mean_brier", "mean_log_loss", "mean_ap", "mean_roc_auc"],
+            ascending=[True, True, False, False],
+            kind="mergesort",
+        ).iloc[0]
+        chosen_problem_keys.append(str(best.get("problem_key", "")))
+    chosen_problem_keys = [key for key in dict.fromkeys(chosen_problem_keys) if key]
+    return model_frontier[model_frontier["problem_key"].astype(str).isin(chosen_problem_keys)].copy()
 
 
 def filter_to_reference_definitions(df: pd.DataFrame, reference_scope: pd.DataFrame) -> pd.DataFrame:
@@ -2489,32 +2769,117 @@ def build_external_validator_guide() -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "Validador externo": "Gap de retorno no bloco 1",
-                "O que mede": "diferença de retorno ativo no 1º bloco de 30 dias depois da janela principal do label",
-                "Por que ajuda": "mostra se a definição escolhida continua sinalizando retorno logo depois do período que definiu o próprio rótulo",
+                "Validador pós-label": "Retorno no bloco 1",
+                "O que mede": "diferença de retorno ativo no 1º bloco de 30 dias depois da janela do label",
             },
             {
-                "Validador externo": "Gap de retorno no bloco 2",
-                "O que mede": "diferença de retorno ativo no 2º bloco de 30 dias depois da janela principal",
-                "Por que ajuda": "testa se o sinal continua vivo um pouco mais à frente, e não só imediatamente após a janela do label",
+                "Validador pós-label": "Retorno no bloco 2",
+                "O que mede": "diferença de retorno ativo no 2º bloco de 30 dias depois da janela do label",
             },
             {
-                "Validador externo": "Gap de retorno no bloco 3",
-                "O que mede": "diferença de retorno ativo no 3º bloco de 30 dias depois da janela principal",
-                "Por que ajuda": "testa se a definição ainda separa comportamento quando o horizonte já está bem mais distante",
+                "Validador pós-label": "Retorno no bloco 3",
+                "O que mede": "diferença de retorno ativo no 3º bloco de 30 dias depois da janela do label",
             },
             {
-                "Validador externo": "Gap de dias ativos nos 3 blocos",
-                "O que mede": "diferença no total de dias ativos somados ao longo dos três blocos pós-label",
-                "Por que ajuda": "resume sustentação e recorrência futura em uma única leitura acumulada",
+                "Validador pós-label": "Dias ativos nos 3 blocos",
+                "O que mede": "diferença no total de dias ativos somados nos 3 blocos pós-label",
             },
             {
-                "Validador externo": "Gap de sustentação em 2 de 3 blocos",
-                "O que mede": "diferença na fração que permaneceu ativa em pelo menos 2 dos 3 blocos pós-label",
-                "Por que ajuda": "evita chamar de ativo alguém que só voltou uma vez e depois sumiu",
+                "Validador pós-label": "Sustentação em 2 de 3 blocos",
+                "O que mede": "diferença na fração que ficou ativa em pelo menos 2 dos 3 blocos pós-label",
             },
         ]
     )
+
+
+def build_bootstrap_metric_frame(model_frontier: pd.DataFrame, bootstrap: pd.DataFrame) -> pd.DataFrame:
+    if model_frontier.empty or bootstrap.empty:
+        return pd.DataFrame()
+    row = model_frontier.iloc[0]
+    metric_point_map = {
+        "ap": row.get("mean_ap", np.nan),
+        "roc_auc": row.get("mean_roc_auc", np.nan),
+        "brier": row.get("mean_brier", np.nan),
+        "log_loss": row.get("mean_log_loss", np.nan),
+    }
+    metric_label_map = {
+        "ap": "AP",
+        "roc_auc": "ROC AUC",
+        "brier": "Brier",
+        "log_loss": "Log loss",
+    }
+    direction_map = {
+        "ap": "maior é melhor",
+        "roc_auc": "maior é melhor",
+        "brier": "menor é melhor",
+        "log_loss": "menor é melhor",
+    }
+    show = bootstrap[bootstrap["metric_name"].astype(str).isin(metric_point_map.keys())].copy()
+    if show.empty:
+        return pd.DataFrame()
+    show["point_estimate"] = show["metric_name"].map(metric_point_map)
+    show["metric_label"] = show["metric_name"].map(metric_label_map)
+    show["direction_label"] = show["metric_name"].map(direction_map)
+    show["error_plus"] = pd.to_numeric(show["ci_high"], errors="coerce") - pd.to_numeric(show["point_estimate"], errors="coerce")
+    show["error_minus"] = pd.to_numeric(show["point_estimate"], errors="coerce") - pd.to_numeric(show["ci_low"], errors="coerce")
+    show["metric_order"] = show["metric_name"].map({"ap": 0, "roc_auc": 1, "brier": 2, "log_loss": 3})
+    return show.sort_values("metric_order", kind="mergesort")
+
+
+def build_train_holdout_test_frame(model_fold_metrics: pd.DataFrame) -> pd.DataFrame:
+    if model_fold_metrics.empty:
+        return pd.DataFrame()
+    show = model_fold_metrics.copy()
+    if "fold_valid_flag" in show.columns:
+        valid = show[show["fold_valid_flag"] == 1].copy()
+        if not valid.empty:
+            show = valid
+    metric_map = {
+        "ap": ("apparent_train_ap", "calibration_holdout_ap", "ap", "AP"),
+        "roc_auc": ("apparent_train_roc_auc", "calibration_holdout_roc_auc", "roc_auc", "ROC AUC"),
+        "brier": ("apparent_train_brier", "calibration_holdout_brier", "brier", "Brier"),
+        "log_loss": ("apparent_train_log_loss", "calibration_holdout_log_loss", "log_loss", "Log loss"),
+    }
+    rows: list[dict[str, Any]] = []
+    for metric_key, (train_col, holdout_col, test_col, metric_label) in metric_map.items():
+        for split_label, col in [
+            ("Treino aparente", train_col),
+            ("Holdout de calibração", holdout_col),
+            ("Teste futuro", test_col),
+        ]:
+            if col not in show.columns:
+                continue
+            values = pd.to_numeric(show[col], errors="coerce").dropna()
+            if values.empty:
+                continue
+            rows.append(
+                {
+                    "metric_name": metric_key,
+                    "metric_label": metric_label,
+                    "split_label": split_label,
+                    "metric_value": float(values.mean()),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def build_confusion_policy_frame(confusion_df: pd.DataFrame) -> pd.DataFrame:
+    if confusion_df.empty:
+        return pd.DataFrame()
+    show = confusion_df.copy()
+    show["policy_label"] = show["policy_name"].map(format_policy_name)
+    show["cell_name"] = show.apply(lambda row: confusion_cell_code(row["actual_group"], row["predicted_group"]), axis=1)
+    show["cell_label"] = show["cell_name"].map(
+        {
+            "TP": "Acerto de risco",
+            "FP": "Alarme falso",
+            "TN": "Acerto de atividade",
+            "FN": "Risco perdido",
+        }
+    )
+    policy_order = ["top 10% do risk_score", "tercis do risk_score", "risk_score >= 0,70"]
+    show["policy_order"] = show["policy_label"].map({label: idx for idx, label in enumerate(policy_order)})
+    return show.sort_values(["policy_order", "cell_name"], kind="mergesort")
 
 
 def display_selected_problem_model_comparison(model_frontier: pd.DataFrame, reference_scope: pd.DataFrame) -> pd.DataFrame:
@@ -2900,9 +3265,65 @@ def display_bootstrap(df: pd.DataFrame) -> pd.DataFrame:
     return show[["Problema", "Modelo", "Métrica", "IC baixo", "IC alto", "Largura do IC"]]
 
 
+def display_reduced_feature_set(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame()
+    show = df.copy()
+    if "reduced_feature_flag" in show.columns:
+        show = show[show["reduced_feature_flag"] == 1].copy()
+    if show.empty:
+        return pd.DataFrame()
+    show["feature_name"] = show["feature_name"].map(format_feature_name)
+    show = show.rename(
+        columns={
+            "selection_rank": "Ordem",
+            "feature_name": "Variável mantida",
+        }
+    )
+    cols = [c for c in ["Ordem", "Variável mantida"] if c in show.columns]
+    return show[cols].sort_values("Ordem", kind="mergesort")
+
+
+def display_feature_set_comparison(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame()
+    show = df.copy()
+    show["feature_set_variant"] = show["feature_set_variant"].map({"full": "Completo", "reduced": "Reduzido"})
+    show = show.rename(
+        columns={
+            "feature_set_variant": "Conjunto",
+            "feature_count": "Sinais",
+            "valid_folds": "Folds válidos",
+            "mean_ap": "AP",
+            "mean_roc_auc": "ROC AUC",
+            "mean_brier": "Brier",
+            "mean_log_loss": "Log loss",
+            "delta_ap_vs_full": "Delta AP vs completo",
+            "delta_roc_auc_vs_full": "Delta ROC AUC vs completo",
+            "delta_brier_vs_full": "Delta Brier vs completo",
+            "delta_log_loss_vs_full": "Delta Log loss vs completo",
+        }
+    )
+    cols = [
+        "Conjunto",
+        "Sinais",
+        "Folds válidos",
+        "AP",
+        "ROC AUC",
+        "Brier",
+        "Log loss",
+        "Delta AP vs completo",
+        "Delta ROC AUC vs completo",
+        "Delta Brier vs completo",
+        "Delta Log loss vs completo",
+    ]
+    return show[cols]
+
+
 def display_feature_importance(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
+    df = select_primary_permutation_metric_rows(df)
     show = (
         df.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
         .agg(importance_media=("importance_mean", "mean"), importance_std=("importance_std", "mean"), folds=("fold_id", "nunique"))
@@ -3850,9 +4271,7 @@ def build_assumptions_block_text(
     )
     why_text = "A previsão sempre termina antes do período que depois será medido."
     what_text = ""
-    conclusion_text = (
-        "Esperar 7 dias abre mais informação do que parar na 1ª sessão; <code>STRICT_CONTEXT</code> é o cenário mais conservador."
-    )
+    conclusion_text = "Esperar 7 dias abre mais informação do que parar na 1ª sessão; cada trilha muda quanto sinal o modelo pode ler antes de a janela futura começar."
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
 
@@ -3864,12 +4283,18 @@ def build_methodology_protocol_block_text(
     candidate_metric_registry: pd.DataFrame,
 ) -> tuple[str, str, str, list[tuple[str, list[str]]], str]:
     a_candidates = (
-        definition_selection[definition_selection["definition_group"].astype(str) == "definition_a"].head(1)
+        definition_selection[
+            definition_selection["definition_group"].astype(str) == "definition_a"
+        ].sort_values(
+            ["winner_flag", "primary_selection_rank"],
+            ascending=[False, True],
+            kind="mergesort",
+        ).head(1)
         if not definition_selection.empty and "definition_group" in definition_selection.columns
         else pd.DataFrame()
     )
     a_row = a_candidates
-    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "n/d"
+    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "não materializada"
     candidate_metrics: list[str] = []
     if not candidate_metric_registry.empty and "definition_a_candidate_flag" in candidate_metric_registry.columns:
         candidate_work = candidate_metric_registry[
@@ -3945,10 +4370,10 @@ def build_methodology_protocol_block_text(
                     f"<code>{max(0, development_months - 1)}</code> outer folds mensais: em cada fold, treina em meses acumulados anteriores e testa no mês seguinte."
                 ) if development_months > 0 else "A busca da definição usa outer folds mensais em expanding window: treino em meses acumulados anteriores e teste no mês seguinte.",
                 population_text,
-                "Na prática, esse filtro remove professores cujo primeiro uso observável aconteceu meses depois da entrada cadastral, além de poucos casos com inconsistência temporal. O objetivo é comparar a coorte oficial sempre no mesmo estágio de ciclo de vida.",
+                "Na prática, esse filtro remove professores cujo primeiro uso observável aconteceu meses depois da entrada cadastral, além de poucos casos com inconsistência temporal. O objetivo é comparar a população oficial sempre no mesmo estágio de ciclo de vida.",
                 removed_population_text,
                 "Esses casos excluídos não são duplicatas da base analítica oficial; são professores distintos que não estão no mês zero da jornada observada.",
-                "O estudo de definição continua separado e usa os validadores pós-label de 90 dias apenas como checagem externa de continuidade; a modelagem oficial desta análise usa apenas o alvo fixo de 30 dias <code>definition_b_label</code>.",
+                "O estudo de definição continua separado e usa os validadores pós-label de 90 dias apenas como checagem externa de continuidade; depois disso, a etapa de modelagem testa os alvos oficiais materializados no bloco de definição sob o mesmo protocolo temporal.",
                 "Os 90 dias não redefinem o label e não repetem nem a regra da <code>Definition A</code> nem a <code>Definition B</code>; eles medem continuidade futura com um construto fixo comum a todas as candidatas.",
                 support_gate_text,
                 f"No modelo, o outer test oficial é limitado aos <code>{int(setup.MAX_OUTER_TEST_MONTHS)}</code> meses mais recentes do protocolo; isso não significa 'usar só esse número de meses no total', porque cada fold do modelo treina em todo o histórico oficial anterior acumulado.",
@@ -3989,31 +4414,23 @@ def build_methodology_protocol_block_text(
             ],
         ),
         (
-            "Overfitting e underfitting",
-            [
-                "O protocolo agora exige uma auditoria formal de generalização comparando <code>apparent_train</code> e <code>calibration_holdout</code> contra <code>outer test</code>, com gap positivo significando desempenho melhor dentro do treino do que fora dele.",
-                "Para reduzir overfitting, o ranking oficial precisa privilegiar candidatos com menor gap de generalização, menos complexidade de regra e melhor estabilidade temporal antes de preferir ganhos marginais de métrica.",
-                "Para reduzir underfitting, a busca oficial pode ampliar interações controladas via <code>AND/OR</code> e regras ponderadas, mas sem abrir árvores profundas ou search spaces pouco auditáveis na etapa de definição.",
-            ],
-        ),
-        (
             "Serving e auditoria",
             [
-                "Nesta arquitetura, o estudo de definição não escolhe mais o alvo do modelo; a modelagem oficial roda apenas sobre <code>definition_b_label</code>.",
-                "<code>serving</code> e <code>reference scope</code> seguem o grupo único presente no <code>model_frontier</code> materializado, em vez de herdar o vencedor do estudo de definição.",
+                "Nesta arquitetura, o estudo de definição escolhe os alvos oficiais que entram na comparação de modelos; a modelagem oficial não deve apagar a <code>Definition A</code> nem reduzir o experimento apenas ao comparador literal.",
+                "<code>serving</code> e <code>reference scope</code> seguem o problema escolhido dentro do <code>model_frontier</code> materializado; isso só faz sentido depois que a comparação entre <code>Definition A</code> e <code>Definition B</code> foi realmente executada.",
                 "A trilha de auditoria continua precisando refletir o escopo real da seleção, sem fallback silencioso e sem metadata enganosa.",
             ],
         ),
     ]
-    quick_definition = "O relatório agora declara explicitamente o protocolo metodológico e separa o que é regra fechada do que ainda é gap de implementação."
+    quick_definition = "O relatório explicita o protocolo metodológico do estudo sem misturar busca de definição, alvo do modelo e saída operacional."
     how_text = (
-        "As regras de governança do estudo ficam visíveis no próprio relatório: como o alvo deve ser escolhido, "
-        "que tipos de regra a <code>Definition A</code> deve explorar, como thresholds/pesos precisam ser auditados e qual é a política correta de serving."
+        "As regras centrais ficam escritas no próprio relatório: qual população entra, como os meses são separados em development, lock e avaliação final, "
+        "como a <code>Definition A</code> é buscada e como as definições oficiais entram na etapa de modelagem."
     )
-    why_text = "Sem isso, o leitor fica forçado a inferir metodologia a partir de tabelas finais e pode confundir artefato materializado com protocolo oficial."
+    why_text = "Sem isso, o leitor fica forçado a inferir a metodologia a partir das tabelas finais e pode confundir resultado materializado com regra do protocolo."
     conclusion_text = (
-        f"No material vigente, a <code>Definition A</code> oficial materializada é <code>{current_rule}</code>; "
-        "o protocolo agora exige que a explicação dessa escolha apareça no relatório, não só no código ou em conversas paralelas."
+        f"No build atual, a <code>Definition A</code> vencedora materializada é <code>{current_rule}</code>, "
+        "e a etapa de modelagem deve comparar essa definição oficial com a <code>Definition B</code> literal sob o mesmo split temporal."
     )
     return quick_definition, how_text, why_text, sections, conclusion_text
 
@@ -4024,15 +4441,21 @@ def build_methodology_gaps_block_text(
     serving_manifest: dict[str, Any],
 ) -> tuple[str, str, str, list[tuple[str, list[str]]], str]:
     a_candidates = (
-        definition_selection[definition_selection["definition_group"].astype(str) == "definition_a"].head(1)
+        definition_selection[
+            definition_selection["definition_group"].astype(str) == "definition_a"
+        ].sort_values(
+            ["winner_flag", "primary_selection_rank"],
+            ascending=[False, True],
+            kind="mergesort",
+        ).head(1)
         if not definition_selection.empty and "definition_group" in definition_selection.columns
         else pd.DataFrame()
     )
     a_row = a_candidates
-    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "n/d"
-    serving_status = str(serving_manifest.get("serving_status", "n/d")) if serving_manifest else "n/d"
+    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "não materializada"
+    serving_status = str(serving_manifest.get("serving_status", "não disponível")) if serving_manifest else "não disponível"
     selection_meta = serving_manifest.get("selection_meta", {}) if serving_manifest else {}
-    current_scope = str(selection_meta.get("selection_scope", "n/d"))
+    current_scope = str(selection_meta.get("selection_scope", "não disponível"))
     sections = [
         (
             "Fatos do materializado atual",
@@ -4057,7 +4480,7 @@ def build_methodology_gaps_block_text(
             [
                 f"O <code>serving_status</code> materializado hoje é <code>{serving_status}</code>.",
                 f"A metadata atual do serving reporta <code>selection_scope = {current_scope}</code>; o relatório precisa deixar claro quando esse valor pertence a um artefato antigo e não à política corrigida do código.",
-                "Na arquitetura atual, o modelo oficial usa apenas <code>definition_b_label</code>; portanto, o serving não deve reaproveitar o vencedor do estudo de definição para redefinir o alvo do modelo.",
+                "Na arquitetura corrigida, o serving não deve inventar um alvo fora do escopo realmente comparado pelo <code>model_frontier</code>; ele precisa refletir qual combinação entre <code>Definition A</code> e <code>Definition B</code> foi de fato publicada.",
             ],
         ),
     ]
@@ -4072,7 +4495,33 @@ def build_methodology_gaps_block_text(
     return quick_definition, how_text, why_text, sections, conclusion_text
 
 
-def build_activity_definition_block_text(definition_frontier: pd.DataFrame) -> tuple[str, str, str, str, str]:
+def build_atomic_threshold_registry_html(candidate_train: pd.DataFrame) -> str:
+    if candidate_train.empty or "metric_name" not in candidate_train.columns or "threshold" not in candidate_train.columns:
+        return ""
+    atomic = candidate_train.copy()
+    if "candidate_type" in atomic.columns:
+        atomic = atomic[atomic["candidate_type"].astype(str) == "univariate_exact_threshold"].copy()
+    if atomic.empty:
+        return ""
+    blocks: list[str] = []
+    for metric_name, group in atomic.groupby("metric_name", dropna=False):
+        thresholds = sorted(pd.to_numeric(group["threshold"], errors="coerce").dropna().unique().tolist())
+        if not thresholds:
+            continue
+        threshold_text = ", ".join(f"{float(value):g}" for value in thresholds)
+        blocks.append(
+            "<details>"
+            f"<summary><code>{metric_name}</code> ({len(thresholds)} cutoffs atômicos testados)</summary>"
+            f"<pre style=\"white-space: pre-wrap; margin-top: 8px;\"><code>{threshold_text}</code></pre>"
+            "</details>"
+        )
+    return "".join(blocks)
+
+
+def build_activity_definition_block_text(
+    definition_frontier: pd.DataFrame,
+    candidate_train: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
     if definition_frontier.empty:
         return (
             "Definição de atividade é a regra que decide quem foi considerado ativo no futuro.",
@@ -4087,23 +4536,25 @@ def build_activity_definition_block_text(definition_frontier: pd.DataFrame) -> t
     b_row = b_row.iloc[0] if not b_row.empty else None
     quick_definition = "Definição de atividade é a regra que separa quem realizou e quem não realizou a atividade futura."
     how_text = (
-        "A <b>Definição B</b> é o comparador fixo e literal do negócio na janela de 30 dias. "
-        "A <b>Definição A</b> é a definição pesquisada, também aplicada nessa janela de 30 dias. "
-        "Depois disso, as duas são julgadas pelos mesmos validadores pós-label de 90 dias, que medem continuidade futura e não repetem nem a regra da A nem a regra da B."
+        "A <b>Definição B</b> é o comparador fixo do negócio na janela de 30 dias. "
+        "A <b>Definição A</b> é a definição pesquisada nessa mesma janela. "
+        "Depois, as duas são julgadas pelos mesmos validadores pós-label de 90 dias, que só medem continuidade futura."
     )
     why_text = "Antes de olhar o score, o próprio alvo precisa ser congelado e separar melhor o que acontece depois, sem AP, Brier ou confusion matrix entrarem na decisão."
     if a_row is not None and b_row is not None:
         a_share = pd.to_numeric(a_row.get("label_share_pct"), errors="coerce") / 100.0
         b_share = pd.to_numeric(b_row.get("label_share_pct"), errors="coerce") / 100.0
         what_text = (
+            "A regra oficial da <b>Definição A</b> é <code>future_business_active_weeks &gt;= 3 OR future_distinct_actions &gt;= 3</code>. "
+            "Na prática, ela marca o professor como ativo se ele tiver pelo menos 3 semanas ativas de negócio ou pelo menos 3 tipos distintos de ação na janela do label. "
+            "O cutoff <code>3</code> não foi escolhido manualmente fora do search; ele fazia parte dos thresholds testados e depois entrou na regra composta vencedora. "
             f"Nesta execução, a <b>Definição A</b> marcou <b>{int(a_row.get('label_positives', 0))}</b> professores "
             f"(<b>{format_percent(a_share)}</b> da base), enquanto a <b>Definição B</b> marcou <b>{int(b_row.get('label_positives', 0))}</b> "
-            f"(<b>{format_percent(b_share)}</b>). A regra oficial materializada da <b>Definição A</b> é <code>{format_rule_text(a_row.get('rule_text'))}</code>. "
-            f"Ela ficou mais exigente e também entregou gaps externos maiores. Aqui, <b>gap</b> significa: média do validador futuro entre os marcados como ativos menos média do mesmo validador entre os marcados como não ativos. No 1º bloco pós-label, "
-            f"o gap de retorno foi <b>{format_number(a_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> na A contra "
-            f"<b>{format_number(b_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> na B; em dias ativos acumulados dos 3 blocos, "
-            f"foi <b>{format_number(a_row.get('test_gap_active_days_post_label_3m'), 3)}</b> na A contra "
-            f"<b>{format_number(b_row.get('test_gap_active_days_post_label_3m'), 3)}</b> na B."
+            f"(<b>{format_percent(b_share)}</b>). "
+            f"A <b>Definição A</b> entregou gaps externos maiores: retorno no bloco 1 de <b>{format_number(a_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> "
+            f"contra <b>{format_number(b_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> na B, "
+            f"e dias ativos acumulados de <b>{format_number(a_row.get('test_gap_active_days_post_label_3m'), 3)}</b> "
+            f"contra <b>{format_number(b_row.get('test_gap_active_days_post_label_3m'), 3)}</b>."
         )
     else:
         what_text = "O gráfico compara as definições oficiais nos validadores externos, mas uma das linhas esperadas não ficou materializada."
@@ -4129,22 +4580,15 @@ def build_scenarios_block_text(scoring_scenarios: pd.DataFrame) -> tuple[str, st
         format_track_name(track): int(pd.to_numeric(group["feature_count"], errors="coerce").dropna().max() or 0)
         for track, group in scoring_scenarios.groupby("track_name", dropna=False)
     }
-    quick_definition = "Cada combinação junta uma definição, uma trilha temporal e um conjunto permitido de variáveis."
+    definition_labels = ", ".join(f"<code>{format_definition_name(name)}</code>" for name in definitions) if definitions else "as definições oficiais materializadas"
+    quick_definition = "A tabela abaixo mostra os problemas oficiais de modelagem que realmente entraram na comparação."
     how_text = (
-        f"Foram testadas <b>{max(1, len(definitions))} definição(ões) oficiais de modelagem</b> em <b>{track_count}</b> trilhas "
-        "(<code>S1</code>, <code>S7</code>, <code>S1+S7</code> e <code>STRICT_CONTEXT</code>, quando disponíveis). "
-        f"Isso gera <b>{problem_count}</b> combinações principais. Em cada combinação, o pipeline compara <b>3 famílias de modelo</b>: regressão logística, random forest e CatBoost."
+        f"No build atual, foram materializados <b>{problem_count}</b> problemas cobrindo <b>{len(definitions)}</b> definições "
+        f"({definition_labels}) nas trilhas <code>S1</code>, <code>S7</code>, <code>S1+S7</code> e <code>STRICT_CONTEXT</code>."
     )
-    why_text = (
-        "Isso importa porque o modelo final não saiu de um teste único. Primeiro foi comparado o mesmo problema em trilhas com quantidades diferentes de informação observável antes do score."
-    )
-    what_text = (
-        f"As {problem_count} combinações usaram a mesma base analítica, com <b>{rows}</b> linhas e <b>{months}</b> meses. "
-        f"O número de variáveis elegíveis foi <b>{feature_counts.get('S1', 0)}</b> no <code>S1</code>, "
-        f"<b>{feature_counts.get('S7', 0)}</b> no <code>S7</code>, <b>{feature_counts.get('S1+S7', 0)}</b> no <code>S1+S7</code> "
-        f"e <b>{feature_counts.get('STRICT_CONTEXT', 0)}</b> no <code>STRICT_CONTEXT</code>."
-    )
-    conclusion_text = "Na arquitetura atual, a modelagem oficial roda apenas sobre o alvo fixo de 30 dias <code>definition_b_label</code>; o estudo de definição fica fora desta etapa."
+    why_text = "Isso deixa explícito o que foi comparado de verdade na etapa oficial de modelagem."
+    what_text = f"Todos os problemas usam a mesma base analítica, com <b>{rows}</b> linhas e <b>{months}</b> meses."
+    conclusion_text = "A comparação oficial cobre <b>Definição A</b> e <b>Definição B</b> sob o mesmo protocolo temporal."
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
 
@@ -4161,57 +4605,28 @@ def build_model_comparison_block_text(
             "O bloco de comparação entre modelos não foi materializado.",
             "Sem comparação publicada, a escolha do modelo fica opaca.",
         )
-    show = model_frontier.copy()
-    show["selected_flag"] = 0
-    primary_problem_key = ""
-    primary_model_name = ""
-    if serving_manifest:
-        rows = serving_manifest.get("reference_scope_rows", [])
-        if rows:
-            primary_problem_key = str(rows[0].get("problem_key", ""))
-            primary_model_name = str(rows[0].get("model_name", ""))
-            mask = (
-                show["problem_key"].astype(str).eq(primary_problem_key)
-                & show["model_name"].astype(str).eq(primary_model_name)
-            )
-            show.loc[mask, "selected_flag"] = 1
-    quick_definition = "Foram comparadas três famílias: regressão logística, random forest e CatBoost."
+    quick_definition = (
+        "Em cada problema publicado, foram comparadas três famílias: regressão logística, "
+        "random forest e CatBoost. Na família linear, a busca testou explicitamente "
+        "<code>lbfgs + l2</code>, <code>liblinear + l1/l2</code> e "
+        "<code>saga + elasticnet</code>."
+    )
     how_text = (
-        f"Nas <b>{show['problem_key'].nunique()}</b> combinações publicadas, as três famílias foram comparadas nas mesmas quatro métricas: <b>AP</b>, <b>ROC AUC</b>, <b>Brier</b> e <b>log loss</b>."
+        "Abaixo aparecem só os dois problemas vencedores finais: o melhor problema da <b>Definição A</b> e o melhor problema da <b>Definição B</b>. "
+        "Dentro de cada um, as três famílias foram comparadas por <b>AP</b>, <b>ROC AUC</b>, <b>Brier</b> e <b>log loss</b>."
     )
-    why_text = "O melhor modelo precisa ranquear bem e também errar pouco na probabilidade."
-    problem_texts: list[str] = []
-    for problem_key, group in show.groupby("problem_key", dropna=False):
-        group = group.sort_values(["mean_brier", "mean_log_loss", "mean_ap", "mean_roc_auc"], ascending=[True, True, False, False], kind="mergesort")
-        best = group.iloc[0]
-        second = group.iloc[1] if len(group) > 1 else None
-        part = (
-            f"Em <b>{format_problem_short_label(problem_key)}</b>, <b>{format_model_name(best.get('model_name'))}</b> ficou em 1º lugar. "
-        )
-        if second is not None:
-            part += f"O 2º lugar ficou com <b>{format_model_name(second.get('model_name'))}</b>."
-        problem_texts.append(part)
-    primary_text = ""
-    if primary_problem_key and primary_model_name:
-        primary_text = f" O modelo servível primário ficou em <b>{format_problem_short_label(primary_problem_key)}</b> com <b>{format_model_name(primary_model_name)}</b>."
-    a_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_a")].head(1)
-    b_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_b")].head(1)
-    prevalence_text = ""
-    if not a_row.empty and not b_row.empty:
-        a_share = float(pd.to_numeric(a_row.iloc[0].get("label_share_pct"), errors="coerce") or 0.0)
-        b_share = float(pd.to_numeric(b_row.iloc[0].get("label_share_pct"), errors="coerce") or 0.0)
-        prevalence_text = (
-            f" A <b>Definição B</b> ficou com AP maior em parte porque é um alvo mais amplo: ela marca <b>{format_number(b_share, 1)}%</b> da base, "
-            f"contra <b>{format_number(a_share, 1)}%</b> na <b>Definição A</b>. Isso tende a facilitar o ranking e, por si só, não torna a definição melhor."
-        )
-    definition_b_text = (
-        " A tabela mostra só a <b>melhor combinação publicada por definição</b>. "
-        "Na <b>Definição B</b>, <code>S1</code>, <code>S7</code> e <code>S1+S7</code> foram comparadas. "
-        "A publicada ficou em <b>S7</b> porque foi ligeiramente melhor que <code>S1+S7</code> ao mesmo tempo em <b>AP</b> "
-        "(0.468 contra 0.465) e em <b>Brier</b> (0.085 contra 0.085, com pequena vantagem para <code>S7</code>)."
-    )
-    what_text = " ".join(problem_texts) + definition_b_text + prevalence_text + primary_text
-    conclusion_text = ""
+    why_text = "O melhor modelo precisa ranquear bem e também errar pouco na probabilidade; por isso AP, ROC AUC, Brier e log loss são lidos em conjunto."
+    winner_labels: list[str] = []
+    if "definition_name" in model_frontier.columns:
+        for _, group in model_frontier.groupby("definition_name", dropna=False):
+            best = group.sort_values(
+                ["mean_brier", "mean_log_loss", "mean_ap", "mean_roc_auc"],
+                ascending=[True, True, False, False],
+                kind="mergesort",
+            ).iloc[0]
+            winner_labels.append(f"<b>{format_problem_short_label(best.get('problem_key', ''))}</b>")
+    what_text = "No build atual, os problemas vencedores finais são " + " e ".join(winner_labels) + "." if winner_labels else ""
+    conclusion_text = "O relatório mostra só os vencedores finais de A e B, sem repetir todos os problemas intermediários."
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
 
@@ -4220,81 +4635,44 @@ def build_trust_block_text(
     cv_metric_folds: pd.DataFrame,
     cv_threshold_summary: pd.DataFrame,
     cv_confusion_summary: pd.DataFrame,
+    bootstrap: pd.DataFrame,
 ) -> tuple[str, str, str, str, str]:
-    quick_definition = "O modelo foi testado em meses futuros que não entraram no treino."
-    how_text = (
-        "Em cada mês futuro fora do treino, o pipeline recalculou duas leituras do mesmo modelo. A primeira foi o <b>score contínuo</b>: "
-        "<b>AP</b>, que resume se os casos de maior risco aparecem mais no topo do ranking, e <b>Brier</b>, que mede o erro médio da probabilidade publicada naquele mês. "
-        "A segunda foi a <b>fila operacional</b>: com o corte em <code>tercis</code>, o pipeline mediu <b>precisão</b>, <b>recall</b>, <b>F1</b>, <b>acurácia</b> e a <b>matriz de confusão</b> completa daquele próprio mês."
-    )
-    why_text = (
-        "Isso importa porque robustez, aqui, não é um único número. É mostrar que o mesmo modelo continua funcionando de dois jeitos quando o mês muda: "
-        "como score contínuo, que ordena a base do menor para o maior risco, e como fila operacional, que transforma esse score em decisão prática."
-    )
+    quick_definition = "A confiança vem de três leituras separadas: estabilidade mês a mês, intervalo de incerteza por bootstrap e comparação entre treino, holdout e teste."
+    how_text = "No build atual, o par publicado foi relido em outer folds válidos, no teste futuro concatenado com bootstrap e na diferença entre treino aparente, holdout de calibração e teste futuro."
+    why_text = "Isso importa porque um score confiável precisa generalizar quando o mês muda, não abrir um abismo entre treino e teste e manter um intervalo plausível de desempenho."
     if model_frontier.empty:
         return quick_definition, how_text, why_text, "As métricas de confiança não ficaram materializadas nesta execução.", "Sem folds válidos, não há confiança publicável."
     row = model_frontier.iloc[0]
     problem_key = str(row.get("problem_key", ""))
+    model_name = str(row.get("model_name", ""))
     fold_metrics = cv_metric_folds[
         (cv_metric_folds["problem_key"].astype(str) == problem_key)
-        & (cv_metric_folds["model_name"].astype(str) == str(row.get("model_name", "")))
+        & (cv_metric_folds["model_name"].astype(str) == model_name)
     ].copy()
     ap_values = pd.to_numeric(fold_metrics.loc[fold_metrics["metric_name"] == "ap", "metric_value"], errors="coerce").dropna()
     brier_values = pd.to_numeric(fold_metrics.loc[fold_metrics["metric_name"] == "brier", "metric_value"], errors="coerce").dropna()
     if ap_values.empty or brier_values.empty:
         return quick_definition, how_text, why_text, "Os folds válidos do modelo final não ficaram materializados nesta execução.", "Sem outer folds válidos, não há confiança publicável."
-    tercis_precision = tercis_recall = None
-    confusion_tp = confusion_fn = confusion_fp = confusion_tn = None
-    if not cv_threshold_summary.empty:
-        subset = cv_threshold_summary[
-            (cv_threshold_summary["problem_key"].astype(str) == problem_key)
-            & (cv_threshold_summary["model_name"].astype(str) == str(row.get("model_name", "")))
-            & (cv_threshold_summary["policy_name"].astype(str) == "tercis")
-        ].copy()
-        precision_row = subset[subset["metric_name"].astype(str) == "precision"]
-        recall_row = subset[subset["metric_name"].astype(str) == "recall"]
-        if not precision_row.empty:
-            tercis_precision = precision_row.iloc[0]
-        if not recall_row.empty:
-            tercis_recall = recall_row.iloc[0]
-    if not cv_confusion_summary.empty:
-        confusion_subset = cv_confusion_summary[
-            (cv_confusion_summary["problem_key"].astype(str) == problem_key)
-            & (cv_confusion_summary["model_name"].astype(str) == str(row.get("model_name", "")))
-            & (cv_confusion_summary["policy_name"].astype(str) == "tercis")
-        ].copy()
-        if not confusion_subset.empty:
-            def _pick(actual: str, predicted: str) -> Any:
-                match = confusion_subset[
-                    (confusion_subset["actual_group"].astype(str) == actual)
-                    & (confusion_subset["predicted_group"].astype(str) == predicted)
-                ]
-                return match.iloc[0] if not match.empty else None
-
-            confusion_tp = _pick("nao_realiza", "nao_realiza")
-            confusion_fn = _pick("nao_realiza", "realiza")
-            confusion_fp = _pick("realiza", "nao_realiza")
-            confusion_tn = _pick("realiza", "realiza")
     what_text = (
-        f"Nos <b>{int(row.get('valid_folds', 0))}</b> meses futuros válidos, o pipeline checou o score contínuo com <b>AP</b>, <b>ROC AUC</b>, <b>Brier</b> e <b>log loss</b>; "
-        f"na leitura operacional, recalculou a fila alta com <b>precisão</b>, <b>recall</b>, <b>F1</b>, <b>acurácia</b> e a <b>matriz de confusão</b> do próprio mês. "
-        f"No modelo final, a <b>AP</b> ficou entre <b>{format_number(ap_values.min(), 3)}</b> e <b>{format_number(ap_values.max(), 3)}</b>; "
-        f"o <b>Brier</b> ficou entre <b>{format_number(brier_values.min(), 3)}</b> e <b>{format_number(brier_values.max(), 3)}</b>. "
+        f"No build atual, o par vencedor foi <b>{format_model_name(model_name)}</b> em <b>{format_problem_short_label(problem_key)}</b>, "
+        f"com <b>{int(row.get('valid_folds', 0))}</b> meses futuros válidos. "
+        "O <b>bootstrap CI</b> foi usado para estimar a faixa plausível de desempenho no teste futuro concatenado, e não só uma estimativa pontual."
     )
-    if tercis_precision is not None and tercis_recall is not None:
-        what_text += (
-            f"Na fila alta em <code>tercis</code>, a <b>precisão média</b> ficou em <b>{format_percent(float(tercis_precision.get('mean_value', np.nan)))}</b> "
-            f"e o <b>recall médio</b> em <b>{format_percent(float(tercis_recall.get('mean_value', np.nan)))}</b>. "
-            f"Isso quer dizer o seguinte: quando o modelo colocava alguém na fila alta, quase não errava; o custo era deixar uma parte do risco fora da fila nesse primeiro corte. "
-        )
-    if all(item is not None for item in [confusion_tp, confusion_fn, confusion_fp, confusion_tn]):
-        what_text += (
-            f" Na média dos folds mensais nessa fila, o modelo capturou <b>{format_number(float(confusion_tp.get('mean_rows', np.nan)), 1)}</b> casos de inatividade, "
-            f"deixou <b>{format_number(float(confusion_fn.get('mean_rows', np.nan)), 1)}</b> casos de inatividade fora da fila, "
-            f"gerou <b>{format_number(float(confusion_fp.get('mean_rows', np.nan)), 1)}</b> alarmes falsos "
-            f"e preservou <b>{format_number(float(confusion_tn.get('mean_rows', np.nan)), 1)}</b> casos ativos fora da fila."
-        )
-    conclusion_text = ""
+    if not bootstrap.empty and "metric_name" in bootstrap.columns:
+        pieces: list[str] = []
+        for metric_name, label in [("ap", "AP"), ("roc_auc", "ROC AUC"), ("brier", "Brier"), ("log_loss", "log loss")]:
+            match = bootstrap[bootstrap["metric_name"].astype(str) == metric_name]
+            if match.empty:
+                continue
+            metric_row = match.iloc[0]
+            pieces.append(
+                f"{label} <b>{format_number(metric_row.get('ci_low'), 3)}</b> a <b>{format_number(metric_row.get('ci_high'), 3)}</b>"
+            )
+        if pieces:
+            what_text += " No modelo vencedor, os intervalos ficaram em: " + "; ".join(pieces) + "."
+    conclusion_text = (
+        "A leitura correta é: o desempenho publicado vem acompanhado de uma faixa de incerteza explícita, e não só de um único número."
+    )
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
 
@@ -4314,24 +4692,21 @@ def build_final_model_block_text(
     row = model_frontier.iloc[0]
     problem_key = str(row.get("problem_key", ""))
     model_name = str(row.get("model_name", ""))
-    threshold_row = _get_threshold_row(threshold_metrics, problem_key, "tercis")
     confusion_rows = _get_confusion_rows(confusion_df, problem_key, "tercis")
     tp = _get_confusion_value(confusion_rows, "nao_realiza", "nao_realiza")
     fp = _get_confusion_value(confusion_rows, "realiza", "nao_realiza")
     tn = _get_confusion_value(confusion_rows, "realiza", "realiza")
     fn = _get_confusion_value(confusion_rows, "nao_realiza", "realiza")
-    quick_definition = f"O modelo final é <b>{format_model_name(model_name)}</b> em <b>{format_problem_short_label(problem_key)}</b>."
-    how_text = (
-        "A matriz cruza duas coisas: o que o modelo marcou como risco e o que de fato aconteceu depois."
-    )
-    why_text = "Ela mostra quantos casos de risco entraram na fila, quantos ficaram de fora e quantos alarmes falsos apareceram."
     total_rows = tp + fp + tn + fn
+    quick_definition = f"No build atual, o par publicado neste relatório é <b>{format_model_name(model_name)}</b> em <b>{format_problem_short_label(problem_key)}</b>."
+    how_text = "A matriz abaixo usa o N inteiro do teste futuro concatenado do modelo vencedor, na política <code>tercis</code>."
+    why_text = "Ela mostra, com os rótulos operacionais da fila, onde o modelo acertou o risco, gerou alarmes falsos e deixou risco fora da fila."
     what_text = (
-        f"A matriz usa só o teste futuro concatenado da faixa alta; por isso o <b>N = {total_rows}</b> não é a base inteira. "
-        f"Nesse recorte, <b>{tp + fn}</b> professores ficaram inativos e <b>{fp + tn}</b> continuaram ativos. "
-        f"O modelo marcou risco para <b>{tp}</b> casos corretos, gerou <b>{fp}</b> alarmes falsos, deixou <b>{fn}</b> casos de risco fora da fila e preservou <b>{tn}</b> casos ativos fora da fila."
+        f"Nessa leitura, <b>N = {total_rows}</b>. "
+        f"O modelo marcou corretamente <b>{tp}</b> casos de risco, gerou <b>{fp}</b> alarmes falsos, "
+        f"deixou <b>{fn}</b> casos de risco fora da fila e preservou <b>{tn}</b> casos ativos fora da fila."
     )
-    conclusion_text = ""
+    conclusion_text = "A leitura correta é: a matriz resume o N inteiro avaliado do modelo vencedor em tercis, e não só um recorte parcial."
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
 
@@ -4384,46 +4759,28 @@ def build_score_block_text(
 
 def build_driver_block_text(
     feature_importance: pd.DataFrame,
+    grouped_permutation_importance: pd.DataFrame,
+    feature_redundancy_groups: pd.DataFrame,
+    reduced_feature_set: pd.DataFrame,
+    feature_set_comparison_summary: pd.DataFrame,
     definition_b_feature_block_gain_summary: pd.DataFrame,
 ) -> tuple[str, str, str, str, str]:
-    quick_definition = "<b>Driver</b>, aqui, não significa causa. Significa o sinal que mais muda a previsão quando é embaralhado no teste."
-    how_text = (
-        "A leitura principal usa <b>importância por permutação</b>: um sinal é embaralhado no conjunto de teste e medimos o quanto a previsão piora."
-    )
-    why_text = "Isso ajuda a explicar o score sem tratar o modelo como caixa-preta."
-    pieces: list[str] = []
-    if not feature_importance.empty:
-        grouped = (
-            feature_importance.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
-            .agg(importance_mean=("importance_mean", "mean"))
-        )
-        grouped["importance_abs"] = grouped["importance_mean"].abs()
-        grouped = grouped.sort_values(["importance_abs", "problem_key", "model_name"], ascending=[False, True, True], kind="mergesort")
-        primary = grouped[grouped["problem_key"].astype(str).str.startswith("definition_a::")].copy()
-        if primary.empty:
-            primary = grouped.copy()
-        if not primary.empty:
-            problem_key = str(primary.iloc[0]["problem_key"])
-            model_name = str(primary.iloc[0]["model_name"])
-            top_features = [
-                format_feature_name(name)
-                for name in primary[
-                    (primary["problem_key"].astype(str) == problem_key)
-                    & (primary["model_name"].astype(str) == model_name)
-                ].head(4)["feature_name"].tolist()
-            ]
-            if top_features:
-                pieces.append(
-                    f"No modelo principal <b>{format_problem_short_label(problem_key)}</b> com <b>{format_model_name(model_name)}</b>, os sinais mais fortes foram "
-                    f"<b>{'</b>, <b>'.join(top_features)}</b>."
-                )
-                pieces.append(
-                    "<b>Sessões nos 7 primeiros dias</b> contam quantas vezes o professor entrou. "
-                    "<b>Dias ativos nos 7 primeiros dias</b> contam em quantos dias distintos houve uso. "
-                    "<b>Minutos de sessão nos 7 primeiros dias</b> somam o tempo total de uso. "
-                    "Os três parecem próximos, mas medem frequência, cadência e intensidade."
-                )
-    what_text = " ".join(pieces) if pieces else "A importância dos sinais não ficou materializada nesta execução."
+    quick_definition = "A leitura principal de sinais usa a importância por permutação do modelo publicado no teste futuro."
+    how_text = "Embaralhamos uma variável no teste e medimos quanto o desempenho piora. Quanto maior a piora no Brier, mais aquele sinal ajuda o modelo vencedor."
+    why_text = "Isso mostra quais variáveis realmente moveram a previsão no teste futuro, e não só dentro do treino."
+    what_text = "A lista abaixo mostra exatamente quais variáveis foram mantidas no conjunto reduzido usado na checagem de parcimônia."
+    if not feature_set_comparison_summary.empty:
+        comparison = feature_set_comparison_summary.copy()
+        reduced_row = comparison[comparison["feature_set_variant"].astype(str) == "reduced"].head(1)
+        full_row = comparison[comparison["feature_set_variant"].astype(str) == "full"].head(1)
+        if not reduced_row.empty and not full_row.empty:
+            reduced = reduced_row.iloc[0]
+            full = full_row.iloc[0]
+            what_text += (
+                f" O modelo reduzido manteve <b>{format_number(reduced.get('feature_count'), 0)}</b> de <b>{format_number(full.get('feature_count'), 0)}</b> variáveis "
+                f"e ficou muito próximo do completo: delta de AP <b>{format_signed_number(reduced.get('delta_ap_vs_full'))}</b> "
+                f"e delta de Brier <b>{format_signed_number(reduced.get('delta_brier_vs_full'))}</b>."
+            )
     conclusion_text = ""
     return quick_definition, how_text, why_text, what_text, conclusion_text
 
@@ -4530,14 +4887,19 @@ def build_beginner_guide_section(
     *,
     build_dir: Path,
     summary: dict[str, Any],
+    primary_scope: pd.DataFrame,
+    future_metrics: pd.DataFrame,
     track_registry: pd.DataFrame,
     arbitrariness: pd.DataFrame,
     feature_registry: pd.DataFrame,
     candidate_metric_registry: pd.DataFrame,
     definition_selection: pd.DataFrame,
+    definition_candidates_train: pd.DataFrame,
     definition_frontier: pd.DataFrame,
     scoring_scenarios: pd.DataFrame,
+    model_fold_metrics: pd.DataFrame,
     model_frontier: pd.DataFrame,
+    bootstrap: pd.DataFrame,
     cv_metric_folds: pd.DataFrame,
     cv_threshold_summary: pd.DataFrame,
     cv_confusion_summary: pd.DataFrame,
@@ -4546,6 +4908,10 @@ def build_beginner_guide_section(
     band_summary: pd.DataFrame,
     predictions: pd.DataFrame,
     feature_importance: pd.DataFrame,
+    grouped_permutation_importance: pd.DataFrame,
+    feature_redundancy_groups: pd.DataFrame,
+    reduced_feature_set: pd.DataFrame,
+    feature_set_comparison_summary: pd.DataFrame,
     definition_b_feature_block_gain_summary: pd.DataFrame,
     cluster_summary: pd.DataFrame,
     cluster_profile: pd.DataFrame,
@@ -4553,11 +4919,23 @@ def build_beginner_guide_section(
     heavy_user_profile: pd.DataFrame,
     serving_manifest: dict[str, Any],
 ) -> str:
-    primary_problem_key, primary_model_name = _resolve_primary_problem_model(model_frontier, serving_manifest)
+    if not primary_scope.empty:
+        primary_problem_key = str(primary_scope.iloc[0].get("problem_key", ""))
+        primary_model_name = str(primary_scope.iloc[0].get("model_name", ""))
+    else:
+        primary_problem_key, primary_model_name = _resolve_primary_problem_model(model_frontier, serving_manifest)
     primary_model_frontier = model_frontier[
         (model_frontier["problem_key"].astype(str) == primary_problem_key)
         & (model_frontier["model_name"].astype(str) == primary_model_name)
     ].copy() if not model_frontier.empty else pd.DataFrame()
+    primary_model_fold_metrics = model_fold_metrics[
+        (model_fold_metrics["problem_key"].astype(str) == primary_problem_key)
+        & (model_fold_metrics["model_name"].astype(str) == primary_model_name)
+    ].copy() if not model_fold_metrics.empty else pd.DataFrame()
+    primary_bootstrap = bootstrap[
+        (bootstrap["problem_key"].astype(str) == primary_problem_key)
+        & (bootstrap["model_name"].astype(str) == primary_model_name)
+    ].copy() if not bootstrap.empty else pd.DataFrame()
     primary_cv_metric_folds = cv_metric_folds[
         (cv_metric_folds["problem_key"].astype(str) == primary_problem_key)
         & (cv_metric_folds["model_name"].astype(str) == primary_model_name)
@@ -4582,6 +4960,22 @@ def build_beginner_guide_section(
         (feature_importance["problem_key"].astype(str) == primary_problem_key)
         & (feature_importance["model_name"].astype(str) == primary_model_name)
     ].copy() if not feature_importance.empty else pd.DataFrame()
+    primary_grouped_permutation_importance = grouped_permutation_importance[
+        (grouped_permutation_importance["problem_key"].astype(str) == primary_problem_key)
+        & (grouped_permutation_importance["model_name"].astype(str) == primary_model_name)
+    ].copy() if not grouped_permutation_importance.empty else pd.DataFrame()
+    primary_feature_redundancy_groups = feature_redundancy_groups[
+        (feature_redundancy_groups["problem_key"].astype(str) == primary_problem_key)
+        & (feature_redundancy_groups["model_name"].astype(str) == primary_model_name)
+    ].copy() if not feature_redundancy_groups.empty else pd.DataFrame()
+    primary_reduced_feature_set = reduced_feature_set[
+        (reduced_feature_set["problem_key"].astype(str) == primary_problem_key)
+        & (reduced_feature_set["model_name"].astype(str) == primary_model_name)
+    ].copy() if not reduced_feature_set.empty else pd.DataFrame()
+    primary_feature_set_comparison_summary = feature_set_comparison_summary[
+        (feature_set_comparison_summary["reference_problem_key"].astype(str) == primary_problem_key)
+        & (feature_set_comparison_summary["model_name"].astype(str) == primary_model_name)
+    ].copy() if not feature_set_comparison_summary.empty else pd.DataFrame()
     primary_band_summary = band_summary[
         (band_summary["problem_key"].astype(str) == primary_problem_key)
         & (band_summary["model_name"].astype(str) == primary_model_name)
@@ -4593,16 +4987,7 @@ def build_beginner_guide_section(
 
     assumption_points = build_assumption_event_points(track_registry, arbitrariness)
     score_deciles = build_score_decile_summary(primary_predictions)
-    comparison_problem_keys: list[str] = []
-    for prefix in ["definition_a", "definition_b"]:
-        best = _best_model_row_for_definition(model_frontier, prefix, ranking_priority=False)
-        if best is not None:
-            comparison_problem_keys.append(str(best.get("problem_key", "")))
     model_selection_df = model_frontier.copy()
-    if comparison_problem_keys:
-        model_selection_df = model_selection_df[
-            model_selection_df["problem_key"].astype(str).isin(comparison_problem_keys)
-        ].copy()
     if not model_selection_df.empty:
         model_selection_df["selected_flag"] = 0
         if serving_manifest:
@@ -4615,6 +5000,12 @@ def build_beginner_guide_section(
                     & model_selection_df["model_name"].astype(str).eq(primary_model_name)
                 )
                 model_selection_df.loc[mask, "selected_flag"] = 1
+        model_selection_df = select_best_problems_per_definition(model_selection_df)
+    winner_scope = pd.DataFrame([{"problem_key": primary_problem_key, "model_name": primary_model_name}]) if primary_problem_key and primary_model_name else pd.DataFrame()
+    trust_bootstrap_chart_df = build_bootstrap_metric_frame(primary_model_frontier, primary_bootstrap)
+    train_holdout_test_chart_df = build_train_holdout_test_frame(primary_model_fold_metrics)
+    scoring_scenarios_table = display_scoring_scenarios(scoring_scenarios)
+    reduced_feature_table = display_reduced_feature_set(primary_reduced_feature_set)
 
     methodology_protocol_block = build_methodology_protocol_block_text(
         build_dir=build_dir,
@@ -4623,19 +5014,21 @@ def build_beginner_guide_section(
         definition_selection=definition_selection,
         candidate_metric_registry=candidate_metric_registry,
     )
-    methodology_gaps_block = build_methodology_gaps_block_text(
-        build_dir=build_dir,
-        definition_selection=definition_selection,
-        serving_manifest=serving_manifest,
-    )
     assumptions_block = build_assumptions_block_text(track_registry, arbitrariness, feature_registry)
-    definition_block = build_activity_definition_block_text(definition_frontier)
+    definition_block = build_activity_definition_block_text(definition_frontier, definition_candidates_train)
     scenarios_block = build_scenarios_block_text(scoring_scenarios)
     model_comparison_block = build_model_comparison_block_text(model_selection_df, definition_frontier, serving_manifest)
-    trust_block = build_trust_block_text(primary_model_frontier, primary_cv_metric_folds, primary_cv_threshold_summary, cv_confusion_summary)
+    trust_block = build_trust_block_text(primary_model_frontier, primary_cv_metric_folds, primary_cv_threshold_summary, cv_confusion_summary, primary_bootstrap)
     final_model_block = build_final_model_block_text(primary_model_frontier, primary_threshold_metrics, primary_confusion_df)
     score_block = build_score_block_text(score_deciles, primary_threshold_metrics, primary_band_summary)
-    driver_block = build_driver_block_text(primary_feature_importance, definition_b_feature_block_gain_summary)
+    driver_block = build_driver_block_text(
+        primary_feature_importance,
+        primary_grouped_permutation_importance,
+        primary_feature_redundancy_groups,
+        primary_reduced_feature_set,
+        primary_feature_set_comparison_summary,
+        definition_b_feature_block_gain_summary,
+    )
     heavy_user_block = build_heavy_user_block_text(primary_heavy_user_summary, heavy_user_profile)
 
     return f"""
@@ -4651,18 +5044,6 @@ def build_beginner_guide_section(
             lineage_items=[
                 ("Base usada", "<code>build/tables</code> + política metodológica registrada no repositório"),
                 ("Escopo", "Guardrails do alvo, da modelagem, do serving e da trilha de auditoria."),
-            ],
-        )}
-        {render_checklist_block(
-            title="0B. O que o material atual ainda não resolve sozinho?",
-            quick_definition=methodology_gaps_block[0],
-            how_text=methodology_gaps_block[1],
-            why_text=methodology_gaps_block[2],
-            sections=methodology_gaps_block[3],
-            conclusion_text=methodology_gaps_block[4],
-            lineage_items=[
-                ("Base usada", "<code>build/tables</code>, <code>build/serving/serving_manifest.json</code> e estado atual do código"),
-                ("Leitura correta", "Este bloco separa fato materializado, política corrigida e gap ainda pendente."),
             ],
         )}
         {render_teaching_block(
@@ -4685,11 +5066,16 @@ def build_beginner_guide_section(
             how_text=definition_block[1],
             why_text=definition_block[2],
             chart_html=render_plotly(definition_frontier, "definition"),
+            detail_html=render_table_card(
+                "O que significam os validadores pós-label",
+                build_external_validator_guide(),
+                note="Eles não redefinem o label; só checam se a definição continua separando melhor quem sustenta atividade depois.",
+            ),
             what_text=definition_block[3],
             conclusion_text=definition_block[4],
             lineage_items=[
-                ("Tabelas usadas", "<code>core_definition_frontier_v1</code>, <code>core_definition_external_validation_v1</code> e <code>governance_label_registry_v1</code>"),
-                ("Unidade do gráfico", "Cada barra é o gap observado entre grupos ativos e não ativos nos validadores externos pós-label."),
+                ("Tabelas usadas", "<code>core_definition_frontier_v1</code>, <code>core_definition_external_validation_v1</code>, <code>core_definition_candidates_train_v1</code> e <code>governance_label_registry_v1</code>"),
+                ("Unidade do gráfico", "Cada linha é um validador pós-label; as barras comparam o gap da Definição A e da Definição B, e o símbolo ★ marca o melhor valor."),
             ],
         )}
         {render_teaching_block(
@@ -4697,12 +5083,16 @@ def build_beginner_guide_section(
             quick_definition=scenarios_block[0],
             how_text=scenarios_block[1],
             why_text=scenarios_block[2],
-            chart_html=render_plotly(scoring_scenarios, "scenarios_tested"),
+            chart_html="",
+            detail_html=render_table_card(
+                "Tabela das combinações testadas",
+                scoring_scenarios_table,
+                note="Cada linha é um problema de modelagem oficialmente materializado.",
+            ),
             what_text=scenarios_block[3],
             conclusion_text=scenarios_block[4],
             lineage_items=[
                 ("Tabelas usadas", "<code>core_scoring_scenarios_v1</code> e <code>governance_feature_registry_v1</code>"),
-                ("Unidade do gráfico", "Cada barra mostra quantas variáveis elegíveis entraram em cada definição + trilha."),
             ],
         )}
         {render_teaching_block(
@@ -4711,11 +5101,12 @@ def build_beginner_guide_section(
             how_text=model_comparison_block[1],
             why_text=model_comparison_block[2],
             chart_html=render_model_selection_board(model_selection_df),
+            detail_html="",
             what_text=model_comparison_block[3],
             conclusion_text=model_comparison_block[4],
             lineage_items=[
                 ("Tabelas usadas", "<code>core_model_frontier_v1</code> e <code>build/serving/serving_manifest.json</code>"),
-                ("Unidade da matriz", "Cada linha é uma combinação definição + modelo; a posição mostra o ranking dentro de cada combinação publicada."),
+                ("Unidade da matriz", "Cada quadro mostra o ranking dos 3 modelos dentro do problema vencedor final de cada definição."),
             ],
         )}
         {render_teaching_block(
@@ -4723,12 +5114,31 @@ def build_beginner_guide_section(
             quick_definition=trust_block[0],
             how_text=trust_block[1],
             why_text=trust_block[2],
-            chart_html=render_plotly(primary_cv_metric_folds, "cv_metric_drift"),
+            chart_html="".join(
+                [
+                    render_chart_card(
+                        "Variação mês a mês nos outer folds",
+                        render_plotly(primary_cv_metric_folds, "cv_metric_drift"),
+                        note="Cada ponto é um mês futuro nunca visto no treino.",
+                    ),
+                    render_chart_card(
+                        "Intervalos de confiança por bootstrap",
+                        render_plotly(trust_bootstrap_chart_df, "bootstrap_ci"),
+                        note="AP e ROC AUC são melhores quando sobem; Brier e log loss são melhores quando descem.",
+                    ),
+                    render_chart_card(
+                        "Treino aparente vs holdout de calibração vs teste",
+                        render_plotly(train_holdout_test_chart_df, "train_holdout_test"),
+                        note="Esse gráfico mostra se o desempenho cai pouco ou muito quando saímos do treino e chegamos ao teste futuro.",
+                    ),
+                ]
+            ),
+            detail_html="",
             what_text=trust_block[3],
             conclusion_text=trust_block[4],
             lineage_items=[
-                ("Tabelas usadas", "<code>core_cv_metric_folds_v1</code> e <code>post_model_cv_threshold_summary_v1</code>"),
-                ("Unidade do gráfico", "Cada ponto é um mês futuro nunca visto no treino."),
+                ("Tabelas usadas", "<code>core_cv_metric_folds_v1</code>, <code>core_prediction_bootstrap_v1</code>, <code>core_model_fold_metrics_v1</code> e <code>post_model_cv_threshold_summary_v1</code>"),
+                ("Unidade dos gráficos", "1) mês futuro por fold, 2) IC bootstrap no teste concatenado e 3) média por estágio entre treino, holdout e teste."),
             ],
         )}
         {render_teaching_block(
@@ -4737,11 +5147,12 @@ def build_beginner_guide_section(
             how_text=final_model_block[1],
             why_text=final_model_block[2],
             chart_html=render_confusion_matrix_panel(primary_confusion_df),
+            detail_html="",
             what_text=final_model_block[3],
             conclusion_text=final_model_block[4],
             lineage_items=[
                 ("Tabelas usadas", "<code>core_model_frontier_v1</code>, <code>post_model_threshold_metrics_v1</code> e <code>post_model_confusion_matrix_v1</code>"),
-                ("Unidade da matriz", "A matriz usa só o teste futuro concatenado do modelo final com a política <code>tercis</code>."),
+                ("Unidade da matriz", "A matriz usa todo o teste futuro concatenado do modelo final na política <code>tercis</code>."),
             ],
         )}
         {render_teaching_block(
@@ -4762,12 +5173,35 @@ def build_beginner_guide_section(
             quick_definition=driver_block[0],
             how_text=driver_block[1],
             why_text=driver_block[2],
-            chart_html=render_plotly(primary_feature_importance, "feature_importance"),
+            chart_html="".join(
+                [
+                    render_chart_card(
+                        "Top 5 sinais por permutação no modelo vencedor",
+                        render_plotly(primary_feature_importance, "feature_importance"),
+                        note="Cada barra mostra quanto o Brier piora quando embaralhamos aquele sinal no teste. Quanto maior a barra, mais o sinal ajuda.",
+                    ),
+                    render_chart_card(
+                        "Modelo completo vs modelo reduzido",
+                        render_plotly(primary_feature_set_comparison_summary, "feature_set_comparison"),
+                        note="A comparação abaixo retreina o mesmo par vencedor com todos os sinais e com apenas o conjunto mais relevante.",
+                    ),
+                ]
+            ),
+            detail_html="".join(
+                [
+                    render_table_card(
+                        "Sinais mantidos no conjunto reduzido",
+                        reduced_feature_table,
+                        note="Estas são as variáveis que ficaram no conjunto reduzido.",
+                    ),
+                ]
+            ),
             what_text=driver_block[3],
             conclusion_text=driver_block[4],
             lineage_items=[
-                ("Tabelas usadas", "<code>post_model_feature_importance_v1</code> e <code>core_definition_b_feature_block_gain_summary_v1</code>"),
-                ("Unidade do gráfico", "As barras mostram o impacto médio de embaralhar um sinal no modelo final."),
+                ("Tabelas usadas", "<code>post_model_feature_importance_v1</code>, <code>post_model_grouped_permutation_importance_v1</code>, <code>feature_redundancy_groups_v1</code> e <code>core_definition_b_feature_block_gain_summary_v1</code>"),
+                ("Checagem de parcimônia", "<code>post_model_reduced_feature_set_v1</code> e <code>post_model_feature_set_comparison_summary_v1</code> quando disponíveis."),
+                ("Unidade dos gráficos", "1) top 5 sinais por permutação no Brier e 2) comparação das métricas do modelo completo contra o reduzido."),
             ],
         )}
       </div>
@@ -4809,6 +5243,7 @@ def main() -> None:
     label_registry = read_table(build_dir, "governance_label_registry_v1")
     future_metrics = read_table(build_dir, "mart_future_metrics_v1")
     definition_selection = read_table(build_dir, "core_definition_selection_v1")
+    definition_candidates_train = read_table(build_dir, "core_definition_candidates_train_v1")
     definition_frontier = read_table(build_dir, "core_definition_frontier_v1")
     definition_external_validation = read_table(build_dir, "core_definition_external_validation_v1")
     scoring_scenarios = read_table(build_dir, "core_scoring_scenarios_v1")
@@ -4835,6 +5270,10 @@ def main() -> None:
     cv_confusion_folds = read_table(build_dir, "post_model_cv_confusion_folds_v1")
     cv_confusion_summary = read_table(build_dir, "post_model_cv_confusion_summary_v1")
     feature_importance = read_table(build_dir, "post_model_feature_importance_v1")
+    grouped_permutation_importance = read_table(build_dir, "post_model_grouped_permutation_importance_v1")
+    feature_redundancy_groups = read_table(build_dir, "feature_redundancy_groups_v1")
+    reduced_feature_set = read_table(build_dir, "post_model_reduced_feature_set_v1")
+    feature_set_comparison_summary = read_table(build_dir, "post_model_feature_set_comparison_summary_v1")
     reference_scope = read_reference_scope(build_dir)
     cluster_summary = read_table(build_dir, "post_model_cluster_summary_v1")
     cluster_profile = read_table(build_dir, "post_model_cluster_profile_v1")
@@ -4852,6 +5291,10 @@ def main() -> None:
     confusion_df_all = confusion_df.copy()
     band_summary_all = band_summary.copy()
     feature_importance_all = feature_importance.copy()
+    grouped_permutation_importance_all = grouped_permutation_importance.copy()
+    feature_redundancy_groups_all = feature_redundancy_groups.copy()
+    reduced_feature_set_all = reduced_feature_set.copy()
+    feature_set_comparison_summary_all = feature_set_comparison_summary.copy()
     cluster_summary_all = cluster_summary.copy()
     heavy_user_summary_all = heavy_user_summary.copy()
 
@@ -4881,6 +5324,10 @@ def main() -> None:
     cv_confusion_folds = filter_to_reference_scope(cv_confusion_folds, reference_scope)
     cv_confusion_summary = filter_to_reference_scope(cv_confusion_summary, reference_scope)
     feature_importance = filter_to_reference_scope(feature_importance, reference_scope)
+    grouped_permutation_importance = filter_to_reference_scope(grouped_permutation_importance, reference_scope)
+    feature_redundancy_groups = filter_to_reference_scope(feature_redundancy_groups, reference_scope)
+    reduced_feature_set = filter_to_reference_scope(reduced_feature_set, reference_scope)
+    feature_set_comparison_summary = filter_to_reference_scope(feature_set_comparison_summary, reference_scope)
     cluster_summary = filter_to_reference_scope(cluster_summary, reference_scope)
     cluster_profile = filter_to_reference_scope(cluster_profile, reference_scope)
     cluster_validation = filter_to_reference_scope(cluster_validation, reference_scope)
@@ -4889,9 +5336,9 @@ def main() -> None:
 
     presentation_scope = select_presentation_scope(reference_scope)
     primary_scope = build_primary_scope(reference_scope, serving_manifest)
-    presentation_definition_frontier = filter_to_reference_definitions(definition_frontier_all, presentation_scope)
-    presentation_scoring_scenarios = filter_to_reference_definitions(scoring_scenarios_all, presentation_scope)
-    comparison_model_frontier = filter_to_problem_keys(model_frontier_all, presentation_scope)
+    presentation_definition_frontier = definition_frontier_all.copy()
+    presentation_scoring_scenarios = scoring_scenarios_all.copy()
+    comparison_model_frontier = model_frontier_all.copy()
     primary_model_frontier = filter_to_reference_scope(model_frontier_all, primary_scope)
     primary_predictions = filter_to_reference_scope(predictions_all, primary_scope)
     primary_cv_metric_folds = filter_to_reference_scope(cv_metric_folds_all, primary_scope)
@@ -4901,6 +5348,10 @@ def main() -> None:
     primary_confusion_df = filter_to_reference_scope(confusion_df_all, primary_scope)
     primary_band_summary = filter_to_reference_scope(band_summary_all, primary_scope)
     primary_feature_importance = filter_to_reference_scope(feature_importance_all, primary_scope)
+    primary_grouped_permutation_importance = filter_to_reference_scope(grouped_permutation_importance_all, primary_scope)
+    primary_feature_redundancy_groups = filter_to_reference_scope(feature_redundancy_groups_all, primary_scope)
+    primary_reduced_feature_set = filter_to_reference_scope(reduced_feature_set_all, primary_scope)
+    primary_feature_set_comparison_summary = filter_to_reference_scope(feature_set_comparison_summary_all, primary_scope)
     primary_cluster_summary = filter_to_reference_scope(cluster_summary_all, primary_scope)
     primary_heavy_user_summary = filter_to_reference_scope(heavy_user_summary_all, primary_scope)
     presentation_definition_b_feature_block_gain_summary = filter_definition_b_feature_block_gain_for_report(
@@ -4933,14 +5384,19 @@ def main() -> None:
     beginner_guide_section = build_beginner_guide_section(
         build_dir=build_dir,
         summary=summary,
+        primary_scope=primary_scope,
+        future_metrics=future_metrics,
         track_registry=track_registry,
         arbitrariness=arbitrariness,
         feature_registry=feature_registry,
         candidate_metric_registry=candidate_metric_registry,
         definition_selection=definition_selection,
+        definition_candidates_train=definition_candidates_train,
         definition_frontier=presentation_definition_frontier,
         scoring_scenarios=presentation_scoring_scenarios,
+        model_fold_metrics=model_fold_metrics,
         model_frontier=comparison_model_frontier,
+        bootstrap=bootstrap,
         cv_metric_folds=primary_cv_metric_folds,
         cv_threshold_summary=primary_cv_threshold_summary,
         cv_confusion_summary=primary_cv_confusion_summary,
@@ -4949,6 +5405,10 @@ def main() -> None:
         band_summary=primary_band_summary,
         predictions=primary_predictions,
         feature_importance=primary_feature_importance,
+        grouped_permutation_importance=primary_grouped_permutation_importance,
+        feature_redundancy_groups=primary_feature_redundancy_groups,
+        reduced_feature_set=primary_reduced_feature_set,
+        feature_set_comparison_summary=primary_feature_set_comparison_summary,
         definition_b_feature_block_gain_summary=presentation_definition_b_feature_block_gain_summary,
         cluster_summary=primary_cluster_summary,
         cluster_profile=cluster_profile,
