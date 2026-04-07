@@ -16,12 +16,14 @@ def _build_logistic_param_distributions() -> list[dict[str, Any]]:
             "model__penalty": ["l2"],
             "model__C": common_c_values,
             "model__class_weight": common_class_weights,
+            "model__max_iter": [10000],
         },
         {
             "model__solver": ["liblinear"],
             "model__penalty": ["l1", "l2"],
             "model__C": common_c_values,
             "model__class_weight": common_class_weights,
+            "model__max_iter": [10000],
         },
         {
             "model__solver": ["saga"],
@@ -29,6 +31,7 @@ def _build_logistic_param_distributions() -> list[dict[str, Any]]:
             "model__C": [0.1, 1.0, 10.0],
             "model__l1_ratio": [0.25, 0.5, 0.75],
             "model__class_weight": common_class_weights,
+            "model__max_iter": [10000],
         },
     ]
 
@@ -67,7 +70,7 @@ def build_model_specs(model_families: list[str]) -> list[dict[str, Any]]:
         specs.append(
             {
                 "model_name": "logistic_regression",
-                "estimator": LogisticRegression(max_iter=4000, solver="lbfgs", random_state=42),
+                "estimator": LogisticRegression(max_iter=10000, solver="lbfgs", random_state=42),
                 "param_distributions": _build_logistic_param_distributions(),
             }
         )

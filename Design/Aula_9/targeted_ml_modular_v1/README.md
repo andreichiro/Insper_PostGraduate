@@ -35,6 +35,11 @@ Atalho rápido:
   - [targeted_ml/apps/streamlit_app.py](targeted_ml/apps/streamlit_app.py)
 - abrir a linhagem dbt:
   - [dbt_lineage/target/index.html](dbt_lineage/target/index.html)
+- regenerar e subir app + dbt docs:
+  - `make refresh-ui-stack`
+  - portas fixas:
+    - Streamlit em `http://localhost:8501`
+    - dbt docs em `http://localhost:8081`
 
 Se preferir um atalho curtíssimo, [QUICK_REFERENCE.md](QUICK_REFERENCE.md) agora só redireciona para este README.
 
@@ -51,7 +56,7 @@ Convenção da app:
 - `specs/`
   Specs configuráveis em YAML para atividade, churn e retorno.
 - `data/`
-  Dados locais do projeto. `data/modelled/duckdb/base_modelada_v2.duckdb` continua existindo como base histórica de referência, mas o caminho canônico dos runs agora é `output_root/modelled/duckdb/base_modelada_v2.duckdb`.
+  Dados locais do projeto. No pacote mínimo de entrega, a base modelada histórica em `data/modelled/` pode ser removida; o caminho canônico dos runs é `output_root/modelled/duckdb/base_modelada_v2.duckdb`.
   Dados brutos `raw` não devem acompanhar a entrega final.
   Se entrar uma nova massa de dados, o `dataset_root` pode ser sobrescrito via spec ou CLI.
 - `build/`
@@ -81,10 +86,10 @@ Se alguém quiser uma visão simples, pense só nestes blocos:
    relatório final
 6. `build/serving/`
    modelo salvo e contrato de inferência
-7. `build/inference_runs/example_modelled_inference/`
-   exemplo de inferência a partir da base modelada
-8. `build/inference_runs/example_raw_inference/`
-   exemplo de inferência a partir do raw
+7. `build/inference_runs/delivery_modelled_inference/`
+   run de entrega com base inteira rankeada, filas filtradas por cutoff e relatório de validação
+8. `build/inference_runs/`
+   runs de inferência salvos; no pacote mínimo, enviar só se quiser incluir um exemplo pronto
 9. `dbt_lineage/models/`
    source da linhagem
 10. `dbt_lineage/target/index.html`
@@ -116,7 +121,12 @@ Se alguém quiser uma visão simples, pense só nestes blocos:
 - `build/serving/`
   artefatos do modelo salvo
 - `build/inference_runs/`
-  exemplos de inferência materializados
+  exemplos locais de inferência materializados; enviar só se a entrega pedir um batch scoreado ou um exemplo pronto
+  quando incluído na entrega, os artefatos principais são:
+  - `all_scored_clients.parquet`: base inteira elegível, rankeada por `risk_score`, com flags por cutoff
+  - `high_risk_clients_top10.parquet`: fila filtrada pela política top 10%
+  - `high_risk_clients_tercis.parquet`: fila filtrada pela política de tercis
+  - `high_risk_clients_score_ge_0_70.parquet`: fila filtrada pela política `risk_score >= 0,70`
 
 ## Gráficos: caminho mais curto
 
@@ -211,9 +221,6 @@ Enviar:
   linhagem completa em JSON
 - `dbt_lineage/target/catalog.json`
   catálogo e descrições das tabelas
-- `data/modelled/duckdb/base_modelada_v2.duckdb`
-  opcional como seed histórica de referência; não é mais o caminho canônico do run
-
 Em outras palavras:
 - `dbt_lineage/` faz parte da entrega
 - principalmente `models/` e `target/` com os docs finais
@@ -226,8 +233,6 @@ Esses itens podem existir localmente durante execução e desenvolvimento, mas n
 
 - `build/staging/`
   arquivos temporários de execução e retomada
-- `build/local_runtime_staging/`
-  staging incremental legado; o caminho canônico novo é `build/staging/`
 - `build/duckdb/build.duckdb`
   banco DuckDB local de trabalho do pipeline `modelled -> ml`
 - `build/duckdb/build.duckdb.wal`
@@ -244,8 +249,8 @@ Esses itens podem existir localmente durante execução e desenvolvimento, mas n
   cache interno do dbt
 - `dbt_lineage/target/perf_info.json`
   telemetria/performance de execução
-- `data/modelled/parquet/`
-  diretório local vazio ou auxiliar, se não estiver sendo usado na entrega
+- `data/modelled/`
+  base modelada histórica/local; no pacote mínimo de entrega ela pode ser removida porque `build/modelled/` já concentra a base modelada oficial do run
 - `data/source_v2/`
   área local de insumo bruto; não deve ir para a entrega final
 
@@ -262,6 +267,13 @@ Para manter a árvore limpa:
 - `make trim-delivery-view`
   mantém só os exemplos de inferência principais, o export de serving mais recente e os arquivos essenciais do dbt docs
 
+## UI local rápida
+
+- `make refresh-ui-stack`
+  comando oficial para uso local
+  regenera o `dbt docs`, sobe o servidor do `dbt docs` em `http://localhost:8081` e sobe a app Streamlit em `http://localhost:8501`
+  o HTML final já aponta para esses mesmos links, então as portas não devem ser trocadas
+
 ## Nomes mais claros para entrega vs local
 
 Hoje a estrutura final do projeto está assim:
@@ -277,14 +289,12 @@ Hoje a estrutura final do projeto está assim:
   artefatos servíveis e contrato formal de inferência
 - `build/staging/`
   staging local de execução e retomada, nunca parte da entrega
-- `build/local_runtime_staging/`
-  staging incremental legado; manter só por compatibilidade de limpeza
 - `build/duckdb/`
   banco DuckDB local de trabalho do pipeline, nunca parte da entrega
 - `build/logs/`
   logs locais de execução manual
 - `data/`
-  `data/modelled/` pode ser mantido como seed histórica; o resultado oficial do run fica em `build/modelled/`
+  manter apenas o que for necessário como insumo bruto; a base modelada oficial do run fica em `build/modelled/`
 - `dbt_lineage/`
   manter na entrega quando a linhagem fizer parte do pacote final
 
@@ -448,7 +458,7 @@ Essas tabelas alimentam o relatório HTML final em `build/reports/targeted_ml_re
   manifesto do run de inferência
 
 Status atual importante:
-- o repositório agora inclui o raw oficial em `data/raw/base_aprendizap`
+- o raw oficial pode permanecer apenas no ambiente local em `data/raw/base_aprendizap`; não deve acompanhar a entrega final
 - com `data.modeled_source=auto`, o comportamento padrão agora é preferir `raw -> modelled` quando o raw estiver disponível no `dataset_root`
 - o fallback para seed modelada histórica fica restrito aos casos em que o raw não estiver presente
 - para forçar explicitamente rebuild a partir do raw em qualquer contexto, use `data.modeled_source=raw` ou o comando `score-raw`
@@ -482,9 +492,17 @@ Instalação:
 
 - `pip install -e .[app]`
 
-Subir a app:
+Subir a app sozinha:
 
 - `streamlit run targeted_ml/apps/streamlit_app.py`
+
+Subir app + dbt docs juntos:
+
+- `make refresh-ui-stack`
+- esse é o caminho recomendado para uso normal, porque mantém os links do HTML consistentes com a app e com o docs
+- portas fixas:
+  - Streamlit: `http://localhost:8501`
+  - dbt docs: `http://localhost:8081`
 
 O que a app já suporta:
 
@@ -513,6 +531,11 @@ Servir localmente:
 
 - `cd dbt_lineage`
 - `dbt docs serve --project-dir . --profiles-dir . --port 8081`
+
+Recomendação prática:
+
+- para uso integrado com o HTML e com a app, prefira `make refresh-ui-stack`
+- esse comando regenera o catálogo dbt e serve a pasta `dbt_lineage/target/` na porta fixa `8081`
 
 Observação:
 - o `profiles.yml` deste projeto aponta para `../build/duckdb/build.duckdb`, que é o DuckDB materializado pelo build atual

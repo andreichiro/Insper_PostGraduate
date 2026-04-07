@@ -33,6 +33,7 @@ from targeted_ml.pipelines.modelled_to_ml.modeling import (
     probability_metrics,
     tune_temporal_estimator,
 )
+from targeted_ml.pipelines.modelled_to_ml.post_model_outputs import resolve_registered_policy
 from targeted_ml.pipelines.modelled_to_ml.selection import (
     candidate_definition_group,
     select_serving_scope,
@@ -229,6 +230,56 @@ def _next_available_dir(parent: Path, slug: str) -> Path:
         idx += 1
 
 
+DELIVERY_POLICY_NAMES = ["top_10_percent", "tercis", "score_ge_0_70"]
+DELIVERY_POLICY_FLAG_COLUMNS = {
+    "top_10_percent": "flag_top_10_percent",
+    "tercis": "flag_tercis",
+    "score_ge_0_70": "flag_score_ge_0_70",
+}
+
+
+def _build_delivery_outputs(scored_df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+    ranked = scored_df[scored_df["risk_score"].notna()].copy()
+    if ranked.empty:
+        empty = scored_df.copy()
+        for flag_col in DELIVERY_POLICY_FLAG_COLUMNS.values():
+            empty[flag_col] = pd.Series(dtype="Int64")
+        filtered = {
+            policy_name: empty.iloc[0:0].copy()
+            for policy_name in DELIVERY_POLICY_NAMES
+        }
+        return empty, filtered
+
+    enriched_groups: list[pd.DataFrame] = []
+    for keys, group in ranked.groupby(["problem_key", "model_name"], dropna=False, sort=False):
+        problem_key, model_name = keys
+        ordered = group.sort_values(
+            ["risk_score", "teacher_unique_id"],
+            ascending=[False, True],
+            na_position="last",
+        ).copy()
+        for policy_name in DELIVERY_POLICY_NAMES:
+            threshold = float(resolve_registered_policy(ordered["risk_score"], policy_name)["threshold"])
+            ordered[DELIVERY_POLICY_FLAG_COLUMNS[policy_name]] = pd.Series(
+                (ordered["risk_score"].to_numpy(dtype=float) >= threshold).astype(int),
+                index=ordered.index,
+                dtype="Int64",
+            )
+        enriched_groups.append(ordered)
+
+    delivery = pd.concat(enriched_groups, ignore_index=True)
+    delivery = delivery.sort_values(
+        ["problem_key", "model_name", "risk_score", "teacher_unique_id"],
+        ascending=[True, True, False, True],
+        na_position="last",
+    )
+    filtered = {
+        policy_name: delivery[delivery[DELIVERY_POLICY_FLAG_COLUMNS[policy_name]] == 1].copy()
+        for policy_name in DELIVERY_POLICY_NAMES
+    }
+    return delivery, filtered
+
+
 def _build_serving_contract(spec: AnalysisSpec, reference_scope_rows: list[dict[str, Any]]) -> tuple[dict[str, Any], pd.DataFrame]:
     required_keys = ["teacher_unique_id", "first_month", "onboarding_anchor_ts"]
     required_modelled_tables: set[str] = set()
@@ -328,6 +379,50 @@ def export_reference_models(
     exported_rows: list[dict[str, Any]] = []
     print(f"[serving] export_id={export_dir.name} | candidates={len(selection_candidates)}", flush=True)
     selection_candidates.to_parquet(export_dir / "serving_selection_candidates.parquet", index=False)
+    if selected_scope.empty:
+        inference_contract, scoring_template = _build_serving_contract(spec, [])
+        write_json(export_dir / "inference_contract.json", inference_contract)
+        scoring_template.to_csv(export_dir / "scoring_frame_template.csv", index=False)
+        serving_status = str(selection_meta.get("serving_status", "no_selected_primary_model"))
+        top_manifest = {
+            "analysis_name": spec.analysis_name,
+            "analysis_kind": spec.analysis_kind,
+            "spec_hash": spec_hash_value,
+            "git_revision": git_revision_value,
+            "source_build_dir": source_build_dir,
+            "source_build_summary": source_build_summary,
+            "export_id": export_dir.name,
+            "export_dir": str(export_dir),
+            "serving_status": serving_status,
+            "primary_model_artifact_id": None,
+            "primary_model_manifest_path": None,
+            "exported_model_count": 0,
+            "exported_at": exported_at,
+            "selection_meta": selection_meta,
+            "inference_contract_path": str(export_dir / "inference_contract.json"),
+            "reference_scope_rows": [],
+        }
+        export_manifest_path = export_dir / "serving_manifest.json"
+        write_json(export_manifest_path, top_manifest)
+        write_json(export_dir / "serving_scope.json", {"serving_scope": [], "selection_meta": selection_meta})
+        write_json(export_dir / "reference_scope.json", {"reference_scope": []})
+        _sync_latest_export_to_root(export_dir, paths.serving_dir)
+        manifest_path = paths.serving_dir / "serving_manifest.json"
+        write_json(manifest_path, top_manifest)
+        write_json(paths.serving_dir / "serving_scope.json", {"serving_scope": [], "selection_meta": selection_meta})
+        write_json(paths.serving_dir / "reference_scope.json", {"reference_scope": []})
+        write_json(paths.serving_dir / "inference_contract.json", inference_contract)
+        scoring_template.to_csv(paths.serving_dir / "scoring_frame_template.csv", index=False)
+        selection_candidates.to_parquet(paths.serving_dir / "serving_selection_candidates.parquet", index=False)
+        write_json(
+            paths.serving_dir / "latest.json",
+            {
+                "latest_export_dir": str(export_dir),
+                "latest_serving_manifest": str(export_manifest_path),
+            },
+        )
+        print(f"[serving] manifest={manifest_path} | status={serving_status}", flush=True)
+        return manifest_path
     for ref_row in selected_scope.to_dict(orient="records"):
         print(
             f"[serving] fitting problem={ref_row['problem_key']} | model={ref_row['model_name']}",
@@ -473,7 +568,20 @@ def load_reference_models(paths: ProjectPaths) -> tuple[dict[str, Any], list[dic
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     bundles: list[dict[str, Any]] = []
     for row in manifest.get("reference_scope_rows", []):
-        model_payload = joblib.load(row["model_path"])
+        model_path = Path(str(row["model_path"]))
+        if not model_path.exists():
+            fallback_path = paths.serving_dir / "models" / model_path.name
+            if fallback_path.exists():
+                row = {
+                    **row,
+                    "model_path": str(fallback_path),
+                    "feature_path": str(paths.serving_dir / "models" / Path(str(row["feature_path"])).name),
+                    "schema_path": str(paths.serving_dir / "models" / Path(str(row["schema_path"])).name),
+                    "calibration_audit_path": str(paths.serving_dir / "models" / Path(str(row["calibration_audit_path"])).name),
+                    "tuning_audit_path": str(paths.serving_dir / "models" / Path(str(row["tuning_audit_path"])).name),
+                }
+                model_path = fallback_path
+        model_payload = joblib.load(model_path)
         bundles.append(
             {
                 "manifest": row,
@@ -695,14 +803,20 @@ def score_modelled_duckdb(
         ["problem_key", "risk_score", "teacher_unique_id"],
         ascending=[True, False, True],
     )
+    delivery_all, delivery_filtered = _build_delivery_outputs(scored_df)
     scored_df.to_parquet(run_dir / "scores_all_models.parquet", index=False)
     high_risk.to_parquet(run_dir / "high_risk_users.parquet", index=False)
+    delivery_all.to_parquet(run_dir / "all_scored_clients.parquet", index=False)
+    delivery_filtered["top_10_percent"].to_parquet(run_dir / "high_risk_clients_top10.parquet", index=False)
+    delivery_filtered["tercis"].to_parquet(run_dir / "high_risk_clients_tercis.parquet", index=False)
+    delivery_filtered["score_ge_0_70"].to_parquet(run_dir / "high_risk_clients_score_ge_0_70.parquet", index=False)
     validation_df.to_parquet(run_dir / "validation_report.parquet", index=False)
-    write_json(
-        run_dir / "run_manifest.json",
-        {
+    _write_inference_run_manifest(
+        run_dir=run_dir,
+        requested_run_name=run_name,
+        payload={
             "run_id": run_id,
-            "run_name": run_name or "",
+            "input_kind": "modelled_duckdb",
             "modelled_duckdb": str(modelled_duckdb.resolve()),
             "latest_observed_ts": str(latest_observed_ts),
             "serving_status": manifest["serving_status"],
@@ -712,6 +826,10 @@ def score_modelled_duckdb(
             "artifacts": {
                 "scores_all_models": str(run_dir / "scores_all_models.parquet"),
                 "high_risk_users": str(run_dir / "high_risk_users.parquet"),
+                "all_scored_clients": str(run_dir / "all_scored_clients.parquet"),
+                "high_risk_clients_top10": str(run_dir / "high_risk_clients_top10.parquet"),
+                "high_risk_clients_tercis": str(run_dir / "high_risk_clients_tercis.parquet"),
+                "high_risk_clients_score_ge_0_70": str(run_dir / "high_risk_clients_score_ge_0_70.parquet"),
                 "validation_report": str(run_dir / "validation_report.parquet"),
             },
         },
@@ -728,6 +846,18 @@ def _load_scoring_frame(scoring_frame_path: Path) -> pd.DataFrame:
     if suffix == ".csv":
         return pd.read_csv(scoring_frame_path)
     raise ValueError(f"Unsupported scoring frame format: {scoring_frame_path}")
+
+
+def _write_inference_run_manifest(*, run_dir: Path, requested_run_name: str | None, payload: dict[str, Any]) -> None:
+    write_json(
+        run_dir / "run_manifest.json",
+        {
+            "run_dir": str(run_dir),
+            "run_name": run_dir.name,
+            "requested_run_name": requested_run_name or "",
+            **payload,
+        },
+    )
 
 
 def score_scoring_frame(
@@ -771,14 +901,19 @@ def score_scoring_frame(
         ["problem_key", "risk_score", "teacher_unique_id"],
         ascending=[True, False, True],
     )
+    delivery_all, delivery_filtered = _build_delivery_outputs(scored_df)
     scored_df.to_parquet(run_dir / "scores_all_models.parquet", index=False)
     high_risk.to_parquet(run_dir / "high_risk_users.parquet", index=False)
+    delivery_all.to_parquet(run_dir / "all_scored_clients.parquet", index=False)
+    delivery_filtered["top_10_percent"].to_parquet(run_dir / "high_risk_clients_top10.parquet", index=False)
+    delivery_filtered["tercis"].to_parquet(run_dir / "high_risk_clients_tercis.parquet", index=False)
+    delivery_filtered["score_ge_0_70"].to_parquet(run_dir / "high_risk_clients_score_ge_0_70.parquet", index=False)
     validation_df.to_parquet(run_dir / "validation_report.parquet", index=False)
-    write_json(
-        run_dir / "run_manifest.json",
-        {
+    _write_inference_run_manifest(
+        run_dir=run_dir,
+        requested_run_name=run_name,
+        payload={
             "run_id": run_id,
-            "run_name": run_name or "",
             "input_kind": "scoring_frame_file",
             "scoring_frame_path": str(scoring_frame_path.resolve()),
             "copied_input_path": str(copied_input),
@@ -790,6 +925,10 @@ def score_scoring_frame(
             "artifacts": {
                 "scores_all_models": str(run_dir / "scores_all_models.parquet"),
                 "high_risk_users": str(run_dir / "high_risk_users.parquet"),
+                "all_scored_clients": str(run_dir / "all_scored_clients.parquet"),
+                "high_risk_clients_top10": str(run_dir / "high_risk_clients_top10.parquet"),
+                "high_risk_clients_tercis": str(run_dir / "high_risk_clients_tercis.parquet"),
+                "high_risk_clients_score_ge_0_70": str(run_dir / "high_risk_clients_score_ge_0_70.parquet"),
                 "validation_report": str(run_dir / "validation_report.parquet"),
             },
         },

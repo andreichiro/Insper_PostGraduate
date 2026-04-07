@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import math
@@ -149,6 +150,118 @@ def probability_metrics(y_true: Sequence[int], y_score: Sequence[float]) -> dict
     metrics["calibration_slope_error"] = abs(slope - 1.0) if pd.notna(slope) else float("nan")
     metrics["calibration_intercept_abs"] = abs(intercept) if pd.notna(intercept) else float("nan")
     return metrics
+
+
+def generalization_gap(
+    train_metric: float,
+    test_metric: float,
+    objective_direction: str,
+) -> float:
+    if pd.isna(train_metric) or pd.isna(test_metric):
+        return float("nan")
+    if objective_direction == "max":
+        return float(train_metric - test_metric)
+    return float(test_metric - train_metric)
+
+
+def build_train_test_generalization_outputs(
+    fold_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    fold_columns = [
+        "problem_key",
+        "definition_name",
+        "track_name",
+        "model_name",
+        "fold_id",
+        "comparison_stage",
+        "metric_name",
+        "train_metric",
+        "test_metric",
+        "generalization_gap",
+    ]
+    summary_columns = [
+        "problem_key",
+        "definition_name",
+        "track_name",
+        "model_name",
+        "comparison_stage",
+        "metric_name",
+        "valid_folds",
+        "mean_train_metric",
+        "mean_test_metric",
+        "mean_generalization_gap",
+        "ci_low_generalization_gap",
+        "ci_high_generalization_gap",
+        "ci_width_generalization_gap",
+        "statistical_gap_flag",
+    ]
+    if fold_df.empty:
+        return pd.DataFrame(columns=fold_columns), pd.DataFrame(columns=summary_columns)
+    valid = fold_df[
+        pd.to_numeric(fold_df.get("fold_valid_flag"), errors="coerce").fillna(0).astype(int) == 1
+    ].copy()
+    if valid.empty:
+        return pd.DataFrame(columns=fold_columns), pd.DataFrame(columns=summary_columns)
+    metric_objectives = {
+        "ap": "max",
+        "roc_auc": "max",
+        "brier": "min",
+        "log_loss": "min",
+    }
+    stage_sources = {
+        "apparent_train": "apparent_train",
+        "calibration_holdout": "calibration_holdout",
+    }
+    rows: list[dict[str, Any]] = []
+    for row in valid.to_dict(orient="records"):
+        for stage_name, prefix in stage_sources.items():
+            for metric_name, direction in metric_objectives.items():
+                train_metric = pd.to_numeric(row.get(f"{prefix}_{metric_name}"), errors="coerce")
+                test_metric = pd.to_numeric(row.get(metric_name), errors="coerce")
+                gap_value = generalization_gap(float(train_metric), float(test_metric), direction) if pd.notna(train_metric) and pd.notna(test_metric) else float("nan")
+                rows.append(
+                    {
+                        "problem_key": row["problem_key"],
+                        "definition_name": row["definition_name"],
+                        "track_name": row["track_name"],
+                        "model_name": row["model_name"],
+                        "fold_id": row["fold_id"],
+                        "comparison_stage": stage_name,
+                        "metric_name": metric_name,
+                        "train_metric": float(train_metric) if pd.notna(train_metric) else float("nan"),
+                        "test_metric": float(test_metric) if pd.notna(test_metric) else float("nan"),
+                        "generalization_gap": gap_value,
+                    }
+                )
+    fold_audit = pd.DataFrame(rows, columns=fold_columns)
+    if fold_audit.empty:
+        return fold_audit, pd.DataFrame(columns=summary_columns)
+    summary_rows: list[dict[str, Any]] = []
+    for keys, group in fold_audit.groupby(
+        ["problem_key", "definition_name", "track_name", "model_name", "comparison_stage", "metric_name"],
+        dropna=False,
+    ):
+        gaps = pd.to_numeric(group["generalization_gap"], errors="coerce").dropna().to_numpy(dtype=float)
+        ci_low, ci_high, ci_width = bootstrap_ci_width(gaps, np.mean) if len(gaps) else (float("nan"), float("nan"), float("nan"))
+        summary_rows.append(
+            {
+                "problem_key": keys[0],
+                "definition_name": keys[1],
+                "track_name": keys[2],
+                "model_name": keys[3],
+                "comparison_stage": keys[4],
+                "metric_name": keys[5],
+                "valid_folds": int(group["fold_id"].nunique()),
+                "mean_train_metric": float(pd.to_numeric(group["train_metric"], errors="coerce").mean()),
+                "mean_test_metric": float(pd.to_numeric(group["test_metric"], errors="coerce").mean()),
+                "mean_generalization_gap": float(np.mean(gaps)) if len(gaps) else float("nan"),
+                "ci_low_generalization_gap": float(ci_low),
+                "ci_high_generalization_gap": float(ci_high),
+                "ci_width_generalization_gap": float(ci_width),
+                "statistical_gap_flag": int(pd.notna(ci_low) and ci_low > 0),
+            }
+        )
+    return fold_audit, pd.DataFrame(summary_rows, columns=summary_columns)
 
 def build_temporal_calibration_holdout(
     train: pd.DataFrame,
@@ -454,13 +567,12 @@ def build_scoring_scenarios(
     definition_frontier: pd.DataFrame,
 ) -> pd.DataFrame:
     rows: List[dict[str, Any]] = []
+    # The model stage is intentionally decoupled from the 90-day definition study.
+    # We always score the fixed 30-day business target (Definition B) and never let
+    # the definition frontier determine the model outcome.
     official_definitions: list[str] = []
-    if not definition_frontier.empty:
-        official_definitions.extend(sorted(definition_frontier["definition_name"].unique().tolist()))
-    if "definition_b_label" in frame.columns and "definition_b_label" not in official_definitions:
-        official_definitions.append("definition_b_label")
-    if not official_definitions and "definition_b_label" in frame.columns:
-        official_definitions.append("definition_b_label")
+    if "definition_b_label" in frame.columns:
+        official_definitions = ["definition_b_label"]
     for definition_name in official_definitions:
         label_col = definition_name
         if label_col not in frame.columns:
@@ -678,7 +790,11 @@ def evaluate_single_problem_model(
                 calibration_idx=calibration_idx,
                 method=setup.CALIBRATION_METHOD,
             )
+            X_apparent_train = train_for_calibration[active_feature_names + ["first_month"]].copy()
+            X_calibration_holdout = calibration_holdout[active_feature_names + ["first_month"]].copy()
             test_score = calibrated.predict_proba(X_test)[:, 1]
+            apparent_train_score = calibrated.predict_proba(X_apparent_train)[:, 1]
+            calibration_holdout_score = calibrated.predict_proba(X_calibration_holdout)[:, 1]
         except Exception as exc:
             exc_msg = setup.normalize_text(str(exc), default=type(exc).__name__).replace(" ", "_")[:120]
             fold_rows.append(
@@ -699,6 +815,8 @@ def evaluate_single_problem_model(
                 }
             )
             continue
+        apparent_train_metrics = probability_metrics(train_for_calibration["y_true"].to_numpy(), apparent_train_score)
+        calibration_holdout_metrics = probability_metrics(calibration_holdout["y_true"].to_numpy(), calibration_holdout_score)
         metrics = probability_metrics(test["y_true"].to_numpy(), test_score)
         official_support_valid = int(
             test_rows >= setup.MIN_OFFICIAL_TEST_ROWS
@@ -722,6 +840,12 @@ def evaluate_single_problem_model(
                 "test_positive_rate": float(test_positives / test_rows) if test_rows else float("nan"),
                 **tuning_meta,
                 "invalid_reason": invalid_reason,
+                "apparent_train_rows": int(len(train_for_calibration)),
+                "calibration_holdout_rows": int(len(calibration_holdout)),
+                "apparent_train_positive_rate": float(pd.to_numeric(train_for_calibration["y_true"], errors="coerce").fillna(0).mean()),
+                "calibration_holdout_positive_rate": float(pd.to_numeric(calibration_holdout["y_true"], errors="coerce").fillna(0).mean()),
+                **{f"apparent_train_{key}": value for key, value in apparent_train_metrics.items()},
+                **{f"calibration_holdout_{key}": value for key, value in calibration_holdout_metrics.items()},
                 **metrics,
             }
         )
@@ -1220,13 +1344,30 @@ def evaluate_model_problems(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     model_specs = build_model_specs()
     scenario_records = scoring_scenarios.to_dict(orient="records")
-    total_tasks = 0
+    task_inputs: list[dict[str, Any]] = []
     for scenario in scenario_records:
-        total_tasks += sum(
-            1
-            for spec in model_specs
+        print(f'[model] scenario {scenario["problem_key"]}', flush=True)
+        feature_names = json.loads(scenario["feature_names_json"])
+        working = frame.dropna(subset=["first_month"]).copy()
+        working["y_true"] = pd.to_numeric(working[scenario["label_col"]], errors="coerce")
+        working = working[working["y_true"].notna()].copy()
+        working["y_true"] = working["y_true"].astype(int)
+        if working.empty:
+            continue
+        selected_specs = [
+            spec for spec in model_specs
             if allowed_problem_model_pairs is None or (scenario["problem_key"], spec["model_name"]) in allowed_problem_model_pairs
-        )
+        ]
+        for model_spec in selected_specs:
+            task_inputs.append(
+                {
+                    "problem": scenario,
+                    "model_spec": model_spec,
+                    "working": working,
+                    "feature_names": feature_names,
+                }
+            )
+    total_tasks = len(task_inputs)
     completed_tasks = 0
     if progress_callback:
         progress_callback(progress_stage_key, 0, total_tasks, "iniciando avaliação de modelos")
@@ -1235,53 +1376,49 @@ def evaluate_model_problems(
     inner_audit_rows: List[dict[str, Any]] = []
     importance_rows: List[dict[str, Any]] = []
     post_model_output_status_rows: List[dict[str, Any]] = []
-    for scenario in scenario_records:
-        print(f'[model] scenario {scenario["problem_key"]}', flush=True)
-        feature_names = json.loads(scenario["feature_names_json"])
-        working = frame.dropna(subset=["first_month"]).copy()
-        working["y_true"] = pd.to_numeric(working[scenario["label_col"]], errors="coerce")
-        working = working[working["y_true"].notna()].copy()
-        working["y_true"] = working["y_true"].astype(int)
-        selected_specs = [
-            spec for spec in model_specs
-            if allowed_problem_model_pairs is None or (scenario["problem_key"], spec["model_name"]) in allowed_problem_model_pairs
-        ]
-        if progress_callback:
-            progress_callback(
-                progress_stage_key,
-                completed_tasks,
-                total_tasks,
-                f'{scenario["problem_key"]} | {len(selected_specs)} modelos',
-            )
-        problem_results = Parallel(
-            n_jobs=min(setup.MODEL_COMPARISON_WORKERS, max(1, len(selected_specs))),
-            prefer="threads",
-        )(
-            delayed(run_or_load_model_task)(
-                scenario,
-                model_spec,
-                working,
-                feature_registry,
-                feature_names,
-                compute_feature_importance,
-                task_store,
-            )
-            for model_spec in selected_specs
+    max_workers = min(setup.MODEL_COMPARISON_WORKERS, max(1, total_tasks))
+    if total_tasks == 0:
+        max_workers = 0
+    if progress_callback and task_inputs:
+        progress_callback(
+            progress_stage_key,
+            0,
+            total_tasks,
+            f'{len(task_inputs)} tarefas globais | até {max_workers} workers',
         )
-        for model_fold_rows, model_prediction_rows, model_inner_rows, model_importance_rows, model_post_model_output_status_rows in problem_results:
-            fold_rows.extend(model_fold_rows)
-            prediction_rows.extend(model_prediction_rows)
-            inner_audit_rows.extend(model_inner_rows)
-            importance_rows.extend(model_importance_rows)
-            post_model_output_status_rows.extend(model_post_model_output_status_rows)
-        completed_tasks += len(selected_specs)
-        if progress_callback:
-            progress_callback(
-                progress_stage_key,
-                completed_tasks,
-                total_tasks,
-                f'{scenario["problem_key"]} concluído',
-            )
+    if task_inputs:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    run_or_load_model_task,
+                    task["problem"],
+                    task["model_spec"],
+                    task["working"],
+                    feature_registry,
+                    task["feature_names"],
+                    compute_feature_importance,
+                    task_store,
+                ): task
+                for task in task_inputs
+            }
+            for future in as_completed(future_map):
+                task = future_map[future]
+                scenario = task["problem"]
+                model_spec = task["model_spec"]
+                model_fold_rows, model_prediction_rows, model_inner_rows, model_importance_rows, model_post_model_output_status_rows = future.result()
+                fold_rows.extend(model_fold_rows)
+                prediction_rows.extend(model_prediction_rows)
+                inner_audit_rows.extend(model_inner_rows)
+                importance_rows.extend(model_importance_rows)
+                post_model_output_status_rows.extend(model_post_model_output_status_rows)
+                completed_tasks += 1
+                if progress_callback:
+                    progress_callback(
+                        progress_stage_key,
+                        completed_tasks,
+                        total_tasks,
+                        f'{scenario["problem_key"]} | {model_spec["model_name"]} concluído',
+                    )
     fold_df = pd.DataFrame(fold_rows)
     inner_audit_df = pd.DataFrame(
         inner_audit_rows,

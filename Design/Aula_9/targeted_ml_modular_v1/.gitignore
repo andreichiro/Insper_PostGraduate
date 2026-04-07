@@ -13,6 +13,7 @@ build/modelled/
 build/duckdb/
 
 # Local execution byproducts
+.runtime/
 build/logs/
 build/staging/
 build/local_runtime_duckdb/

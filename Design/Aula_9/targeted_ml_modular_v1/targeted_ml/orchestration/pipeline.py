@@ -141,7 +141,8 @@ def score_modelled_input(
             "modelled_duckdb": str(requested_modelled),
             "problem_keys": problem_keys or [],
             "model_names": model_names or [],
-            "run_name": run_name or "",
+            "run_name": run_dir.name,
+            "requested_run_name": run_name or "",
         },
     )
     return run_dir
@@ -177,7 +178,8 @@ def score_scoring_frame_input(
             "latest_observed_ts": latest_observed_ts or "",
             "problem_keys": problem_keys or [],
             "model_names": model_names or [],
-            "run_name": run_name or "",
+            "run_name": run_dir.name,
+            "requested_run_name": run_name or "",
         },
     )
     return run_dir
@@ -226,7 +228,8 @@ def score_raw_input(
             "staging_modelled_duckdb": str(staging_paths.modelled_duckdb),
             "problem_keys": problem_keys or [],
             "model_names": model_names or [],
-            "run_name": run_name or "",
+            "run_name": run_dir.name,
+            "requested_run_name": run_name or "",
         },
     )
     return run_dir

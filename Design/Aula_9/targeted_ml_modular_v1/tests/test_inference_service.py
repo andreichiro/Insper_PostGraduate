@@ -7,7 +7,14 @@ import pandas as pd
 import pytest
 
 from targeted_ml.config.loader import load_analysis_spec
-from targeted_ml.inference.service import _build_serving_contract, _next_available_dir, _score_bundle_on_frame, validate_inference_input_schema
+from targeted_ml.inference.service import (
+    _build_delivery_outputs,
+    _build_serving_contract,
+    _next_available_dir,
+    _score_bundle_on_frame,
+    _write_inference_run_manifest,
+    validate_inference_input_schema,
+)
 
 
 class DummyPredictor:
@@ -100,6 +107,82 @@ def test_next_available_dir_appends_suffix(tmp_path) -> None:
     first.mkdir()
     second = _next_available_dir(tmp_path, "run")
     assert second.name == "run_2"
+
+
+def test_inference_run_manifest_tracks_requested_and_resolved_names(tmp_path) -> None:
+    run_dir = tmp_path / "example_modelled_inference"
+    run_dir.mkdir()
+    _write_inference_run_manifest(
+        run_dir=run_dir,
+        requested_run_name="final_modelled_latest",
+        payload={"run_id": "123", "serving_status": "unique_primary_model"},
+    )
+
+    payload = json.loads((run_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert payload["run_dir"] == str(run_dir)
+    assert payload["run_name"] == "example_modelled_inference"
+    assert payload["requested_run_name"] == "final_modelled_latest"
+
+
+def test_build_delivery_outputs_adds_flags_and_filtered_views() -> None:
+    scored = pd.DataFrame(
+        [
+            {
+                "teacher_unique_id": "u1",
+                "first_month": "2024-01-01",
+                "onboarding_anchor_ts": "2024-01-03",
+                "problem_key": "definition_a::rule__S1_PLUS_S7",
+                "definition_name": "definition_a::rule",
+                "track_name": "S1_PLUS_S7",
+                "model_name": "catboost",
+                "score_window_ready_flag": 1,
+                "score_positive": 0.1,
+                "risk_score": 0.9,
+                "eligibility_reason": "",
+                "risk_rank": 1,
+            },
+            {
+                "teacher_unique_id": "u2",
+                "first_month": "2024-01-01",
+                "onboarding_anchor_ts": "2024-01-03",
+                "problem_key": "definition_a::rule__S1_PLUS_S7",
+                "definition_name": "definition_a::rule",
+                "track_name": "S1_PLUS_S7",
+                "model_name": "catboost",
+                "score_window_ready_flag": 1,
+                "score_positive": 0.4,
+                "risk_score": 0.6,
+                "eligibility_reason": "",
+                "risk_rank": 2,
+            },
+            {
+                "teacher_unique_id": "u3",
+                "first_month": "2024-01-01",
+                "onboarding_anchor_ts": "2024-01-03",
+                "problem_key": "definition_a::rule__S1_PLUS_S7",
+                "definition_name": "definition_a::rule",
+                "track_name": "S1_PLUS_S7",
+                "model_name": "catboost",
+                "score_window_ready_flag": 1,
+                "score_positive": 0.8,
+                "risk_score": 0.2,
+                "eligibility_reason": "",
+                "risk_rank": 3,
+            },
+        ]
+    )
+
+    delivery, filtered = _build_delivery_outputs(scored)
+
+    assert {"flag_top_10_percent", "flag_tercis", "flag_score_ge_0_70"}.issubset(delivery.columns)
+    assert int(delivery.loc[delivery["teacher_unique_id"] == "u1", "flag_top_10_percent"].iloc[0]) == 1
+    assert int(delivery.loc[delivery["teacher_unique_id"] == "u1", "flag_tercis"].iloc[0]) == 1
+    assert int(delivery.loc[delivery["teacher_unique_id"] == "u2", "flag_tercis"].iloc[0]) == 0
+    assert int(delivery.loc[delivery["teacher_unique_id"] == "u1", "flag_score_ge_0_70"].iloc[0]) == 1
+    assert int(delivery.loc[delivery["teacher_unique_id"] == "u2", "flag_score_ge_0_70"].iloc[0]) == 0
+    assert list(filtered["top_10_percent"]["teacher_unique_id"]) == ["u1"]
+    assert list(filtered["tercis"]["teacher_unique_id"]) == ["u1"]
+    assert list(filtered["score_ge_0_70"]["teacher_unique_id"]) == ["u1"]
 
 
 def test_build_serving_contract_declares_raw_dataset_root_support(tmp_path) -> None:

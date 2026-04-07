@@ -19,12 +19,14 @@ from .analysis_setup import RuntimeBuildConfig
 from .analysis_setup import (
     build_arbitrariness_registry,
     build_candidate_metric_registry,
+    build_definition_selection_period_registry,
     build_feature_registry,
     build_label_registry,
     build_policy_registry,
     build_track_registry,
 )
 from .dataset_builder import (
+    build_analysis_frame,
     build_feature_eligibility_log,
     build_first_session_journey_mart,
     build_future_metrics,
@@ -33,8 +35,15 @@ from .dataset_builder import (
     build_official_frame,
     build_onboarding_mart,
 )
-from .definitions import build_definition_search, compare_official_definitions
+from .definitions import (
+    build_definition_evaluability_audit,
+    build_definition_search,
+    build_definition_search_stage_audit,
+    compare_official_definitions,
+    compute_candidate_diagnostics,
+)
 from .modeling import (
+    build_train_test_generalization_outputs,
     bootstrap_prediction_metrics,
     build_definition_b_feature_block_gain_diagnostics,
     build_scoring_scenarios,
@@ -79,17 +88,90 @@ def build_summary_payload(
     official_problem_frontier: pd.DataFrame,
     definition_frontier: pd.DataFrame,
     arbitrariness_registry: pd.DataFrame,
+    official_frame: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     frontier_count = int(official_problem_frontier["pareto_frontier_flag"].sum()) if "pareto_frontier_flag" in official_problem_frontier.columns else 0
+    official_rows = int(len(official_frame)) if official_frame is not None else 0
+    official_months = int(official_frame["first_month"].nunique()) if official_frame is not None and "first_month" in official_frame.columns else 0
+    development_frame, lock_frame, final_eval_frame, _, _, _ = (
+        setup.split_definition_workflow_frame(official_frame)
+        if official_frame is not None
+        else (pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), [], [], [])
+    )
     return {
         "pipeline_scope": "single_publishable_build",
         "modelled_duckdb": str(cfg.modelled_duckdb),
         "output_dir": str(cfg.output_dir),
+        "official_population_filter": setup.official_population_filter_description(),
+        "definition_selection_holdout_months": int(setup.DEFINITION_SELECTION_HOLDOUT_MONTHS),
+        "definition_lock_months": int(setup.DEFINITION_LOCK_MONTHS),
+        "definition_a_promoted_candidate_limit": int(setup.DEFINITION_A_PROMOTED_CANDIDATE_LIMIT),
+        "definition_selection_development_months": int(development_frame["first_month"].nunique()) if not development_frame.empty else 0,
+        "definition_lock_realized_months": int(lock_frame["first_month"].nunique()) if not lock_frame.empty else 0,
+        "final_model_evaluation_months": int(final_eval_frame["first_month"].nunique()) if not final_eval_frame.empty else 0,
+        "official_population_rows": official_rows,
+        "official_population_months": official_months,
         "official_definition_frontier_count": int(definition_frontier["pareto_frontier_flag"].sum()) if "pareto_frontier_flag" in definition_frontier.columns else 0,
         "official_problem_frontier_count": frontier_count,
         "official_score_status": "unique_official_score" if frontier_count == 1 else ("admissible_set_only" if frontier_count > 1 else "no_official_score"),
         "arbitrary_items_in_official_report": int(arbitrariness_registry["in_official_report_flag"].sum()),
     }
+
+
+def build_population_sensitivity_summary(
+    full_frame: pd.DataFrame,
+    definition_names: list[str],
+) -> pd.DataFrame:
+    columns = [
+        "population_group",
+        "definition_name",
+        "rows",
+        "months",
+        "months_after_entry_mean",
+        "months_after_entry_median",
+        "positives",
+        "negatives",
+        "prevalence",
+        "prevalence_entropy",
+        "monthly_prevalence_mean",
+        "monthly_prevalence_std",
+        "bootstrap_prevalence_ci_low",
+        "bootstrap_prevalence_ci_high",
+        "bootstrap_prevalence_ci_width",
+        "candidate_valid_flag",
+        *[f"gap_{validator}" for validator in setup.EXTERNAL_VALIDATORS],
+    ]
+    if full_frame.empty:
+        return pd.DataFrame(columns=columns)
+    months_after_entry = pd.to_numeric(full_frame.get("months_after_entry"), errors="coerce")
+    population_masks = {
+        "all_observed_first_use": pd.Series(True, index=full_frame.index, dtype=bool),
+        "same_month_entry_only": months_after_entry.eq(0).fillna(False),
+        "delayed_entry_observed": months_after_entry.gt(0).fillna(False),
+    }
+    rows: list[dict[str, Any]] = []
+    for population_group, mask in population_masks.items():
+        subset = full_frame.loc[mask].copy()
+        if subset.empty:
+            continue
+        subset_months_after_entry = pd.to_numeric(subset.get("months_after_entry"), errors="coerce")
+        for definition_name in definition_names:
+            if definition_name not in subset.columns:
+                continue
+            label = pd.to_numeric(subset[definition_name], errors="coerce").fillna(0).astype(int).to_numpy()
+            diagnostics = compute_candidate_diagnostics(subset, label)
+            rows.append(
+                {
+                    "population_group": population_group,
+                    "definition_name": definition_name,
+                    "rows": int(len(subset)),
+                    "months": int(subset["first_month"].nunique()) if "first_month" in subset.columns else 0,
+                    "months_after_entry_mean": float(subset_months_after_entry.mean()) if not subset_months_after_entry.empty else float("nan"),
+                    "months_after_entry_median": float(subset_months_after_entry.median()) if not subset_months_after_entry.empty else float("nan"),
+                    **diagnostics,
+                }
+            )
+    return pd.DataFrame(rows, columns=columns)
 
 def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None) -> dict[str, Any]:
     if runtime_config is not None:
@@ -135,6 +217,12 @@ def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None
         progress.complete_stage("future_metrics", detail="future metrics ready")
         print("[build] future metrics ready", flush=True)
         persist_table(out_conn, cfg.output_dir, "mart_future_metrics_v1", future_metrics)
+        definition_selection_periods = build_definition_selection_period_registry(
+            setup.apply_official_population_filter(
+                future_metrics.loc[future_metrics["full_followup_observed_flag"] == 1].copy()
+            )
+        )
+        persist_table(out_conn, cfg.output_dir, "governance_definition_selection_periods_v1", definition_selection_periods)
 
         feature_registry = build_feature_registry()
         persist_table(out_conn, cfg.output_dir, "governance_feature_registry_v1", feature_registry)
@@ -142,12 +230,20 @@ def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None
         persist_table(out_conn, cfg.output_dir, "governance_feature_eligibility_v1", feature_eligibility_log)
 
         progress.start_stage("definition_search", detail="buscando candidatos de definição")
-        candidate_df, candidate_test_df, selection_df = build_definition_search(future_metrics, candidate_metric_registry)
+        candidate_df, candidate_test_df, definition_lock_df, selection_df = build_definition_search(future_metrics, candidate_metric_registry)
+        definition_search_stage_audit = build_definition_search_stage_audit(
+            candidate_df,
+            candidate_test_df,
+            definition_lock_df,
+            selection_df,
+        )
         progress.complete_stage("definition_search", detail="definition search ready")
         print("[build] definition search ready", flush=True)
         persist_table(out_conn, cfg.output_dir, "core_definition_candidates_train_v1", candidate_df)
         persist_table(out_conn, cfg.output_dir, "core_definition_candidates_test_frontier_v1", candidate_test_df)
+        persist_table(out_conn, cfg.output_dir, "core_definition_lock_summary_v1", definition_lock_df)
         persist_table(out_conn, cfg.output_dir, "core_definition_selection_v1", selection_df)
+        persist_table(out_conn, cfg.output_dir, "core_definition_search_stage_audit_v1", definition_search_stage_audit)
 
         definition_b_row = selection_df.loc[selection_df["definition_group"] == "definition_b"].iloc[0].to_dict()
         official_a_rows = selection_df[(selection_df["definition_name"] == "definition_a") & selection_df["official_status"].str.startswith("official")].copy()
@@ -156,17 +252,31 @@ def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None
 
         progress.start_stage("definition_comparison", detail="comparando definições oficiais")
         definition_fold_eval, definition_frontier = compare_official_definitions(future_metrics, selection_df)
+        definition_evaluability_audit, definition_evaluability_summary = build_definition_evaluability_audit(
+            future_metrics,
+            selection_df,
+        )
         progress.complete_stage("definition_comparison", detail="definition comparison ready")
         print("[build] definition comparison ready", flush=True)
         persist_table(out_conn, cfg.output_dir, "core_definition_external_validation_v1", definition_fold_eval)
         persist_table(out_conn, cfg.output_dir, "core_definition_frontier_v1", definition_frontier)
+        persist_table(out_conn, cfg.output_dir, "core_definition_evaluability_audit_v1", definition_evaluability_audit)
+        persist_table(out_conn, cfg.output_dir, "core_definition_evaluability_summary_v1", definition_evaluability_summary)
 
+        full_analysis_frame = build_analysis_frame(
+            journey,
+            future_metrics,
+            selection_df,
+            apply_population_filter=False,
+        )
         frame = build_official_frame(journey, future_metrics, selection_df)
         official_definition_names = sorted([name for name in definition_frontier.get("definition_name", pd.Series(dtype=str)).dropna().unique().tolist() if name in frame.columns])
         if "definition_b_label" in frame.columns and "definition_b_label" not in official_definition_names:
             official_definition_names.append("definition_b_label")
         if not official_definition_names and "definition_b_label" in frame.columns:
             official_definition_names = ["definition_b_label"]
+        population_sensitivity = build_population_sensitivity_summary(full_analysis_frame, official_definition_names)
+        persist_table(out_conn, cfg.output_dir, "core_population_sensitivity_v1", population_sensitivity)
         scoring_scenarios = build_scoring_scenarios(frame, feature_registry, track_registry, definition_frontier)
         persist_table(out_conn, cfg.output_dir, "core_scoring_scenarios_v1", scoring_scenarios)
 
@@ -196,6 +306,12 @@ def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None
         persist_table(out_conn, cfg.output_dir, "core_model_calibration_audit_v1", inner_split_audit)
         all_post_model_output_status = post_model_output_status.copy()
         official_predictions = filter_official_predictions(model_predictions)
+
+        progress.start_stage("train_test_audit", detail="auditando generalização train vs test")
+        generalization_folds, generalization_summary = build_train_test_generalization_outputs(model_fold_metrics)
+        progress.complete_stage("train_test_audit", detail="train vs test audit ready")
+        persist_table(out_conn, cfg.output_dir, "core_model_generalization_folds_v1", generalization_folds)
+        persist_table(out_conn, cfg.output_dir, "core_model_generalization_summary_v1", generalization_summary)
 
         progress.start_stage("cv_score_robustness", detail="resumindo robustez do score")
         cv_score_folds, cv_score_summary = build_cv_score_robustness_outputs(official_predictions)
@@ -311,7 +427,7 @@ def run_build(cfg: EnginePaths, runtime_config: RuntimeBuildConfig | None = None
         persist_table(out_conn, cfg.output_dir, "core_navigation_transitions_v1", nav_transitions)
 
         progress.start_stage("summary_write", detail="escrevendo resumo final")
-        summary_payload = build_summary_payload(cfg, model_frontier, definition_frontier, arbitrariness_registry)
+        summary_payload = build_summary_payload(cfg, model_frontier, definition_frontier, arbitrariness_registry, official_frame=frame)
         write_json(cfg.output_dir / "metadata" / "build_summary_v1.json", summary_payload)
         progress.complete_stage("summary_write", detail="summary write ready")
         return summary_payload

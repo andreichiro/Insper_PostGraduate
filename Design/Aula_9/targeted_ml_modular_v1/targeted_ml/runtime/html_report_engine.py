@@ -10,13 +10,25 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix, f1_score, r2_score
 
+from targeted_ml.pipelines.modelled_to_ml import analysis_setup as setup
+
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
 except Exception:
     px = None
+    go = None
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
+
+COLOR_INFO = "#3B82F6"
+COLOR_NEUTRAL = "#94A3B8"
+COLOR_POSITIVE = "#0F766E"
+COLOR_POSITIVE_LIGHT = "#2DD4BF"
+COLOR_NEGATIVE = "#D97706"
+COLOR_NEGATIVE_LIGHT = "#F59E0B"
+COLOR_ERROR = "#EF4444"
 
 
 def parse_args() -> argparse.Namespace:
@@ -198,12 +210,30 @@ def format_problem_key(value: Any) -> str:
     return text
 
 
+def format_problem_short_label(value: Any) -> str:
+    text = str(value)
+    if text.startswith("definition_a::"):
+        _, _, track_part = text.partition("__")
+        track_label = format_track_name(track_part) if track_part else ""
+        return f"Definição A | {track_label}" if track_label else "Definição A"
+    if text.startswith("definition_b_label__"):
+        track_label = format_track_name(text.replace("definition_b_label__", ""))
+        return f"Definição B | {track_label}" if track_label else "Definição B"
+    if text.startswith("definition_b__"):
+        track_label = format_track_name(text.replace("definition_b__", ""))
+        return f"Definição B | {track_label}" if track_label else "Definição B"
+    return format_problem_key(text)
+
+
 def format_official_status(value: Any) -> str:
     mapping = {
         "official_admissible": "admissível na fronteira oficial",
         "official_fixed_literal": "comparador literal fixo",
         "official_unique": "definição oficial única",
         "official_winner": "vencedor oficial",
+        "sensitivity_admissible": "admissível na sensibilidade",
+        "sensitivity_lock_topk": "sensibilidade no lock temporal",
+        "sensitivity_development_frontier": "sensibilidade na fronteira do development",
     }
     return mapping.get(str(value), str(value))
 
@@ -212,6 +242,9 @@ def format_selection_basis(value: Any) -> str:
     mapping = {
         "per_metric_out_of_sample_rank_aggregation_then_metric_pareto_front": "agregação por desempenho fora da amostra + fronteira de Pareto por métrica",
         "literal_comparator_fixed_a_priori": "regra literal fixada a priori",
+        "univariate_exact_development_outer_test_rank_aggregation_then_metric_pareto_front_then_deterministic_ranked_promotion_with_temporal_holdout_reserved": "busca no development + fronteira admissível + promoção ranqueada antes da avaliação temporal intocada",
+        "univariate_exact_development_outer_test_rank_aggregation_then_metric_pareto_front_then_definition_lock_pareto_with_local_threshold_sensitivity_before_final_model_evaluation": "busca no development + top-K admissível + lock temporal com sensibilidade local de threshold antes da avaliação final do modelo",
+        "atomic_screening_on_development_outer_tests_then_pairwise_and_or_and_weighted_percentile_expansion_then_definition_lock_with_threshold_structural_and_weight_sensitivity_before_final_model_evaluation": "screening atômico no development + expansão pairwise AND/OR e ponderada + lock temporal com sensibilidade de threshold, estrutura e peso antes da avaliação final do modelo",
     }
     return mapping.get(str(value), str(value))
 
@@ -252,11 +285,12 @@ def format_selection_reason(value: Any) -> str:
     text = str(value)
     if text.startswith("serving_primary::"):
         parts = text.split("::")
-        if len(parts) >= 4:
-            return (
-                f"modelo servível primário da {format_definition_name(parts[2])} "
-                "após desempate por erro probabilístico, variabilidade e informação disponível"
-            )
+        if len(parts) >= 3:
+            scope = str(parts[1])
+            if scope == "definition_group_matched_frontier_candidates":
+                return "modelo servível primário dentro do definition_group congelado após desempate por erro probabilístico, variabilidade e informação disponível"
+            if scope == "all_pareto_frontier_candidates":
+                return "modelo servível primário entre todos os candidatos da fronteira após desempate por erro probabilístico, variabilidade e informação disponível"
         return "modelo servível primário após regra formal de desempate"
     if text.startswith("best_probability_first_within_definition::"):
         definition_name = text.split("::", 1)[1]
@@ -378,6 +412,37 @@ def describe_strict_context_feature(feature_name: str) -> str:
     return mapping.get(feature_name, "")
 
 
+def build_strict_context_detail(feature_registry: pd.DataFrame, *, multiline: bool = False) -> str:
+    if feature_registry.empty:
+        return ""
+    show = feature_registry.copy()
+    if "allowed_in_STRICT_CONTEXT" in show.columns:
+        show = show[show["allowed_in_STRICT_CONTEXT"] == 1].copy()
+    if show.empty:
+        return ""
+    ordered_features = [
+        "months_after_entry",
+        "teacher_population_status",
+        "utm_group",
+        "first_session_entry_surface",
+        "first_session_device_bucket",
+        "first_event_missing_flag",
+        "first_device_missing_flag",
+        "first_utm_missing_flag",
+        "session_without_interaction_flag",
+    ]
+    parts: list[str] = []
+    available = set(show["feature_name"].astype(str)) if "feature_name" in show.columns else set()
+    for feature_name in ordered_features:
+        if feature_name in available:
+            description = describe_strict_context_feature(feature_name)
+            parts.append(f"<code>{feature_name}</code>: {description}")
+    if not parts:
+        return ""
+    separator = "<br/>" if multiline else " "
+    return separator.join(parts)
+
+
 def format_external_validator_name(value: Any) -> str:
     mapping = {
         "returned_active_post_label_m1": "retorno ativo no 1º bloco pós-label",
@@ -477,7 +542,7 @@ def format_arbitrary_why(value: Any) -> str:
         "Post-label validators are measured in three consecutive 30-day blocks after the label window.": "Os validadores pós-label são medidos em três blocos consecutivos de 30 dias depois da janela principal do label.",
         "Bootstrap needs a finite number of resamples. The value is surfaced explicitly instead of being hidden in the code.": "Bootstrap precisa de número finito de reamostragens. O valor aparece explicitamente no relatório em vez de ficar escondido no código.",
         "The splitter evaluates one unique month at a time to preserve month boundaries in the panel.": "O splitter avalia um mês por vez para preservar os limites mensais do painel.",
-        "The published build limits the expanding outer backtest to the last 5 test months to keep the exact-threshold search and calibrated model comparison computationally feasible. This is surfaced explicitly instead of being hidden.": "O build publicado limita o outer backtest expansivo aos últimos 5 meses de teste para manter viável a busca exata de thresholds e a comparação calibrada de modelos. Isso aparece explicitamente no relatório.",
+        "The published build limits the expanding outer backtest to the last 5 test months to keep the exact-threshold search and calibrated model comparison computationally feasible. This is surfaced explicitly instead of being hidden.": "O build publicado limita o outer backtest expansivo aos últimos meses de teste configurados para manter viável a busca exata de thresholds e a comparação calibrada de modelos. Isso aparece explicitamente no relatório.",
         "The official build requires at least two valid outer folds before publishing a mean and dispersion across folds. Single-fold results remain diagnostic only.": "O build oficial exige pelo menos dois outer folds válidos antes de publicar média e dispersão entre folds. Resultado de um único fold fica só como diagnóstico.",
         "The official path follows the library-guided default for smaller calibration samples and preserves monotonic ranking.": "O caminho oficial segue a escolha guiada pela biblioteca para amostras menores de calibração e preserva o ranking monotônico.",
         "The official comparison is intentionally limited to the three requested model families and does not claim that this scope is exhaustive.": "A comparação oficial fica intencionalmente limitada às três famílias de modelo pedidas e não afirma que esse escopo é exaustivo.",
@@ -502,6 +567,639 @@ def render_intro_table(rows: list[tuple[str, str]]) -> str:
     return render_clean_table(intro)
 
 
+def render_lineage_box(items: list[tuple[str, str]]) -> str:
+    if not items:
+        return ""
+    body = "".join(f"<p><b>{label}:</b> {value}</p>" for label, value in items if value)
+    if not body:
+        return ""
+    return f"<div class='lineage'>{body}</div>"
+
+
+def render_teaching_block(
+    *,
+    title: str,
+    quick_definition: str,
+    how_text: str,
+    why_text: str,
+    chart_html: str,
+    detail_html: str = "",
+    what_text: str,
+    conclusion_text: str,
+    lineage_items: list[tuple[str, str]],
+) -> str:
+    chart_wrap = f"<div class='embedded-chart-wrap'>{chart_html}</div>" if chart_html else ""
+    lineage_html = render_lineage_box(lineage_items)
+    what_html = f'<p class="section-text">{what_text}</p>' if str(what_text).strip() else ""
+    conclusion_html = f'<div class="note">{conclusion_text}</div>' if str(conclusion_text).strip() else ""
+    return f"""
+    <div class="guide-card">
+      <h3>{title}</h3>
+      <p class="section-text lead-text">{quick_definition}</p>
+      <p class="section-text"><b>Como foi feito.</b> {how_text}</p>
+      <p class="section-text"><b>Por que isso importa.</b> {why_text}</p>
+      {chart_wrap}
+      {detail_html}
+      {what_html}
+      {conclusion_html}
+      {lineage_html}
+    </div>
+    """
+
+
+def render_protocol_sections(sections: list[tuple[str, list[str]]]) -> str:
+    if not sections:
+        return ""
+    chunks: list[str] = []
+    for title, bullets in sections:
+        if not bullets:
+            continue
+        bullet_html = "".join(f"<li>{bullet}</li>" for bullet in bullets)
+        chunks.append(
+            f"""
+            <div class="protocol-section">
+              <h4>{title}</h4>
+              <ul class="protocol-list">
+                {bullet_html}
+              </ul>
+            </div>
+            """
+        )
+    if not chunks:
+        return ""
+    return f"<div class='protocol-wrap'>{''.join(chunks)}</div>"
+
+
+def render_checklist_block(
+    *,
+    title: str,
+    quick_definition: str,
+    how_text: str,
+    why_text: str,
+    sections: list[tuple[str, list[str]]],
+    conclusion_text: str,
+    lineage_items: list[tuple[str, str]],
+) -> str:
+    section_html = render_protocol_sections(sections)
+    lineage_html = render_lineage_box(lineage_items)
+    conclusion_html = f'<div class="note">{conclusion_text}</div>' if str(conclusion_text).strip() else ""
+    return f"""
+    <div class="guide-card">
+      <h3>{title}</h3>
+      <p class="section-text lead-text">{quick_definition}</p>
+      <p class="section-text"><b>Como deve ser lido.</b> {how_text}</p>
+      <p class="section-text"><b>Por que isso importa.</b> {why_text}</p>
+      {section_html}
+      {conclusion_html}
+      {lineage_html}
+    </div>
+    """
+
+
+def render_strict_context_note(feature_registry: pd.DataFrame) -> str:
+    return (
+        "<div class='definition-note'>"
+        "<strong>STRICT_CONTEXT</strong>"
+        "<p>Usa só 9 variáveis de contexto inicial e completude: tempo desde a entrada, status básico do professor, canal de aquisição, origem e dispositivo da 1ª entrada, e flags de ausência/1ª sessão sem interação.</p>"
+        "</div>"
+    )
+
+
+def render_compact_block(
+    *,
+    title: str,
+    description: str,
+    chart_html: str,
+    finding_text: str,
+    lineage_items: list[tuple[str, str]],
+) -> str:
+    chart_wrap = f"<div class='embedded-chart-wrap'>{chart_html}</div>" if chart_html else ""
+    lineage_html = render_lineage_box(lineage_items)
+    return f"""
+    <div class="guide-card compact-card">
+      <h3>{title}</h3>
+      <p class="section-text lead-text">{description}</p>
+      {chart_wrap}
+      <p class="section-text">{finding_text}</p>
+      {lineage_html}
+    </div>
+    """
+
+
+def render_assumptions_timeline(
+    assumption_points: pd.DataFrame,
+    feature_registry: pd.DataFrame,
+) -> str:
+    if assumption_points.empty:
+        return ""
+    ordered_tracks = ["S1", "S7", "S1+S7", "STRICT_CONTEXT"]
+    point_map: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in assumption_points.to_dict(orient="records"):
+        point_map[(str(row.get("track_name", "")), str(row.get("event_name", "")))] = row
+    rows: list[str] = []
+    for track in ordered_tracks:
+        score = point_map.get((track, "momento do score"), {})
+        raw_score_day = float(pd.to_numeric(score.get("day_number"), errors="coerce") or 0.0)
+        score_slot = "session" if track == "S1" and raw_score_day <= 1.0 else "week"
+        slot_icons = {
+            "start": "<i class='legend-dot legend-start'></i>",
+            "session": "<i class='legend-dot legend-predict'></i>" if score_slot == "session" else "",
+            "week": "<i class='legend-dot legend-predict'></i>" if score_slot == "week" else "",
+            "result": "<i class='legend-dot legend-result-shape'></i>",
+        }
+        rows.append(
+            f"""
+            <div class="assumption-matrix-row">
+              <div class="assumption-track">{track}</div>
+              <div class="assumption-trackline">
+                <div class="assumption-rail-line"></div>
+                <div class="assumption-cell">{slot_icons["start"]}</div>
+                <div class="assumption-cell">{slot_icons["session"]}</div>
+                <div class="assumption-cell">{slot_icons["week"]}</div>
+                <div class="assumption-cell">{slot_icons["result"]}</div>
+              </div>
+            </div>
+            """
+        )
+    axis = """
+    <div class="assumption-header">
+      <div></div>
+      <div class="assumption-header-cell">Início</div>
+      <div class="assumption-header-cell">Fim da 1ª sessão</div>
+      <div class="assumption-header-cell">Fim dos 7 dias</div>
+      <div class="assumption-header-cell">Fim da janela futura</div>
+    </div>
+    """
+    legend = """
+    <div class="assumption-legend">
+      <span><i class="legend-dot legend-start"></i>Início observado</span>
+      <span><i class="legend-dot legend-predict"></i>Já dá para prever</span>
+      <span><i class="legend-dot legend-result-shape"></i>Janela futura já pode ser medida</span>
+    </div>
+    """
+    return f"<div class='assumption-panel'>{legend}{axis}<div class='assumption-matrix'>{''.join(rows)}</div><div class='assumption-axis-title'>Momento do processo</div></div>"
+
+
+def render_model_selection_board(model_frontier: pd.DataFrame) -> str:
+    if model_frontier.empty:
+        return ""
+    sections: list[str] = []
+    for problem_key, group in model_frontier.groupby("problem_key", dropna=False):
+        group = group.sort_values(
+            ["mean_brier", "mean_log_loss", "mean_ap", "mean_roc_auc"],
+            ascending=[True, True, False, False],
+            kind="mergesort",
+        ).copy()
+        body_rows: list[str] = []
+        for idx, row in enumerate(group.to_dict(orient="records"), start=1):
+            model_label = format_model_name(row.get("model_name"))
+            is_winner = idx == 1
+            is_primary = int(row.get("selected_flag", 0)) == 1
+            row_class = "comparison-table-row-selected" if (is_winner or is_primary) else ""
+            badges: list[str] = []
+            if is_winner:
+                badges.append("<span class='status-pill winner-pill'>vencedor</span>")
+            if is_primary:
+                badges.append("<span class='status-pill selected-pill'>primário</span>")
+            badge_html = (" " + " ".join(badges)) if badges else ""
+            body_rows.append(
+                f"""
+                <tr class="{row_class}">
+                  <td><span class="rank-pill">{idx}º</span></td>
+                  <td><strong>{model_label}</strong>{badge_html}</td>
+                  <td>{format_number(row.get('mean_ap'), 3)}</td>
+                  <td>{format_number(row.get('mean_roc_auc'), 3)}</td>
+                  <td>{format_number(row.get('mean_brier'), 3)}</td>
+                  <td>{format_number(row.get('mean_log_loss'), 3)}</td>
+                </tr>
+                """
+            )
+        problem_class = "comparison-section-a" if str(problem_key).startswith("definition_a") else "comparison-section-b"
+        sections.append(
+            f"""
+            <div class="comparison-section {problem_class}">
+              <div class="comparison-section-title">{format_problem_short_label(problem_key)}</div>
+              <table class="comparison-table">
+                <thead>
+                  <tr>
+                    <th>Posição</th>
+                    <th>Modelo</th>
+                    <th>AP</th>
+                    <th>ROC AUC</th>
+                    <th>Brier</th>
+                    <th>Log loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {''.join(body_rows)}
+                </tbody>
+              </table>
+            </div>
+            """
+        )
+    return f"<div class='comparison-sections'>{''.join(sections)}</div>"
+
+
+def render_trust_panel(
+    cv_metric_folds: pd.DataFrame,
+    cv_threshold_summary: pd.DataFrame,
+) -> str:
+    if cv_metric_folds.empty:
+        return ""
+    ap_rows = cv_metric_folds[cv_metric_folds["metric_name"].astype(str) == "ap"].copy()
+    brier_rows = cv_metric_folds[cv_metric_folds["metric_name"].astype(str) == "brier"].copy()
+    ap_values = pd.to_numeric(ap_rows["metric_value"], errors="coerce").dropna()
+    brier_values = pd.to_numeric(brier_rows["metric_value"], errors="coerce").dropna()
+    folds = sorted(set(pd.to_numeric(ap_rows["fold_id"], errors="coerce").dropna().astype(int).tolist()))
+    trust_cards: list[str] = []
+    if folds:
+        trust_cards.append(
+            f"""
+            <div class="trust-card">
+              <span>Outer folds válidos</span>
+              <strong>{len(folds)}</strong>
+              <small>Cada fold é um mês futuro nunca visto no treino.</small>
+            </div>
+            """
+        )
+    if not ap_values.empty:
+        trust_cards.append(
+            f"""
+            <div class="trust-card">
+              <span>AP</span>
+              <strong>{format_number(ap_values.mean(), 3)}</strong>
+              <small>Faixa {format_number(ap_values.min(), 3)} a {format_number(ap_values.max(), 3)}</small>
+            </div>
+            """
+        )
+    if not brier_values.empty:
+        trust_cards.append(
+            f"""
+            <div class="trust-card">
+              <span>Brier</span>
+              <strong>{format_number(brier_values.mean(), 3)}</strong>
+              <small>Faixa {format_number(brier_values.min(), 3)} a {format_number(brier_values.max(), 3)}</small>
+            </div>
+            """
+        )
+    if not cv_threshold_summary.empty:
+        subset = cv_threshold_summary[cv_threshold_summary["policy_name"].astype(str) == "tercis"].copy()
+        for metric_name, label in [("precision", "Precisão em tercis"), ("recall", "Recall em tercis")]:
+            metric_row = subset[subset["metric_name"].astype(str) == metric_name]
+            if not metric_row.empty:
+                row = metric_row.iloc[0]
+                trust_cards.append(
+                    f"""
+                    <div class="trust-card">
+                      <span>{label}</span>
+                      <strong>{format_percent(row.get('mean_value'), 1)}</strong>
+                      <small>Faixa {format_percent(row.get('min_value'), 1)} a {format_percent(row.get('max_value'), 1)}</small>
+                    </div>
+                    """
+                )
+    fold_lines: list[str] = []
+    for fold_id in folds:
+        ap_match = ap_rows[pd.to_numeric(ap_rows["fold_id"], errors="coerce").astype("Int64") == fold_id]
+        brier_match = brier_rows[pd.to_numeric(brier_rows["fold_id"], errors="coerce").astype("Int64") == fold_id]
+        ap_value = ap_match.iloc[0]["metric_value"] if not ap_match.empty else np.nan
+        brier_value = brier_match.iloc[0]["metric_value"] if not brier_match.empty else np.nan
+        fold_lines.append(
+            f"""
+            <div class="fold-line">
+              <b>Fold {fold_id}</b>
+              <span>AP {format_number(ap_value, 3)}</span>
+              <span>Brier {format_number(brier_value, 3)}</span>
+            </div>
+            """
+        )
+    return (
+        f"<div class='trust-kpi-grid'>{''.join(trust_cards)}</div>"
+        f"<div class='fold-strip'>{''.join(fold_lines)}</div>"
+    )
+
+
+def render_confusion_matrix_panel(confusion_df: pd.DataFrame) -> str:
+    if confusion_df.empty:
+        return ""
+    preferred = confusion_df[confusion_df["policy_name"].astype(str) == "tercis"].copy()
+    if not preferred.empty:
+        confusion_df = preferred
+    tp = _get_confusion_value(confusion_df, "nao_realiza", "nao_realiza")
+    fp = _get_confusion_value(confusion_df, "realiza", "nao_realiza")
+    fn = _get_confusion_value(confusion_df, "nao_realiza", "realiza")
+    tn = _get_confusion_value(confusion_df, "realiza", "realiza")
+    return f"""
+    <div class="confusion-grid">
+      <div class="confusion-head empty-head"></div>
+      <div class="confusion-head top-head-risk">Modelo marcou como inativo</div>
+      <div class="confusion-head top-head-active">Modelo marcou como ativo</div>
+      <div class="confusion-head side-head side-head-risk">Na prática, ficou inativo</div>
+      <div class="confusion-cell tp-cell"><span class="conf-label">Acerto de risco</span><strong>{tp}</strong><small>Ficou inativo e entrou na fila de risco</small></div>
+      <div class="confusion-cell fn-cell"><span class="conf-label">Risco perdido</span><strong>{fn}</strong><small>Ficou inativo, mas ficou fora da fila</small></div>
+      <div class="confusion-head side-head side-head-active">Na prática, continuou ativo</div>
+      <div class="confusion-cell fp-cell"><span class="conf-label">Alarme falso</span><strong>{fp}</strong><small>Entrou na fila de risco, mas continuou ativo</small></div>
+      <div class="confusion-cell tn-cell"><span class="conf-label">Acerto de atividade</span><strong>{tn}</strong><small>Continuou ativo e ficou fora da fila</small></div>
+    </div>
+    """
+
+
+def render_final_model_panel(
+    model_frontier: pd.DataFrame,
+    threshold_metrics: pd.DataFrame,
+    confusion_df: pd.DataFrame,
+) -> str:
+    if model_frontier.empty:
+        return ""
+    row = model_frontier.iloc[0]
+    problem_key = str(row.get("problem_key", ""))
+    threshold_row = _get_threshold_row(threshold_metrics, problem_key, "tercis")
+    cards = [
+        f"<div class='trust-card'><span>AP</span><strong>{format_number(row.get('mean_ap'), 3)}</strong><small>Teste futuro concatenado</small></div>",
+        f"<div class='trust-card'><span>ROC AUC</span><strong>{format_number(row.get('mean_roc_auc'), 3)}</strong><small>Separação entre realizou e não realizou</small></div>",
+        f"<div class='trust-card'><span>Brier</span><strong>{format_number(row.get('mean_brier'), 3)}</strong><small>Erro médio da probabilidade</small></div>",
+        f"<div class='trust-card'><span>Log loss</span><strong>{format_number(row.get('mean_log_loss'), 3)}</strong><small>Pune probabilidade muito errada com confiança alta</small></div>",
+    ]
+    if threshold_row is not None:
+        cards.append(
+            f"<div class='trust-card'><span>Precisão em tercis</span><strong>{format_percent(threshold_row.get('precision'))}</strong><small>Entre os marcados como alto risco, quantos realmente não realizaram</small></div>"
+        )
+        cards.append(
+            f"<div class='trust-card'><span>Recall em tercis</span><strong>{format_percent(threshold_row.get('recall'))}</strong><small>Entre quem não realizou, quantos foram capturados como alto risco</small></div>"
+        )
+    return f"<div class='trust-kpi-grid'>{''.join(cards)}</div>{render_confusion_matrix_panel(confusion_df)}"
+
+
+def render_score_panel(
+    score_deciles: pd.DataFrame,
+    threshold_metrics: pd.DataFrame,
+    band_summary: pd.DataFrame,
+) -> str:
+    parts: list[str] = []
+    if not score_deciles.empty:
+        ordered = score_deciles.sort_values("score_decile", kind="mergesort").copy()
+        decile_rows: list[str] = []
+        for row in ordered.to_dict(orient="records"):
+            score_value = float(pd.to_numeric(row.get("mean_score"), errors="coerce") or 0.0)
+            realized_value = float(pd.to_numeric(row.get("realized_rate"), errors="coerce") or 0.0)
+            decile_rows.append(
+                f"""
+                <div class="decile-row">
+                  <div class="decile-label">D{int(pd.to_numeric(row.get('score_decile'), errors='coerce') or 0)}</div>
+                  <div class="decile-metric">
+                    <span>Score previsto {format_percent(score_value)}</span>
+                    <div class="decile-track"><div class="decile-fill decile-pred-fill" style="width:{score_value * 100:.1f}%"></div></div>
+                  </div>
+                  <div class="decile-metric">
+                    <span>Taxa observada {format_percent(realized_value)}</span>
+                    <div class="decile-track"><div class="decile-fill decile-real-fill" style="width:{realized_value * 100:.1f}%"></div></div>
+                  </div>
+                </div>
+                """
+            )
+        parts.append(
+            "<div class='decile-panel'>"
+            "<div class='decile-legend'><span><i class='legend-box decile-pred-fill'></i>Score previsto</span><span><i class='legend-box decile-real-fill'></i>Taxa observada</span></div>"
+            f"{''.join(decile_rows)}</div>"
+        )
+    if threshold_metrics.empty:
+        return "".join(parts)
+    problem_key = str(score_deciles.iloc[0].get("problem_key", "")) if not score_deciles.empty else ""
+    policy_cards: list[str] = []
+    share_lookup: dict[tuple[str, str], Any] = {}
+    if not band_summary.empty:
+        match = band_summary[band_summary["problem_key"].astype(str) == problem_key].copy()
+        for row in match.to_dict(orient="records"):
+            share_lookup[(str(row.get("policy_name", "")), str(row.get("band_name", "")))] = row.get("share")
+    for policy_name in ["top_10_percent", "tercis", "score_ge_0_70"]:
+        row = _get_threshold_row(threshold_metrics, problem_key, policy_name)
+        if row is None:
+            continue
+        policy_cards.append(
+            f"""
+            <div class="policy-card">
+              <h4>{format_policy_name(policy_name)}</h4>
+              <div class="metric-grid">
+                <div class="metric-mini"><span>Precisão</span><strong>{format_percent(row.get('precision'))}</strong></div>
+                <div class="metric-mini"><span>Recall</span><strong>{format_percent(row.get('recall'))}</strong></div>
+                <div class="metric-mini"><span>Faixa alta</span><strong>{format_percent(share_lookup.get((policy_name, 'alto')))}</strong></div>
+              </div>
+            </div>
+            """
+        )
+    if policy_cards:
+        parts.append(f"<div class='policy-grid'>{''.join(policy_cards)}</div>")
+    return "".join(parts)
+
+
+def render_driver_panel(
+    feature_importance: pd.DataFrame,
+    definition_b_feature_block_gain_summary: pd.DataFrame,
+) -> str:
+    bars: list[str] = []
+    if not feature_importance.empty:
+        grouped = (
+            feature_importance.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
+            .agg(importance_mean=("importance_mean", "mean"))
+        )
+        grouped["importance_abs"] = grouped["importance_mean"].abs()
+        grouped = grouped.sort_values(["importance_abs", "problem_key", "model_name"], ascending=[False, True, True], kind="mergesort")
+        primary = grouped[grouped["problem_key"].astype(str).str.startswith("definition_a::")].copy()
+        if primary.empty:
+            primary = grouped.copy()
+        if not primary.empty:
+            problem_key = str(primary.iloc[0]["problem_key"])
+            model_name = str(primary.iloc[0]["model_name"])
+            plot_df = primary[
+                (primary["problem_key"].astype(str) == problem_key)
+                & (primary["model_name"].astype(str) == model_name)
+            ].head(5).copy()
+            max_abs = float(plot_df["importance_abs"].max() or 0.0)
+            for row in plot_df.to_dict(orient="records"):
+                width = 0.0 if max_abs == 0 else float(row["importance_abs"]) / max_abs * 100.0
+                bars.append(
+                    f"""
+                    <div class="feature-bar-row">
+                      <div class="feature-bar-label">{format_feature_name(row.get('feature_name'))}</div>
+                      <div class="feature-bar-track"><div class="feature-bar-fill" style="width:{width:.1f}%"></div></div>
+                      <div class="feature-bar-value">{float(pd.to_numeric(row.get('importance_mean'), errors='coerce') or 0.0):.5f}</div>
+                    </div>
+                    """
+                )
+    chips: list[str] = []
+    s1_row = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_feature_class::s1")
+    s7_row = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_feature_class::s7")
+    if s1_row is not None and s7_row is not None:
+        chips.append(
+            f"<div class='signal-chip'><strong>1ª sessão vs 7 dias</strong><span>+{format_number(s1_row.get('delta_ap_vs_context'), 3)} de AP com S1 e +{format_number(s7_row.get('delta_ap_vs_context'), 3)} com S7.</span></div>"
+        )
+    early_views = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_behavior_family::early_views")
+    early_downloads = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_behavior_family::early_downloads")
+    week_views = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_behavior_family::week_views")
+    week_downloads = _block_gain_row(definition_b_feature_block_gain_summary, "context_plus_behavior_family::week_downloads")
+    if early_views is not None and early_downloads is not None and week_views is not None and week_downloads is not None:
+        chips.append(
+            f"<div class='signal-chip'><strong>Views vs downloads</strong><span>Na 1ª sessão, views {format_number(early_views.get('delta_ap_vs_context'), 3)} vs downloads {format_number(early_downloads.get('delta_ap_vs_context'), 3)}. Na semana, views {format_number(week_views.get('delta_ap_vs_context'), 3)} vs downloads {format_number(week_downloads.get('delta_ap_vs_context'), 3)}.</span></div>"
+        )
+    feature_html = f"<div class='feature-bar-list'>{''.join(bars)}</div>" if bars else ""
+    chips_html = f"<div class='signal-chip-grid'>{''.join(chips)}</div>" if chips else ""
+    return feature_html + chips_html
+
+
+def render_cluster_panel(cluster_summary: pd.DataFrame, cluster_profile: pd.DataFrame) -> str:
+    if cluster_summary.empty:
+        return ""
+    summary = cluster_summary.sort_values("mean_risk_score", ascending=False, kind="mergesort").copy()
+    profile_map: dict[str, dict[str, float]] = {}
+    if not cluster_profile.empty:
+        subset = cluster_profile[
+            cluster_profile["feature_name"].astype(str).isin(
+                [
+                    "teacher_active_months_total",
+                    "avg_activity_events_active_month",
+                    "avg_active_days_active_month",
+                    "avg_strict_downloads_active_month",
+                    "avg_content_views_active_month",
+                ]
+            )
+        ].copy()
+        for cluster_name, group in subset.groupby("cluster_name", dropna=False):
+            profile_map[str(cluster_name)] = {
+                str(row["feature_name"]): float(row["feature_mean"])
+                for row in group.to_dict(orient="records")
+            }
+    cards: list[str] = []
+    for row in summary.to_dict(orient="records"):
+        cluster_name = str(row.get("cluster_name", ""))
+        profile = profile_map.get(cluster_name, {})
+        cards.append(
+            f"""
+            <div class="profile-card">
+              <h4>{format_cluster_name(cluster_name)}</h4>
+              <div class="metric-grid">
+                <div class="metric-mini"><span>Share</span><strong>{format_percent(row.get('share'))}</strong></div>
+                <div class="metric-mini"><span>risk_score médio</span><strong>{format_percent(row.get('mean_risk_score'))}</strong></div>
+                <div class="metric-mini"><span>Não realização</span><strong>{format_percent(row.get('realized_inactivity_rate'))}</strong></div>
+              </div>
+              <div class="profile-list">
+                <div><b>Meses ativos totais</b>: {format_number(profile.get('teacher_active_months_total'), 1)}</div>
+                <div><b>Eventos por mês ativo</b>: {format_number(profile.get('avg_activity_events_active_month'), 1)}</div>
+                <div><b>Dias ativos por mês</b>: {format_number(profile.get('avg_active_days_active_month'), 1)}</div>
+                <div><b>Downloads por mês ativo</b>: {format_number(profile.get('avg_strict_downloads_active_month'), 1)}</div>
+                <div><b>Visualizações por mês ativo</b>: {format_number(profile.get('avg_content_views_active_month'), 1)}</div>
+              </div>
+            </div>
+            """
+        )
+    return f"<div class='profile-grid'>{''.join(cards)}</div>"
+
+
+def render_heavy_user_panel(
+    heavy_user_summary: pd.DataFrame,
+    heavy_user_profile: pd.DataFrame,
+) -> str:
+    if px is None or heavy_user_summary.empty:
+        return ""
+    summary = heavy_user_summary[heavy_user_summary["policy_name"].astype(str) == "heavy_top_10_percent"].copy()
+    if summary.empty:
+        summary = heavy_user_summary.copy()
+    profile_map: dict[int, dict[str, float]] = {}
+    if not heavy_user_profile.empty:
+        subset = heavy_user_profile[heavy_user_profile["policy_name"].astype(str) == "heavy_top_10_percent"].copy()
+        if subset.empty:
+            subset = heavy_user_profile.copy()
+        subset = subset[
+            subset["metric_name"].astype(str).isin(
+                [
+                    "future_sessions",
+                    "future_session_minutes",
+                    "future_active_days",
+                    "future_activity_events",
+                ]
+            )
+        ].copy()
+        for flag, group in subset.groupby("heavy_user_flag", dropna=False):
+            profile_map[int(flag)] = {
+                str(row["metric_name"]): float(row["metric_mean"])
+                for row in group.to_dict(orient="records")
+            }
+    rows: list[dict[str, Any]] = []
+    base_profile = profile_map.get(0, {})
+    heavy_profile = profile_map.get(1, {})
+    summary_by_flag = {
+        int(row.get("heavy_user_flag", 0)): row
+        for row in summary.to_dict(orient="records")
+    }
+    heavy_row = summary_by_flag.get(1, {})
+    base_row = summary_by_flag.get(0, {})
+    comparisons = [
+        ("Taxa de inatividade", float(pd.to_numeric(heavy_row.get("realized_inactivity_rate"), errors="coerce") or 0.0), float(pd.to_numeric(base_row.get("realized_inactivity_rate"), errors="coerce") or 0.0), "negative"),
+        ("Sessões futuras", float(heavy_profile.get("future_sessions", 0.0)), float(base_profile.get("future_sessions", 0.0)), "positive"),
+        ("Dias ativos futuros", float(heavy_profile.get("future_active_days", 0.0)), float(base_profile.get("future_active_days", 0.0)), "positive"),
+        ("Minutos futuros", float(heavy_profile.get("future_session_minutes", 0.0)), float(base_profile.get("future_session_minutes", 0.0)), "positive"),
+        ("Eventos futuros", float(heavy_profile.get("future_activity_events", 0.0)), float(base_profile.get("future_activity_events", 0.0)), "positive"),
+    ]
+    for metric_name, heavy_value, base_value, semantic in comparisons:
+        if base_value == 0:
+            ratio = np.nan
+        else:
+            ratio = heavy_value / base_value
+        rows.append(
+            {
+                "metric_name": metric_name,
+                "ratio_vs_rest": ratio,
+                "semantic": semantic,
+            }
+        )
+    plot_df = pd.DataFrame(rows)
+    if plot_df.empty:
+        return ""
+    order = ["Taxa de inatividade", "Sessões futuras", "Dias ativos futuros", "Minutos futuros", "Eventos futuros"]
+    plot_df["metric_name"] = pd.Categorical(plot_df["metric_name"], categories=order, ordered=True)
+    fig = px.bar(
+        plot_df.sort_values(["metric_name"], kind="mergesort"),
+        x="metric_name",
+        y="ratio_vs_rest",
+        color="semantic",
+        barmode="group",
+        text="ratio_vs_rest",
+        title="Quanto o grupo de uso forte difere do restante da base",
+        color_discrete_map={"positive": COLOR_POSITIVE, "negative": COLOR_NEGATIVE},
+    )
+    fig.update_traces(texttemplate="%{text:.1f}x", textposition="outside", cliponaxis=False)
+    fig.update_xaxes(title="")
+    fig.update_yaxes(title="Vezes o restante da base")
+    fig.update_layout(height=560, margin=dict(l=40, r=30, t=70, b=70), legend_title_text="", showlegend=False)
+    return fig.to_html(full_html=False, include_plotlyjs="cdn")
+
+
+def render_product_block() -> str:
+    return """
+    <div class="guide-card">
+      <h3>Produto</h3>
+      <div class="product-list">
+        <div><b>YAML controla</b>: caminhos de dados, janela do label, trilhas oficiais, famílias de modelo, tuning e políticas de cutoff/faixas.</div>
+        <div><b>Definições aceitas</b>: A definição A oficial por busca univariada exata e a definição B literal declarada no YAML.</div>
+        <div><b>Pipelines separados</b>: treino em <code>build-modelled</code>, <code>build-ml</code>, <code>build-report</code> e <code>build</code>; inferência em <code>export-serving</code>, <code>score-modelled</code>, <code>score-frame</code> e <code>score-raw</code>.</div>
+        <div><b>Lista de score</b>: teacher id, mês, modelo, definição, trilha, <code>score</code>, <code>risk_score</code>, elegibilidade e rank.</div>
+      </div>
+      <p class="section-text"><a class="button-link" href="http://localhost:8501" target="_blank" rel="noopener noreferrer">Abrir Streamlit</a> <a class="button-link secondary-link" href="http://localhost:8081" target="_blank" rel="noopener noreferrer">Abrir dbt docs</a></p>
+    </div>
+    """
+
+
+def _choice_numeric(arbitrariness: pd.DataFrame, choice_name: str, default: int | None = None) -> int | None:
+    if arbitrariness.empty or "choice_name" not in arbitrariness.columns:
+        return default
+    match = arbitrariness[arbitrariness["choice_name"].astype(str) == choice_name]
+    if match.empty:
+        return default
+    value = match.iloc[0].get("choice_value", default)
+    try:
+        return int(float(value))
+    except Exception:
+        return default
+
+
 def render_plotly(df: pd.DataFrame, kind: str) -> str:
     if px is None or df.empty:
         return ""
@@ -520,6 +1218,7 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
             color="definition_name",
             barmode="group",
             title="Validadores externos por definição",
+            color_discrete_map={"Definição A": COLOR_INFO, "Definição B": COLOR_NEGATIVE},
         )
     elif kind == "models":
         plot_df = df.copy()
@@ -539,6 +1238,167 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
             hover_name="problem_key",
             title="Fronteira oficial de score no teste futuro concatenado",
         )
+    elif kind == "assumptions":
+        plot_df = df.copy()
+        if plot_df.empty or go is None:
+            return ""
+        track_order = ["S1", "S7", "S1+S7", "STRICT_CONTEXT"]
+        point_map = {
+            (str(row["track_name"]), str(row["event_name"])): row
+            for row in plot_df.to_dict(orient="records")
+        }
+        y_positions = {track: len(track_order) - idx for idx, track in enumerate(track_order)}
+        fig = go.Figure()
+        for track in track_order:
+            score = point_map.get((track, "momento do score"), {})
+            end = point_map.get((track, "fim da janela do resultado"), {})
+            y = y_positions[track]
+            score_day = float(pd.to_numeric(score.get("day_number"), errors="coerce") or 0.0)
+            end_day = float(pd.to_numeric(end.get("day_number"), errors="coerce") or 37.0)
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, end_day],
+                    y=[y, y],
+                    mode="lines",
+                    line=dict(color="#64748B", width=8),
+                    hoverinfo="skip",
+                    showlegend=False,
+                )
+            )
+        start_x = [0] * len(track_order)
+        pred_x: list[float] = []
+        for track in track_order:
+            raw_score_day = float(pd.to_numeric(point_map.get((track, "momento do score"), {}).get("day_number"), errors="coerce") or 0.0)
+            pred_x.append(1.0 if track == "S1" and raw_score_day == 0.0 else raw_score_day)
+        result_x = [float(pd.to_numeric(point_map.get((track, "fim da janela do resultado"), {}).get("day_number"), errors="coerce") or 37.0) for track in track_order]
+        ys = [y_positions[track] for track in track_order]
+        fig.add_trace(go.Scatter(x=start_x, y=ys, mode="markers", name="Início observado", marker=dict(color="#E2E8F0", line=dict(color="#475569", width=2), size=16, symbol="circle")))
+        fig.add_trace(go.Scatter(x=pred_x, y=ys, mode="markers", name="Já dá para prever", marker=dict(color=COLOR_INFO, size=16, symbol="circle")))
+        fig.add_trace(go.Scatter(x=result_x, y=ys, mode="markers", name="Resultado pode ser medido", marker=dict(color=COLOR_POSITIVE, size=18, symbol="triangle-up")))
+        fig.update_yaxes(
+            tickmode="array",
+            tickvals=ys,
+            ticktext=track_order,
+            title="",
+            range=[0.5, len(track_order) + 0.5],
+        )
+        fig.update_xaxes(
+            title="Momento do processo",
+            tickmode="array",
+            tickvals=[0, 1, 7, 8, 37],
+            ticktext=["Início", "1ª sessão", "7 dias", "Início<br>do resultado", "Fim<br>do resultado"],
+            tickangle=0,
+        )
+        fig.update_layout(
+            title=dict(
+                text="Quando cada previsão pode ser feita e quando o resultado passa a poder ser medido",
+                x=0.0,
+                xanchor="left",
+                pad=dict(b=32),
+            ),
+            height=470,
+            margin=dict(l=40, r=30, t=90, b=78),
+            legend_title_text="",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+        )
+    elif kind == "scenarios_tested":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        plot_df["definition_name"] = plot_df["definition_name"].map(format_definition_name)
+        plot_df["track_name"] = plot_df["track_name"].map(format_track_name)
+        fig = px.bar(
+            plot_df,
+            x="track_name",
+            y="feature_count",
+            color="definition_name",
+            barmode="group",
+            text="feature_count",
+            title="Definições e trilhas testadas",
+            color_discrete_map={"Definição A": COLOR_INFO, "Definição B": COLOR_NEGATIVE},
+        )
+        fig.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="Trilha")
+        fig.update_yaxes(title="Quantidade de variáveis elegíveis")
+    elif kind == "model_selection":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        plot_df["problem_label"] = plot_df["problem_key"].map(format_problem_short_label)
+        plot_df["model_label"] = plot_df["model_name"].map(format_model_name)
+        metric_rows: list[dict[str, Any]] = []
+        for row in plot_df.to_dict(orient="records"):
+            metric_rows.extend(
+                [
+                    {
+                        "problem_label": row["problem_label"],
+                        "model_label": row["model_label"],
+                        "metric_label": "AP",
+                        "metric_value": float(pd.to_numeric(row.get("mean_ap"), errors="coerce") or 0.0),
+                        "raw_value": float(pd.to_numeric(row.get("mean_ap"), errors="coerce") or 0.0),
+                    },
+                    {
+                        "problem_label": row["problem_label"],
+                        "model_label": row["model_label"],
+                        "metric_label": "ROC AUC",
+                        "metric_value": float(pd.to_numeric(row.get("mean_roc_auc"), errors="coerce") or 0.0),
+                        "raw_value": float(pd.to_numeric(row.get("mean_roc_auc"), errors="coerce") or 0.0),
+                    },
+                    {
+                        "problem_label": row["problem_label"],
+                        "model_label": row["model_label"],
+                        "metric_label": "1 - Brier",
+                        "metric_value": 1.0 - float(pd.to_numeric(row.get("mean_brier"), errors="coerce") or 0.0),
+                        "raw_value": float(pd.to_numeric(row.get("mean_brier"), errors="coerce") or 0.0),
+                    },
+                    {
+                        "problem_label": row["problem_label"],
+                        "model_label": row["model_label"],
+                        "metric_label": "1 - Log loss",
+                        "metric_value": 1.0 - float(pd.to_numeric(row.get("mean_log_loss"), errors="coerce") or 0.0),
+                        "raw_value": float(pd.to_numeric(row.get("mean_log_loss"), errors="coerce") or 0.0),
+                    },
+                ]
+            )
+        plot_df = pd.DataFrame(metric_rows)
+        plot_df["comparison_label"] = plot_df["problem_label"] + "<br>" + plot_df["metric_label"]
+        fig = px.bar(
+            plot_df,
+            x="comparison_label",
+            y="metric_value",
+            color="model_label",
+            barmode="group",
+            color_discrete_map={
+                "CatBoost": COLOR_INFO,
+                "Regressão logística": COLOR_POSITIVE,
+                "Random Forest": COLOR_NEGATIVE,
+            },
+            category_orders={
+                "comparison_label": [
+                    "Definição A | S1+S7<br>AP",
+                    "Definição A | S1+S7<br>ROC AUC",
+                    "Definição A | S1+S7<br>1 - Brier",
+                    "Definição A | S1+S7<br>1 - Log loss",
+                    "Definição B | S7<br>AP",
+                    "Definição B | S7<br>ROC AUC",
+                    "Definição B | S7<br>1 - Brier",
+                    "Definição B | S7<br>1 - Log loss",
+                ],
+            },
+            hover_data={
+                "metric_value": ":.3f",
+                "raw_value": ":.3f",
+                "problem_label": False,
+                "model_label": False,
+                "metric_label": False,
+                "comparison_label": False,
+            },
+            title="Comparação entre famílias nas duas combinações publicadas",
+        )
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="", range=[0, 1.05])
     elif kind == "cv_score_drift":
         plot_df = df.copy()
         if plot_df.empty:
@@ -561,21 +1421,24 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
         if plot_df.empty:
             return ""
         plot_df = plot_df[plot_df["metric_name"].isin(["ap", "brier"])].copy()
-        plot_df["problem_key"] = plot_df["problem_key"].map(format_problem_key)
+        plot_df["problem_key"] = plot_df["problem_key"].map(format_problem_short_label)
         plot_df["model_name"] = plot_df["model_name"].map(format_model_name)
         plot_df["metric_name"] = plot_df["metric_name"].map({"ap": "AP", "brier": "Brier"})
         plot_df["serie"] = plot_df["problem_key"] + " | " + plot_df["model_name"]
-        top_series = plot_df["serie"].value_counts().head(6).index.tolist()
-        plot_df = plot_df[plot_df["serie"].isin(top_series)].copy()
         fig = px.line(
             plot_df,
             x="fold_id",
             y="metric_value",
-            color="serie",
+            color="metric_name",
             facet_row="metric_name",
             markers=True,
-            title="Como AP e Brier variaram entre outer folds",
+            title="AP e Brier do modelo final em cada mês de teste",
+            color_discrete_map={"AP": COLOR_INFO, "Brier": COLOR_NEGATIVE},
         )
+        fig.update_traces(line=dict(width=3), marker=dict(size=10))
+        fig.for_each_xaxis(lambda axis: axis.update(title_text=""))
+        fig.for_each_annotation(lambda ann: ann.update(text=str(ann.text).split("=")[-1]))
+        fig.update_yaxes(title="", matches=None)
     elif kind == "cv_threshold_drift":
         plot_df = df.copy()
         if plot_df.empty:
@@ -630,23 +1493,62 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
         if plot_df.empty:
             return ""
         plot_df["importance_abs"] = plot_df["importance_mean"].abs()
-        plot_df["serie"] = plot_df["problem_key"].map(format_problem_key) + " | " + plot_df["model_name"].map(format_model_name)
-        plot_df = (
-            plot_df.sort_values(["serie", "importance_abs"], ascending=[True, False])
-            .groupby("serie", group_keys=False)
-            .head(8)
-            .copy()
-        )
+        plot_df["serie"] = plot_df["problem_key"].map(format_problem_short_label) + " | " + plot_df["model_name"].map(format_model_name)
+        preferred_series = None
+        if any(plot_df["problem_key"].astype(str).str.startswith("definition_a::")):
+            preferred = plot_df[plot_df["problem_key"].astype(str).str.startswith("definition_a::")].copy()
+            if not preferred.empty:
+                preferred = preferred.sort_values(
+                    ["importance_abs", "problem_key", "model_name"],
+                    ascending=[False, True, True],
+                    kind="mergesort",
+                )
+                preferred_series = preferred.iloc[0]["serie"]
+        if preferred_series is None:
+            preferred_series = plot_df.sort_values(
+                ["importance_abs", "serie"],
+                ascending=[False, True],
+                kind="mergesort",
+            ).iloc[0]["serie"]
+        plot_df = plot_df[plot_df["serie"] == preferred_series].copy()
+        plot_df = plot_df.sort_values("importance_abs", ascending=False, kind="mergesort").head(8).copy()
         plot_df["feature_name"] = plot_df["feature_name"].map(format_feature_name)
         fig = px.bar(
-            plot_df.sort_values(["serie", "importance_abs"], ascending=[True, True]),
+            plot_df.sort_values("importance_abs", ascending=True, kind="mergesort"),
             x="importance_mean",
             y="feature_name",
-            color="serie",
             orientation="h",
-            facet_col="serie",
-            title="Sinais com maior impacto por permutação",
+            text="importance_mean",
+            title=f"Sinais com maior impacto no modelo principal: {preferred_series}",
         )
+        fig.update_traces(texttemplate="%{text:.3f}", textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="Importância média por permutação")
+        fig.update_yaxes(title="")
+    elif kind == "final_confusion":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        if "policy_name" in plot_df.columns:
+            preferred = plot_df[plot_df["policy_name"].astype(str) == "tercis"].copy()
+            if not preferred.empty:
+                plot_df = preferred
+        matrix = (
+            plot_df.groupby(["actual_group", "predicted_group"], as_index=False)["rows"]
+            .sum()
+            .pivot(index="actual_group", columns="predicted_group", values="rows")
+            .reindex(index=["nao_realiza", "realiza"], columns=["nao_realiza", "realiza"])
+            .fillna(0)
+        )
+        matrix.index = ["Observado: não realizou", "Observado: realizou"]
+        matrix.columns = ["Previsto: não realizou", "Previsto: realizou"]
+        fig = px.imshow(
+            matrix,
+            text_auto=True,
+            color_continuous_scale="Blues",
+            labels={"x": "", "y": "", "color": "Professores"},
+            title="Matriz de confusão do modelo final em tercis",
+        )
+        fig.update_xaxes(side="top")
     elif kind == "band_summary":
         plot_df = df.copy()
         if plot_df.empty:
@@ -686,14 +1588,118 @@ def render_plotly(df: pd.DataFrame, kind: str) -> str:
             barmode="group",
             title="Ajuste mensal agregado do risk_score",
         )
+    elif kind == "score_deciles":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        plot_df = plot_df.melt(
+            id_vars=["serie", "score_decile"],
+            value_vars=["mean_score", "realized_rate"],
+            var_name="metric_name",
+            value_name="metric_value",
+        )
+        plot_df["metric_name"] = plot_df["metric_name"].map(
+            {
+                "mean_score": "score médio previsto",
+                "realized_rate": "taxa realmente observada",
+            }
+        )
+        fig = px.line(
+            plot_df,
+            x="score_decile",
+            y="metric_value",
+            color="metric_name",
+            markers=True,
+            title="Score previsto e taxa observada por decil",
+            color_discrete_map={
+                "score médio previsto": COLOR_INFO,
+                "taxa realmente observada": COLOR_POSITIVE,
+            },
+        )
+        fig.update_xaxes(title="Decil do score", dtick=1)
+        fig.update_yaxes(title="Proporção", tickformat=".0%")
+    elif kind == "cluster_summary":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        plot_df["cluster_name"] = plot_df["cluster_name"].map(format_cluster_name)
+        fig = px.bar(
+            plot_df,
+            x="cluster_name",
+            y="realized_inactivity_rate",
+            color="cluster_name",
+            text="share",
+            title="Clusters descritivos no modelo final",
+        )
+        fig.update_traces(texttemplate="%{text:.1%}", textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="Taxa observada de não realização", tickformat=".0%")
+    elif kind == "heavy_user_summary":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        if "policy_name" in plot_df.columns:
+            preferred = plot_df[plot_df["policy_name"].astype(str) == "heavy_top_10_percent"].copy()
+            if not preferred.empty:
+                plot_df = preferred
+        plot_df["grupo"] = plot_df["heavy_user_flag"].map({1: "heavy-user", 0: "restante"})
+        fig = px.bar(
+            plot_df,
+            x="grupo",
+            y="realized_inactivity_rate",
+            color="grupo",
+            text="share",
+            title="Heavy-user como camada descritiva",
+        )
+        fig.update_traces(texttemplate="%{text:.1%}", textposition="outside", cliponaxis=False)
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="Taxa observada de não realização", tickformat=".0%")
+    elif kind == "navigation_sequences":
+        plot_df = df.copy()
+        if plot_df.empty:
+            return ""
+        plot_df["step_sequence_first5"] = plot_df["step_sequence_first5"].map(format_navigation_sequence)
+        plot_df["grupo"] = plot_df["label_value"].map({0: "não realizou", 1: "realizou"})
+        fig = px.bar(
+            plot_df.sort_values("teachers", ascending=True, kind="mergesort"),
+            x="teachers",
+            y="step_sequence_first5",
+            color="grupo",
+            orientation="h",
+            barmode="group",
+            title="Caminhos iniciais mais frequentes",
+        )
+        fig.update_xaxes(title="Professores")
+        fig.update_yaxes(title="")
     else:
         return ""
     default_height = 520
-    if kind in {"feature_importance", "cv_metric_drift", "cv_threshold_drift", "cv_confusion_drift"}:
+    if kind in {"feature_importance", "cv_metric_drift", "cv_threshold_drift", "cv_confusion_drift", "score_deciles", "navigation_sequences"}:
         default_height = 620
-    if kind in {"band_summary", "monthly_fit"}:
+    if kind in {"band_summary", "monthly_fit", "assumptions", "scenarios_tested", "model_selection", "cluster_summary", "heavy_user_summary"}:
         default_height = 560
-    fig.update_layout(height=default_height, margin=dict(l=40, r=30, t=70, b=40))
+    if kind == "cv_metric_drift":
+        default_height = 680
+    if kind == "score_deciles":
+        default_height = 560
+    if kind == "feature_importance":
+        default_height = 680
+    if kind == "final_confusion":
+        default_height = 520
+    if kind == "assumptions":
+        fig.update_layout(height=470, margin=dict(l=40, r=30, t=90, b=78))
+    else:
+        fig.update_layout(height=default_height, margin=dict(l=40, r=30, t=70, b=60))
+    if kind in {"assumptions", "feature_importance", "score_deciles", "cv_metric_drift", "model_selection"}:
+        fig.update_layout(legend_title_text="")
+    for annotation in getattr(fig.layout, "annotations", []) or []:
+        if isinstance(annotation.text, str):
+            annotation.text = (
+                annotation.text.replace("serie=", "")
+                .replace("metric_name=", "")
+                .replace("validator=", "")
+                .replace("problem_label=", "")
+            )
     return fig.to_html(full_html=False, include_plotlyjs="cdn")
 
 
@@ -901,7 +1907,7 @@ def build_intro_rows(
         ),
         (
             "Definição oficial",
-            f"No build atual, a escolha final do alvo ficou em <b>{official_definition}</b>. A métrica nativa <code>future_business_active_weeks</code> conta quantas semanas futuras tiveram, na mesma semana, pelo menos uma sessão em <code>fct_session_clean</code> e pelo menos um evento de atividade em <code>fct_interaction_clean</code>. A Definição A oficial acrescenta recorrência, diversidade de uso e um piso mínimo de profundidade em minutos futuros.",
+            f"No build atual, o alvo oficial do modelo ficou em <b>{official_definition}</b>. Separadamente, o estudo de definição continua publicando uma <code>Definition A</code> oficial apenas como comparador substantivo; ela não vira alvo do modelo. A métrica nativa <code>future_business_active_weeks</code> agora conta quantas semanas futuras tiveram pelo menos uma atividade literal da lista fixa da Definição B, ou progresso em formação, ou mensagem enviada pelo usuário na Mari IA.",
         ),
         (
             "Score oficial",
@@ -909,7 +1915,7 @@ def build_intro_rows(
         ),
         (
             "Como ler o score",
-            "O <code>score</code> é a probabilidade calibrada de realizar a atividade futura. Ele pode ser lido como probabilidade porque o modelo cru é recalibrado com <code>sigmoid</code> em um bloco temporal separado do treino e depois checado em meses futuros nunca vistos. O <code>risk_score = 1 - score</code> é a mesma informação vista do lado do risco de não realizar.",
+            "O <code>score</code> é a probabilidade calibrada de o professor entrar no grupo definido como ativo no período futuro deste relatório. Ele pode ser lido como probabilidade porque o modelo cru é recalibrado com <code>sigmoid</code> em um bloco temporal separado do treino e depois checado em meses futuros nunca vistos. O <code>risk_score = 1 - score</code> é a mesma informação vista do lado do risco de ficar fora desse grupo.",
         ),
         (
             "Trilhas oficiais",
@@ -1337,6 +2343,13 @@ def filter_to_reference_scope(df: pd.DataFrame, reference_scope: pd.DataFrame) -
     return df.merge(keys, on=join_cols, how="inner")
 
 
+def filter_to_problem_keys(df: pd.DataFrame, scope: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or scope.empty or "problem_key" not in df.columns or "problem_key" not in scope.columns:
+        return df.copy()
+    keys = scope["problem_key"].dropna().astype(str).unique().tolist()
+    return df[df["problem_key"].astype(str).isin(keys)].copy()
+
+
 def select_presentation_scope(reference_scope: pd.DataFrame) -> pd.DataFrame:
     if reference_scope.empty:
         return reference_scope.copy()
@@ -1356,6 +2369,15 @@ def select_presentation_scope(reference_scope: pd.DataFrame) -> pd.DataFrame:
     overall["priority"] = overall["selection_reason"].map(lambda x: priority.get(str(x), 99))
     overall = overall.sort_values(["priority", "problem_key", "model_name"]).drop(columns=["priority"])
     return overall.drop_duplicates(subset=["problem_key", "model_name"]).copy()
+
+
+def build_primary_scope(reference_scope: pd.DataFrame, serving_manifest: dict[str, Any]) -> pd.DataFrame:
+    rows = serving_manifest.get("reference_scope_rows", []) if serving_manifest else []
+    if rows:
+        return pd.DataFrame([rows[0]])
+    if reference_scope.empty:
+        return pd.DataFrame()
+    return reference_scope.head(1).copy()
 
 
 def filter_to_reference_definitions(df: pd.DataFrame, reference_scope: pd.DataFrame) -> pd.DataFrame:
@@ -2662,15 +3684,1130 @@ def build_method_text(model_frontier: pd.DataFrame, summary: dict[str, Any]) -> 
     return text_1, text_2
 
 
+def build_assumption_event_points(track_registry: pd.DataFrame, arbitrariness: pd.DataFrame) -> pd.DataFrame:
+    if track_registry.empty:
+        return pd.DataFrame()
+    label_window_days = _choice_numeric(arbitrariness, "label_window_days", 30) or 30
+    future_start_day = 8
+    future_end_day = future_start_day + label_window_days - 1
+    show = track_registry.copy()
+    if "official_flag" in show.columns:
+        show = show[show["official_flag"] == 1].copy()
+    rows: list[dict[str, Any]] = []
+    for row in show.to_dict(orient="records"):
+        track_label = format_track_name(row.get("track_name", ""))
+        score_day = int(pd.to_numeric(row.get("score_window_end_day"), errors="coerce") or 0)
+        score_detail = str(row.get("score_moment_text", "")).strip()
+        rows.extend(
+            [
+                {
+                    "track_name": track_label,
+                    "event_name": "momento do score",
+                    "event_detail": score_detail or "Momento em que o modelo para de olhar a entrada.",
+                    "day_number": score_day,
+                },
+                {
+                    "track_name": track_label,
+                    "event_name": "início do resultado futuro",
+                    "event_detail": "A janela do resultado começa depois de completar 7 dias desde a âncora.",
+                    "day_number": future_start_day,
+                },
+                {
+                    "track_name": track_label,
+                    "event_name": "fim da janela do resultado",
+                    "event_detail": f"O resultado futuro é medido por {label_window_days} dias corridos.",
+                    "day_number": future_end_day,
+                },
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
+def build_score_decile_summary(predictions: pd.DataFrame) -> pd.DataFrame:
+    if predictions.empty or "score" not in predictions.columns or "y_true" not in predictions.columns:
+        return pd.DataFrame()
+    show = predictions.copy()
+    if "fold_valid_flag" in show.columns:
+        show = show[show["fold_valid_flag"] == 1].copy()
+    if "technical_fold_valid_flag" in show.columns:
+        show = show[show["technical_fold_valid_flag"] == 1].copy()
+    if show.empty:
+        return pd.DataFrame()
+    rows: list[pd.DataFrame] = []
+    for (problem_key, model_name), group in show.groupby(["problem_key", "model_name"], dropna=False):
+        group = group.sort_values("score", kind="mergesort").reset_index(drop=True)
+        if group.empty:
+            continue
+        bins = min(10, len(group))
+        if bins <= 1:
+            group["score_decile"] = 1
+        else:
+            group["score_decile"] = pd.qcut(
+                np.arange(len(group)),
+                q=bins,
+                labels=False,
+                duplicates="drop",
+            ) + 1
+        summary = (
+            group.groupby("score_decile", as_index=False)
+            .agg(
+                mean_score=("score", "mean"),
+                realized_rate=("y_true", "mean"),
+                rows=("y_true", "size"),
+            )
+            .sort_values("score_decile", kind="mergesort")
+        )
+        summary["problem_key"] = problem_key
+        summary["model_name"] = model_name
+        summary["serie"] = format_problem_short_label(problem_key) + " | " + format_model_name(model_name)
+        rows.append(summary)
+    if not rows:
+        return pd.DataFrame()
+    return pd.concat(rows, ignore_index=True)
+
+
+def build_navigation_sequence_summary(navigation_sequences: pd.DataFrame, top_n: int = 6) -> pd.DataFrame:
+    if navigation_sequences.empty:
+        return pd.DataFrame()
+    show = navigation_sequences.copy()
+    totals = (
+        show.groupby("step_sequence_first5", as_index=False)["teachers"]
+        .sum()
+        .sort_values("teachers", ascending=False, kind="mergesort")
+        .head(top_n)
+    )
+    return show[show["step_sequence_first5"].isin(totals["step_sequence_first5"])].copy()
+
+
+def _get_reference_model_row(model_frontier: pd.DataFrame, problem_key: str) -> pd.Series | None:
+    if model_frontier.empty:
+        return None
+    match = model_frontier[model_frontier["problem_key"].astype(str) == str(problem_key)].copy()
+    if match.empty:
+        return None
+    return match.iloc[0]
+
+
+def _get_threshold_row(threshold_metrics: pd.DataFrame, problem_key: str, policy_name: str) -> pd.Series | None:
+    if threshold_metrics.empty:
+        return None
+    match = threshold_metrics[
+        (threshold_metrics["problem_key"].astype(str) == str(problem_key))
+        & (threshold_metrics["policy_name"].astype(str) == str(policy_name))
+    ].copy()
+    if match.empty:
+        return None
+    return match.iloc[0]
+
+
+def _get_confusion_rows(confusion_df: pd.DataFrame, problem_key: str, policy_name: str) -> pd.DataFrame:
+    if confusion_df.empty:
+        return pd.DataFrame()
+    return confusion_df[
+        (confusion_df["problem_key"].astype(str) == str(problem_key))
+        & (confusion_df["policy_name"].astype(str) == str(policy_name))
+    ].copy()
+
+
+def _get_confusion_value(confusion_rows: pd.DataFrame, actual_group: str, predicted_group: str) -> int:
+    if confusion_rows.empty:
+        return 0
+    match = confusion_rows[
+        (confusion_rows["actual_group"].astype(str) == actual_group)
+        & (confusion_rows["predicted_group"].astype(str) == predicted_group)
+    ]
+    if match.empty:
+        return 0
+    return int(match.iloc[0].get("rows", 0))
+
+
+def _resolve_primary_problem_model(
+    model_frontier: pd.DataFrame,
+    serving_manifest: dict[str, Any],
+) -> tuple[str, str]:
+    if serving_manifest:
+        rows = serving_manifest.get("reference_scope_rows", [])
+        if rows:
+            return str(rows[0].get("problem_key", "")), str(rows[0].get("model_name", ""))
+    if not model_frontier.empty:
+        row = model_frontier.iloc[0]
+        return str(row.get("problem_key", "")), str(row.get("model_name", ""))
+    return "", ""
+
+
+def build_assumptions_block_text(
+    track_registry: pd.DataFrame,
+    arbitrariness: pd.DataFrame,
+    feature_registry: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
+    label_window_days = _choice_numeric(arbitrariness, "label_window_days", 30) or 30
+    quick_definition = "O modelo só lê o que já existia no momento da previsão."
+    how_text = (
+        "<code>S1</code> para no fim da 1ª sessão. <code>S7</code> e <code>S1+S7</code> param no fim dos primeiros 7 dias corridos. "
+        "<code>STRICT_CONTEXT</code> para no mesmo ponto, mas só com contexto inicial. Depois disso começa a janela futura do resultado: "
+        f"do <code>day_8</code> ao <code>day_{8 + label_window_days - 1}</code>. Esses números aparecem porque os primeiros 7 dias ficam reservados para ler os sinais iniciais, "
+        f"e os 30 dias seguintes são usados para medir se o professor continuou ativo."
+    )
+    why_text = "A previsão sempre termina antes do período que depois será medido."
+    what_text = ""
+    conclusion_text = (
+        "Esperar 7 dias abre mais informação do que parar na 1ª sessão; <code>STRICT_CONTEXT</code> é o cenário mais conservador."
+    )
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_methodology_protocol_block_text(
+    build_dir: Path,
+    summary: dict[str, Any],
+    future_metrics: pd.DataFrame,
+    definition_selection: pd.DataFrame,
+    candidate_metric_registry: pd.DataFrame,
+) -> tuple[str, str, str, list[tuple[str, list[str]]], str]:
+    a_candidates = (
+        definition_selection[definition_selection["definition_group"].astype(str) == "definition_a"].head(1)
+        if not definition_selection.empty and "definition_group" in definition_selection.columns
+        else pd.DataFrame()
+    )
+    a_row = a_candidates
+    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "n/d"
+    candidate_metrics: list[str] = []
+    if not candidate_metric_registry.empty and "definition_a_candidate_flag" in candidate_metric_registry.columns:
+        candidate_work = candidate_metric_registry[
+            pd.to_numeric(candidate_metric_registry["definition_a_candidate_flag"], errors="coerce").fillna(0).astype(int) == 1
+        ].copy()
+        if "metric_name" in candidate_work.columns:
+            candidate_metrics = [format_metric_name(metric) for metric in candidate_work["metric_name"].dropna().astype(str).tolist()]
+    periods_materialized = (build_dir / "tables" / "governance_definition_selection_periods_v1.parquet").exists()
+    development_months = int(pd.to_numeric(summary.get("definition_selection_development_months"), errors="coerce")) if pd.notna(pd.to_numeric(summary.get("definition_selection_development_months"), errors="coerce")) else 0
+    lock_months = int(pd.to_numeric(summary.get("definition_lock_realized_months"), errors="coerce")) if pd.notna(pd.to_numeric(summary.get("definition_lock_realized_months"), errors="coerce")) else 0
+    final_eval_months = int(pd.to_numeric(summary.get("final_model_evaluation_months"), errors="coerce")) if pd.notna(pd.to_numeric(summary.get("final_model_evaluation_months"), errors="coerce")) else 0
+    split_text = (
+        "O protocolo fechado do estudo separa <code>development</code>, <code>definition lock</code> e "
+        "<code>final untouched model evaluation</code>."
+    )
+    if development_months > 0 or lock_months > 0 or final_eval_months > 0:
+        split_text += (
+            f" Nesta execução, isso corresponde a <code>{development_months}</code> meses de development, "
+            f"<code>{lock_months}</code> meses de definition lock e "
+            f"<code>{final_eval_months}</code> meses de avaliação final do modelo."
+        )
+    if not periods_materialized:
+        split_text += " O build materializado atual ainda não traz a tabela dessa separação."
+    removed_population_text = (
+        "A decomposição exata dos casos excluídos por <code>same_month_entry_only</code> ainda não está materializada neste build."
+    )
+    if not future_metrics.empty and {"full_followup_observed_flag", "months_after_entry"}.issubset(future_metrics.columns):
+        population_frame = future_metrics.copy()
+        population_frame = population_frame[
+            pd.to_numeric(population_frame["full_followup_observed_flag"], errors="coerce").fillna(0).astype(int) == 1
+        ].copy()
+        months_after_entry = pd.to_numeric(population_frame.get("months_after_entry"), errors="coerce")
+        removed_mask = months_after_entry.ne(0)
+        removed_total = int(removed_mask.sum())
+        delayed_total = int((months_after_entry > 0).sum())
+        inconsistent_total = int((months_after_entry < 0).sum())
+        removed_population_text = (
+            "Na execução materializada atual, esse filtro excluiu "
+            f"<code>{removed_total:,}</code> professores distintos: "
+            f"<code>{delayed_total:,}</code> casos de entrada observada com atraso "
+            "(\u200b<code>months_after_entry &gt; 0</code>) e "
+            f"<code>{inconsistent_total:,}</code> inconsistências temporais "
+            "(\u200b<code>months_after_entry &lt; 0</code>)."
+        ).replace(",", ".")
+    gate_spec = setup.get_definition_lock_bootstrap_gate_spec()
+    support_gate_text = (
+        "Para um fold mensal da definição ou do modelo entrar no resumo oficial, ele precisa passar no gate mínimo de suporte: "
+        f"pelo menos <code>{int(setup.MIN_OFFICIAL_TEST_ROWS)}</code> linhas, "
+        f"<code>{int(setup.MIN_OFFICIAL_TEST_POSITIVES)}</code> positivos e "
+        f"<code>{int(setup.MIN_OFFICIAL_TEST_NEGATIVES)}</code> negativos."
+    )
+    lock_gate_text = (
+        "O output publicado desse bootstrap é <code>ci_low</code>, <code>ci_high</code> e <code>ci_width</code>. "
+        "No lock oficial, a candidata só pode sobreviver se "
+        f"<code>{gate_spec['column_name']} {gate_spec['operator']} {float(gate_spec['threshold']):g}</code>; "
+        "isso faz a regra dura do lock ficar explícita e configurável na spec."
+    )
+    population_text = (
+        "A população oficial principal é <code>same_month_entry_only</code>: "
+        "ficam apenas professores com <code>months_after_entry == 0</code>, isto é, "
+        "cujo <code>first_month</code> observado coincide com o mês de entrada cadastral."
+    )
+    if str(summary.get("official_population_filter", "")) != "same_month_entry_only":
+        population_text = "A população oficial atual não está marcada como <code>same_month_entry_only</code> neste summary."
+    sections = [
+        (
+            "Guardrails fechados",
+            [
+                "<code>Definition A</code> e <code>Definition B</code> devem ser decididas sem AP, Brier, confusion matrix, feature importance ou qualquer outra métrica de modelo.",
+                split_text,
+                (
+                    f"Com <code>{development_months}</code> meses em development, a busca da definição gera "
+                    f"<code>{max(0, development_months - 1)}</code> outer folds mensais: em cada fold, treina em meses acumulados anteriores e testa no mês seguinte."
+                ) if development_months > 0 else "A busca da definição usa outer folds mensais em expanding window: treino em meses acumulados anteriores e teste no mês seguinte.",
+                population_text,
+                "Na prática, esse filtro remove professores cujo primeiro uso observável aconteceu meses depois da entrada cadastral, além de poucos casos com inconsistência temporal. O objetivo é comparar a coorte oficial sempre no mesmo estágio de ciclo de vida.",
+                removed_population_text,
+                "Esses casos excluídos não são duplicatas da base analítica oficial; são professores distintos que não estão no mês zero da jornada observada.",
+                "O estudo de definição continua separado e usa os validadores pós-label de 90 dias apenas como checagem externa de continuidade; a modelagem oficial desta análise usa apenas o alvo fixo de 30 dias <code>definition_b_label</code>.",
+                "Os 90 dias não redefinem o label e não repetem nem a regra da <code>Definition A</code> nem a <code>Definition B</code>; eles medem continuidade futura com um construto fixo comum a todas as candidatas.",
+                support_gate_text,
+                f"No modelo, o outer test oficial é limitado aos <code>{int(setup.MAX_OUTER_TEST_MONTHS)}</code> meses mais recentes do protocolo; isso não significa 'usar só esse número de meses no total', porque cada fold do modelo treina em todo o histórico oficial anterior acumulado.",
+                "Tuning, calibração e outer test continuam separados temporalmente dentro da etapa de modelagem.",
+            ],
+        ),
+        (
+            "Como ler gap e grupos",
+            [
+                "Em cada outer fold da definição, a candidata divide o mês de teste em dois grupos: positivos = professores que a regra marcou como ativos na janela inicial; negativos = professores que a regra não marcou como ativos nessa mesma janela.",
+                "O grupo negativo não significa 'permaneceu inativo depois'. Ele pode voltar a aparecer como ativo nos 90 dias seguintes; só significa que a regra não o marcou como ativo no primeiro window.",
+                "Para cada validador pós-label, <b>gap</b> significa: média do validador no grupo positivo menos média do mesmo validador no grupo negativo.",
+                "Exemplo: se 46% dos positivos sustentaram atividade futura e 19% dos negativos também sustentaram atividade futura, o gap do fold é <code>0.46 - 0.19 = 0.27</code>.",
+            ],
+        ),
+        (
+            "Busca oficial da Definition A",
+            [
+                "O search space oficial precisa incluir regras atômicas <code>m &gt;= t</code>, compostas booleanas <code>AND/OR</code> e combinações ponderadas <code>w1*z1 + w2*z2 &gt;= τ</code>.",
+                "Combinações entre métricas são requisito explícito; o motor suportar <code>AND/OR</code> não basta, a busca oficial precisa gerá-las.",
+                "Pesos entre métricas exigem escala comparável; a recomendação atual é percentil empírico no treino do fold, mapeando cada métrica para <code>[0,1]</code>.",
+                (
+                    "O universo atual de métricas candidatas da <code>Definition A</code> é uma decisão de projeto, não algo descoberto automaticamente: "
+                    + ", ".join(f"<code>{metric}</code>" for metric in candidate_metrics)
+                ) if candidate_metrics else "O universo de métricas candidatas da <code>Definition A</code> precisa ser explicitado como política do estudo.",
+            ],
+        ),
+        (
+            "Sensibilidades obrigatórias",
+            [
+                "<code>Threshold testing</code> é parte oficial do protocolo: thresholds testados e sensibilidade local precisam ficar registrados.",
+                "Para regras compostas, o lock precisa medir <code>threshold sensitivity</code>, troca <code>AND -&gt; OR</code>, <code>drop-one-literal</code> e <code>weight perturbation</code>.",
+                "Thresholds pseudo-exatos como <code>8.3138</code> devem ser tratados como cutpoints empíricos; sua leitura substantiva vem da estabilidade local, não do número bruto.",
+                "Os validadores de 90 dias usam um construto fixo de continuação comportamental: downloads, criações, compartilhamentos e views de conteúdo pedagógico central. Eles não usam a regra da candidata sendo testada.",
+                "O bootstrap da definição não reamostra professores crus. Ele pega, para uma mesma candidata, a lista dos gaps observados ao longo dos folds válidos e reamostra essa lista com reposição para estimar a estabilidade da média do gap entre meses.",
+                lock_gate_text,
+                "Depois desse corte duro, <code>ci_width</code> vira critério de estabilidade: largura pequena quer dizer que a média do gap muda pouco quando reamostramos os folds; largura grande quer dizer instabilidade maior entre meses.",
+            ],
+        ),
+        (
+            "Overfitting e underfitting",
+            [
+                "O protocolo agora exige uma auditoria formal de generalização comparando <code>apparent_train</code> e <code>calibration_holdout</code> contra <code>outer test</code>, com gap positivo significando desempenho melhor dentro do treino do que fora dele.",
+                "Para reduzir overfitting, o ranking oficial precisa privilegiar candidatos com menor gap de generalização, menos complexidade de regra e melhor estabilidade temporal antes de preferir ganhos marginais de métrica.",
+                "Para reduzir underfitting, a busca oficial pode ampliar interações controladas via <code>AND/OR</code> e regras ponderadas, mas sem abrir árvores profundas ou search spaces pouco auditáveis na etapa de definição.",
+            ],
+        ),
+        (
+            "Serving e auditoria",
+            [
+                "Nesta arquitetura, o estudo de definição não escolhe mais o alvo do modelo; a modelagem oficial roda apenas sobre <code>definition_b_label</code>.",
+                "<code>serving</code> e <code>reference scope</code> seguem o grupo único presente no <code>model_frontier</code> materializado, em vez de herdar o vencedor do estudo de definição.",
+                "A trilha de auditoria continua precisando refletir o escopo real da seleção, sem fallback silencioso e sem metadata enganosa.",
+            ],
+        ),
+    ]
+    quick_definition = "O relatório agora declara explicitamente o protocolo metodológico e separa o que é regra fechada do que ainda é gap de implementação."
+    how_text = (
+        "As regras de governança do estudo ficam visíveis no próprio relatório: como o alvo deve ser escolhido, "
+        "que tipos de regra a <code>Definition A</code> deve explorar, como thresholds/pesos precisam ser auditados e qual é a política correta de serving."
+    )
+    why_text = "Sem isso, o leitor fica forçado a inferir metodologia a partir de tabelas finais e pode confundir artefato materializado com protocolo oficial."
+    conclusion_text = (
+        f"No material vigente, a <code>Definition A</code> oficial materializada é <code>{current_rule}</code>; "
+        "o protocolo agora exige que a explicação dessa escolha apareça no relatório, não só no código ou em conversas paralelas."
+    )
+    return quick_definition, how_text, why_text, sections, conclusion_text
+
+
+def build_methodology_gaps_block_text(
+    build_dir: Path,
+    definition_selection: pd.DataFrame,
+    serving_manifest: dict[str, Any],
+) -> tuple[str, str, str, list[tuple[str, list[str]]], str]:
+    a_candidates = (
+        definition_selection[definition_selection["definition_group"].astype(str) == "definition_a"].head(1)
+        if not definition_selection.empty and "definition_group" in definition_selection.columns
+        else pd.DataFrame()
+    )
+    a_row = a_candidates
+    current_rule = format_rule_text(a_row.iloc[0]["rule_text"]) if not a_row.empty and "rule_text" in a_row.columns else "n/d"
+    serving_status = str(serving_manifest.get("serving_status", "n/d")) if serving_manifest else "n/d"
+    selection_meta = serving_manifest.get("selection_meta", {}) if serving_manifest else {}
+    current_scope = str(selection_meta.get("selection_scope", "n/d"))
+    sections = [
+        (
+            "Fatos do materializado atual",
+            [
+                "O estado materializado vigente é o de <code>build/tables</code>; o rerun rigoroso deletado não é mais a base para leitura do projeto.",
+                f"A <code>Definition A</code> oficial hoje materializada é <code>{current_rule}</code>.",
+                "Isso prova que o projeto materializado já usou regra composta; portanto, não é correto dizer genericamente que o projeto não usa <code>AND/OR</code>.",
+            ],
+        ),
+        (
+            "Inconsistências e gaps que o relatório precisa admitir",
+            [
+                "O artefato vigente tem <code>Definition A</code> composta, enquanto o build materializado atual ainda é anterior ao search oficial composto/ponderado agora implementado no código; portanto, código e materializado continuam defasados até o próximo rerun oficial.",
+                "O repositório atual não sustenta sozinho a narrativa auditável <code>5, 6, 7, 8, 9, 10 -&gt; 8 -&gt; 8.3138</code>.",
+                "Ainda falta uma etapa explícita de <code>definition evaluability/modelability audit</code> antes da modelagem oficial.",
+                "O código agora prevê uma auditoria formal <code>apparent_train/calibration_holdout vs outer test</code>, mas o build materializado atual só vai exibir essa tabela depois de um novo rerun de <code>build-ml</code>.",
+                "Evento raro + outer test mensal + poucos positivos aumenta variância e fragilidade interpretativa; isso precisa ser lido como limitação estatística, não como prova automática de overfitting.",
+            ],
+        ),
+        (
+            "Estado atual do serving",
+            [
+                f"O <code>serving_status</code> materializado hoje é <code>{serving_status}</code>.",
+                f"A metadata atual do serving reporta <code>selection_scope = {current_scope}</code>; o relatório precisa deixar claro quando esse valor pertence a um artefato antigo e não à política corrigida do código.",
+                "Na arquitetura atual, o modelo oficial usa apenas <code>definition_b_label</code>; portanto, o serving não deve reaproveitar o vencedor do estudo de definição para redefinir o alvo do modelo.",
+            ],
+        ),
+    ]
+    quick_definition = "Além do protocolo, o relatório também precisa admitir explicitamente onde o materializado atual ainda diverge do código ou do desenho metodológico desejado."
+    how_text = (
+        "Este bloco separa fato materializado, inconsistência conhecida e pendência metodológica. Ele evita que o relatório pareça mais fechado do que o projeto realmente está."
+    )
+    why_text = "Sem essa camada, o HTML passa a impressão errada de que artefato, search atual, serving e auditorias adicionais já estão completamente alinhados."
+    conclusion_text = (
+        "O relatório passa a distinguir explicitamente o que já é fato do build atual, o que é política corrigida no código e o que ainda precisa ser fechado antes do próximo rerun oficial."
+    )
+    return quick_definition, how_text, why_text, sections, conclusion_text
+
+
+def build_activity_definition_block_text(definition_frontier: pd.DataFrame) -> tuple[str, str, str, str, str]:
+    if definition_frontier.empty:
+        return (
+            "Definição de atividade é a regra que decide quem foi considerado ativo no futuro.",
+            "Nesta materialização não há definições oficiais publicadas para comparar.",
+            "Sem definição clara, não existe alvo confiável para o score.",
+            "O bloco de definições não foi materializado nesta execução.",
+            "Sem definição publicada, não existe score interpretável.",
+        )
+    a_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_a")].head(1)
+    b_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_b")].head(1)
+    a_row = a_row.iloc[0] if not a_row.empty else None
+    b_row = b_row.iloc[0] if not b_row.empty else None
+    quick_definition = "Definição de atividade é a regra que separa quem realizou e quem não realizou a atividade futura."
+    how_text = (
+        "A <b>Definição B</b> é o comparador fixo e literal do negócio na janela de 30 dias. "
+        "A <b>Definição A</b> é a definição pesquisada, também aplicada nessa janela de 30 dias. "
+        "Depois disso, as duas são julgadas pelos mesmos validadores pós-label de 90 dias, que medem continuidade futura e não repetem nem a regra da A nem a regra da B."
+    )
+    why_text = "Antes de olhar o score, o próprio alvo precisa ser congelado e separar melhor o que acontece depois, sem AP, Brier ou confusion matrix entrarem na decisão."
+    if a_row is not None and b_row is not None:
+        a_share = pd.to_numeric(a_row.get("label_share_pct"), errors="coerce") / 100.0
+        b_share = pd.to_numeric(b_row.get("label_share_pct"), errors="coerce") / 100.0
+        what_text = (
+            f"Nesta execução, a <b>Definição A</b> marcou <b>{int(a_row.get('label_positives', 0))}</b> professores "
+            f"(<b>{format_percent(a_share)}</b> da base), enquanto a <b>Definição B</b> marcou <b>{int(b_row.get('label_positives', 0))}</b> "
+            f"(<b>{format_percent(b_share)}</b>). A regra oficial materializada da <b>Definição A</b> é <code>{format_rule_text(a_row.get('rule_text'))}</code>. "
+            f"Ela ficou mais exigente e também entregou gaps externos maiores. Aqui, <b>gap</b> significa: média do validador futuro entre os marcados como ativos menos média do mesmo validador entre os marcados como não ativos. No 1º bloco pós-label, "
+            f"o gap de retorno foi <b>{format_number(a_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> na A contra "
+            f"<b>{format_number(b_row.get('test_gap_returned_active_post_label_m1'), 3)}</b> na B; em dias ativos acumulados dos 3 blocos, "
+            f"foi <b>{format_number(a_row.get('test_gap_active_days_post_label_3m'), 3)}</b> na A contra "
+            f"<b>{format_number(b_row.get('test_gap_active_days_post_label_3m'), 3)}</b> na B."
+        )
+    else:
+        what_text = "O gráfico compara as definições oficiais nos validadores externos, mas uma das linhas esperadas não ficou materializada."
+    conclusion_text = "A leitura correta aqui é: a <b>Definição A</b> é a definição pesquisada, a <b>Definição B</b> é o comparador fixo, e os 90 dias entram apenas como validação externa comum para ambas."
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_scenarios_block_text(scoring_scenarios: pd.DataFrame) -> tuple[str, str, str, str, str]:
+    if scoring_scenarios.empty:
+        return (
+            "Cada combinação junta uma definição, uma trilha temporal e um conjunto permitido de variáveis.",
+            "As combinações testadas não ficaram materializadas nesta execução.",
+            "Sem esse mapa, não dá para saber o que realmente foi comparado.",
+            "O bloco de cenários não foi materializado.",
+            "Sem cenários publicados, a comparação principal fica incompleta.",
+        )
+    rows = int(pd.to_numeric(scoring_scenarios["rows"], errors="coerce").dropna().max() or 0)
+    months = int(pd.to_numeric(scoring_scenarios["months"], errors="coerce").dropna().max() or 0)
+    definitions = sorted(scoring_scenarios["definition_name"].dropna().astype(str).unique().tolist()) if "definition_name" in scoring_scenarios.columns else []
+    problem_count = int(len(scoring_scenarios))
+    track_count = int(scoring_scenarios["track_name"].dropna().astype(str).nunique()) if "track_name" in scoring_scenarios.columns else 0
+    feature_counts = {
+        format_track_name(track): int(pd.to_numeric(group["feature_count"], errors="coerce").dropna().max() or 0)
+        for track, group in scoring_scenarios.groupby("track_name", dropna=False)
+    }
+    quick_definition = "Cada combinação junta uma definição, uma trilha temporal e um conjunto permitido de variáveis."
+    how_text = (
+        f"Foram testadas <b>{max(1, len(definitions))} definição(ões) oficiais de modelagem</b> em <b>{track_count}</b> trilhas "
+        "(<code>S1</code>, <code>S7</code>, <code>S1+S7</code> e <code>STRICT_CONTEXT</code>, quando disponíveis). "
+        f"Isso gera <b>{problem_count}</b> combinações principais. Em cada combinação, o pipeline compara <b>3 famílias de modelo</b>: regressão logística, random forest e CatBoost."
+    )
+    why_text = (
+        "Isso importa porque o modelo final não saiu de um teste único. Primeiro foi comparado o mesmo problema em trilhas com quantidades diferentes de informação observável antes do score."
+    )
+    what_text = (
+        f"As {problem_count} combinações usaram a mesma base analítica, com <b>{rows}</b> linhas e <b>{months}</b> meses. "
+        f"O número de variáveis elegíveis foi <b>{feature_counts.get('S1', 0)}</b> no <code>S1</code>, "
+        f"<b>{feature_counts.get('S7', 0)}</b> no <code>S7</code>, <b>{feature_counts.get('S1+S7', 0)}</b> no <code>S1+S7</code> "
+        f"e <b>{feature_counts.get('STRICT_CONTEXT', 0)}</b> no <code>STRICT_CONTEXT</code>."
+    )
+    conclusion_text = "Na arquitetura atual, a modelagem oficial roda apenas sobre o alvo fixo de 30 dias <code>definition_b_label</code>; o estudo de definição fica fora desta etapa."
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_model_comparison_block_text(
+    model_frontier: pd.DataFrame,
+    definition_frontier: pd.DataFrame,
+    serving_manifest: dict[str, Any],
+) -> tuple[str, str, str, str, str]:
+    if model_frontier.empty:
+        return (
+            "Os modelos comparados são as famílias candidatas para o mesmo problema.",
+            "A comparação entre famílias não ficou materializada nesta execução.",
+            "Sem essa comparação, não dá para justificar a escolha do modelo.",
+            "O bloco de comparação entre modelos não foi materializado.",
+            "Sem comparação publicada, a escolha do modelo fica opaca.",
+        )
+    show = model_frontier.copy()
+    show["selected_flag"] = 0
+    primary_problem_key = ""
+    primary_model_name = ""
+    if serving_manifest:
+        rows = serving_manifest.get("reference_scope_rows", [])
+        if rows:
+            primary_problem_key = str(rows[0].get("problem_key", ""))
+            primary_model_name = str(rows[0].get("model_name", ""))
+            mask = (
+                show["problem_key"].astype(str).eq(primary_problem_key)
+                & show["model_name"].astype(str).eq(primary_model_name)
+            )
+            show.loc[mask, "selected_flag"] = 1
+    quick_definition = "Foram comparadas três famílias: regressão logística, random forest e CatBoost."
+    how_text = (
+        f"Nas <b>{show['problem_key'].nunique()}</b> combinações publicadas, as três famílias foram comparadas nas mesmas quatro métricas: <b>AP</b>, <b>ROC AUC</b>, <b>Brier</b> e <b>log loss</b>."
+    )
+    why_text = "O melhor modelo precisa ranquear bem e também errar pouco na probabilidade."
+    problem_texts: list[str] = []
+    for problem_key, group in show.groupby("problem_key", dropna=False):
+        group = group.sort_values(["mean_brier", "mean_log_loss", "mean_ap", "mean_roc_auc"], ascending=[True, True, False, False], kind="mergesort")
+        best = group.iloc[0]
+        second = group.iloc[1] if len(group) > 1 else None
+        part = (
+            f"Em <b>{format_problem_short_label(problem_key)}</b>, <b>{format_model_name(best.get('model_name'))}</b> ficou em 1º lugar. "
+        )
+        if second is not None:
+            part += f"O 2º lugar ficou com <b>{format_model_name(second.get('model_name'))}</b>."
+        problem_texts.append(part)
+    primary_text = ""
+    if primary_problem_key and primary_model_name:
+        primary_text = f" O modelo servível primário ficou em <b>{format_problem_short_label(primary_problem_key)}</b> com <b>{format_model_name(primary_model_name)}</b>."
+    a_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_a")].head(1)
+    b_row = definition_frontier[definition_frontier["definition_name"].astype(str).str.startswith("definition_b")].head(1)
+    prevalence_text = ""
+    if not a_row.empty and not b_row.empty:
+        a_share = float(pd.to_numeric(a_row.iloc[0].get("label_share_pct"), errors="coerce") or 0.0)
+        b_share = float(pd.to_numeric(b_row.iloc[0].get("label_share_pct"), errors="coerce") or 0.0)
+        prevalence_text = (
+            f" A <b>Definição B</b> ficou com AP maior em parte porque é um alvo mais amplo: ela marca <b>{format_number(b_share, 1)}%</b> da base, "
+            f"contra <b>{format_number(a_share, 1)}%</b> na <b>Definição A</b>. Isso tende a facilitar o ranking e, por si só, não torna a definição melhor."
+        )
+    definition_b_text = (
+        " A tabela mostra só a <b>melhor combinação publicada por definição</b>. "
+        "Na <b>Definição B</b>, <code>S1</code>, <code>S7</code> e <code>S1+S7</code> foram comparadas. "
+        "A publicada ficou em <b>S7</b> porque foi ligeiramente melhor que <code>S1+S7</code> ao mesmo tempo em <b>AP</b> "
+        "(0.468 contra 0.465) e em <b>Brier</b> (0.085 contra 0.085, com pequena vantagem para <code>S7</code>)."
+    )
+    what_text = " ".join(problem_texts) + definition_b_text + prevalence_text + primary_text
+    conclusion_text = ""
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_trust_block_text(
+    model_frontier: pd.DataFrame,
+    cv_metric_folds: pd.DataFrame,
+    cv_threshold_summary: pd.DataFrame,
+    cv_confusion_summary: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
+    quick_definition = "O modelo foi testado em meses futuros que não entraram no treino."
+    how_text = (
+        "Em cada mês futuro fora do treino, o pipeline recalculou duas leituras do mesmo modelo. A primeira foi o <b>score contínuo</b>: "
+        "<b>AP</b>, que resume se os casos de maior risco aparecem mais no topo do ranking, e <b>Brier</b>, que mede o erro médio da probabilidade publicada naquele mês. "
+        "A segunda foi a <b>fila operacional</b>: com o corte em <code>tercis</code>, o pipeline mediu <b>precisão</b>, <b>recall</b>, <b>F1</b>, <b>acurácia</b> e a <b>matriz de confusão</b> completa daquele próprio mês."
+    )
+    why_text = (
+        "Isso importa porque robustez, aqui, não é um único número. É mostrar que o mesmo modelo continua funcionando de dois jeitos quando o mês muda: "
+        "como score contínuo, que ordena a base do menor para o maior risco, e como fila operacional, que transforma esse score em decisão prática."
+    )
+    if model_frontier.empty:
+        return quick_definition, how_text, why_text, "As métricas de confiança não ficaram materializadas nesta execução.", "Sem folds válidos, não há confiança publicável."
+    row = model_frontier.iloc[0]
+    problem_key = str(row.get("problem_key", ""))
+    fold_metrics = cv_metric_folds[
+        (cv_metric_folds["problem_key"].astype(str) == problem_key)
+        & (cv_metric_folds["model_name"].astype(str) == str(row.get("model_name", "")))
+    ].copy()
+    ap_values = pd.to_numeric(fold_metrics.loc[fold_metrics["metric_name"] == "ap", "metric_value"], errors="coerce").dropna()
+    brier_values = pd.to_numeric(fold_metrics.loc[fold_metrics["metric_name"] == "brier", "metric_value"], errors="coerce").dropna()
+    if ap_values.empty or brier_values.empty:
+        return quick_definition, how_text, why_text, "Os folds válidos do modelo final não ficaram materializados nesta execução.", "Sem outer folds válidos, não há confiança publicável."
+    tercis_precision = tercis_recall = None
+    confusion_tp = confusion_fn = confusion_fp = confusion_tn = None
+    if not cv_threshold_summary.empty:
+        subset = cv_threshold_summary[
+            (cv_threshold_summary["problem_key"].astype(str) == problem_key)
+            & (cv_threshold_summary["model_name"].astype(str) == str(row.get("model_name", "")))
+            & (cv_threshold_summary["policy_name"].astype(str) == "tercis")
+        ].copy()
+        precision_row = subset[subset["metric_name"].astype(str) == "precision"]
+        recall_row = subset[subset["metric_name"].astype(str) == "recall"]
+        if not precision_row.empty:
+            tercis_precision = precision_row.iloc[0]
+        if not recall_row.empty:
+            tercis_recall = recall_row.iloc[0]
+    if not cv_confusion_summary.empty:
+        confusion_subset = cv_confusion_summary[
+            (cv_confusion_summary["problem_key"].astype(str) == problem_key)
+            & (cv_confusion_summary["model_name"].astype(str) == str(row.get("model_name", "")))
+            & (cv_confusion_summary["policy_name"].astype(str) == "tercis")
+        ].copy()
+        if not confusion_subset.empty:
+            def _pick(actual: str, predicted: str) -> Any:
+                match = confusion_subset[
+                    (confusion_subset["actual_group"].astype(str) == actual)
+                    & (confusion_subset["predicted_group"].astype(str) == predicted)
+                ]
+                return match.iloc[0] if not match.empty else None
+
+            confusion_tp = _pick("nao_realiza", "nao_realiza")
+            confusion_fn = _pick("nao_realiza", "realiza")
+            confusion_fp = _pick("realiza", "nao_realiza")
+            confusion_tn = _pick("realiza", "realiza")
+    what_text = (
+        f"Nos <b>{int(row.get('valid_folds', 0))}</b> meses futuros válidos, o pipeline checou o score contínuo com <b>AP</b>, <b>ROC AUC</b>, <b>Brier</b> e <b>log loss</b>; "
+        f"na leitura operacional, recalculou a fila alta com <b>precisão</b>, <b>recall</b>, <b>F1</b>, <b>acurácia</b> e a <b>matriz de confusão</b> do próprio mês. "
+        f"No modelo final, a <b>AP</b> ficou entre <b>{format_number(ap_values.min(), 3)}</b> e <b>{format_number(ap_values.max(), 3)}</b>; "
+        f"o <b>Brier</b> ficou entre <b>{format_number(brier_values.min(), 3)}</b> e <b>{format_number(brier_values.max(), 3)}</b>. "
+    )
+    if tercis_precision is not None and tercis_recall is not None:
+        what_text += (
+            f"Na fila alta em <code>tercis</code>, a <b>precisão média</b> ficou em <b>{format_percent(float(tercis_precision.get('mean_value', np.nan)))}</b> "
+            f"e o <b>recall médio</b> em <b>{format_percent(float(tercis_recall.get('mean_value', np.nan)))}</b>. "
+            f"Isso quer dizer o seguinte: quando o modelo colocava alguém na fila alta, quase não errava; o custo era deixar uma parte do risco fora da fila nesse primeiro corte. "
+        )
+    if all(item is not None for item in [confusion_tp, confusion_fn, confusion_fp, confusion_tn]):
+        what_text += (
+            f" Na média dos folds mensais nessa fila, o modelo capturou <b>{format_number(float(confusion_tp.get('mean_rows', np.nan)), 1)}</b> casos de inatividade, "
+            f"deixou <b>{format_number(float(confusion_fn.get('mean_rows', np.nan)), 1)}</b> casos de inatividade fora da fila, "
+            f"gerou <b>{format_number(float(confusion_fp.get('mean_rows', np.nan)), 1)}</b> alarmes falsos "
+            f"e preservou <b>{format_number(float(confusion_tn.get('mean_rows', np.nan)), 1)}</b> casos ativos fora da fila."
+        )
+    conclusion_text = ""
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_final_model_block_text(
+    model_frontier: pd.DataFrame,
+    threshold_metrics: pd.DataFrame,
+    confusion_df: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
+    if model_frontier.empty:
+        return (
+            "Modelo final é o par definição + trilha + família de modelo que ficou selecionado para uso.",
+            "O modelo final não ficou materializado nesta execução.",
+            "Sem modelo final, não existe leitura operacional consolidada.",
+            "O bloco do modelo final não foi materializado.",
+            "Sem modelo final, não existe decisão publicável.",
+        )
+    row = model_frontier.iloc[0]
+    problem_key = str(row.get("problem_key", ""))
+    model_name = str(row.get("model_name", ""))
+    threshold_row = _get_threshold_row(threshold_metrics, problem_key, "tercis")
+    confusion_rows = _get_confusion_rows(confusion_df, problem_key, "tercis")
+    tp = _get_confusion_value(confusion_rows, "nao_realiza", "nao_realiza")
+    fp = _get_confusion_value(confusion_rows, "realiza", "nao_realiza")
+    tn = _get_confusion_value(confusion_rows, "realiza", "realiza")
+    fn = _get_confusion_value(confusion_rows, "nao_realiza", "realiza")
+    quick_definition = f"O modelo final é <b>{format_model_name(model_name)}</b> em <b>{format_problem_short_label(problem_key)}</b>."
+    how_text = (
+        "A matriz cruza duas coisas: o que o modelo marcou como risco e o que de fato aconteceu depois."
+    )
+    why_text = "Ela mostra quantos casos de risco entraram na fila, quantos ficaram de fora e quantos alarmes falsos apareceram."
+    total_rows = tp + fp + tn + fn
+    what_text = (
+        f"A matriz usa só o teste futuro concatenado da faixa alta; por isso o <b>N = {total_rows}</b> não é a base inteira. "
+        f"Nesse recorte, <b>{tp + fn}</b> professores ficaram inativos e <b>{fp + tn}</b> continuaram ativos. "
+        f"O modelo marcou risco para <b>{tp}</b> casos corretos, gerou <b>{fp}</b> alarmes falsos, deixou <b>{fn}</b> casos de risco fora da fila e preservou <b>{tn}</b> casos ativos fora da fila."
+    )
+    conclusion_text = ""
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_score_block_text(
+    score_deciles: pd.DataFrame,
+    threshold_metrics: pd.DataFrame,
+    band_summary: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
+    quick_definition = "<b>Score</b> é a chance de continuar ativo; <b>risk_score</b> é a chance complementar de ficar inativo."
+    how_text = (
+        "Cada ponto representa 10% da base, ordenada do menor para o maior score. A linha azul mostra o <b>score médio previsto</b>, isto é, a média das probabilidades publicadas pelo modelo naquele grupo. A linha verde mostra a <b>taxa observada</b>, isto é, a fração de professores daquele mesmo grupo que realmente continuou ativa depois."
+    )
+    why_text = "Comparar as duas linhas é útil porque mostra, grupo por grupo, se o score está acompanhando o que de fato aconteceu. Se o score funciona bem, grupos com score mais alto precisam terminar com taxa observada mais alta."
+    if score_deciles.empty:
+        return quick_definition, how_text, why_text, "O score por decil não ficou materializado nesta execução.", "Sem score materializado, não há fila de priorização."
+    ordered = score_deciles.sort_values("score_decile", kind="mergesort").copy()
+    low = ordered.iloc[0]
+    high = ordered.iloc[-1]
+    top10 = _get_threshold_row(threshold_metrics, str(low.get("problem_key", "")), "top_10_percent")
+    tercis = _get_threshold_row(threshold_metrics, str(low.get("problem_key", "")), "tercis")
+    ge70 = _get_threshold_row(threshold_metrics, str(low.get("problem_key", "")), "score_ge_0_70")
+    band_rows = band_summary.copy()
+    top10_share = tercis_high_share = ge70_high_share = None
+    if not band_rows.empty:
+        key = str(low.get("problem_key", ""))
+        model_name = str(low.get("model_name", ""))
+        match = band_rows[
+            (band_rows["problem_key"].astype(str) == key)
+            & (band_rows["model_name"].astype(str) == model_name)
+        ].copy()
+        top10_match = match[(match["policy_name"].astype(str) == "top_10_percent") & (match["band_name"].astype(str) == "alto")]
+        tercis_match = match[(match["policy_name"].astype(str) == "tercis") & (match["band_name"].astype(str) == "alto")]
+        ge70_match = match[(match["policy_name"].astype(str) == "score_ge_0_70") & (match["band_name"].astype(str) == "alto")]
+        if not top10_match.empty:
+            top10_share = format_percent(top10_match.iloc[0].get("share"))
+        if not tercis_match.empty:
+            tercis_high_share = format_percent(tercis_match.iloc[0].get("share"))
+        if not ge70_match.empty:
+            ge70_high_share = format_percent(ge70_match.iloc[0].get("share"))
+    what_text = (
+        f"Nos grupos do começo, quase ninguém volta: no decil mais baixo, o score médio ficou em <b>{format_percent(low.get('mean_score'))}</b> "
+        f"e a taxa observada em <b>{format_percent(low.get('realized_rate'))}</b>. No fim da fila, isso sobe para <b>{format_percent(high.get('mean_score'))}</b> "
+        f"e <b>{format_percent(high.get('realized_rate'))}</b>. No meio do gráfico há oscilações pequenas; isso é normal. O ponto principal é que a curva observada cresce quando o score entra nas faixas mais altas. Em operação, o <code>top 10%</code> do risco monta uma fila pequena "
+        f"(<b>{top10_share or ''}</b> da base) e muito precisa; os <code>tercis</code> montam uma fila maior "
+        f"(<b>{tercis_high_share or ''}</b> da base), ainda com precisão de <b>{format_percent(tercis.get('precision')) if tercis is not None else ''}</b>."
+    )
+    conclusion_text = "O score ordena a base; cutoff e faixas só decidem quantos casos entram na fila."
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_driver_block_text(
+    feature_importance: pd.DataFrame,
+    definition_b_feature_block_gain_summary: pd.DataFrame,
+) -> tuple[str, str, str, str, str]:
+    quick_definition = "<b>Driver</b>, aqui, não significa causa. Significa o sinal que mais muda a previsão quando é embaralhado no teste."
+    how_text = (
+        "A leitura principal usa <b>importância por permutação</b>: um sinal é embaralhado no conjunto de teste e medimos o quanto a previsão piora."
+    )
+    why_text = "Isso ajuda a explicar o score sem tratar o modelo como caixa-preta."
+    pieces: list[str] = []
+    if not feature_importance.empty:
+        grouped = (
+            feature_importance.groupby(["problem_key", "model_name", "feature_name"], as_index=False)
+            .agg(importance_mean=("importance_mean", "mean"))
+        )
+        grouped["importance_abs"] = grouped["importance_mean"].abs()
+        grouped = grouped.sort_values(["importance_abs", "problem_key", "model_name"], ascending=[False, True, True], kind="mergesort")
+        primary = grouped[grouped["problem_key"].astype(str).str.startswith("definition_a::")].copy()
+        if primary.empty:
+            primary = grouped.copy()
+        if not primary.empty:
+            problem_key = str(primary.iloc[0]["problem_key"])
+            model_name = str(primary.iloc[0]["model_name"])
+            top_features = [
+                format_feature_name(name)
+                for name in primary[
+                    (primary["problem_key"].astype(str) == problem_key)
+                    & (primary["model_name"].astype(str) == model_name)
+                ].head(4)["feature_name"].tolist()
+            ]
+            if top_features:
+                pieces.append(
+                    f"No modelo principal <b>{format_problem_short_label(problem_key)}</b> com <b>{format_model_name(model_name)}</b>, os sinais mais fortes foram "
+                    f"<b>{'</b>, <b>'.join(top_features)}</b>."
+                )
+                pieces.append(
+                    "<b>Sessões nos 7 primeiros dias</b> contam quantas vezes o professor entrou. "
+                    "<b>Dias ativos nos 7 primeiros dias</b> contam em quantos dias distintos houve uso. "
+                    "<b>Minutos de sessão nos 7 primeiros dias</b> somam o tempo total de uso. "
+                    "Os três parecem próximos, mas medem frequência, cadência e intensidade."
+                )
+    what_text = " ".join(pieces) if pieces else "A importância dos sinais não ficou materializada nesta execução."
+    conclusion_text = ""
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_cluster_block_text(cluster_summary: pd.DataFrame, cluster_profile: pd.DataFrame) -> tuple[str, str]:
+    if cluster_summary.empty:
+        return (
+            "Cluster é uma camada descritiva de grupos parecidos de score.",
+            "A camada de cluster não ficou materializada nesta execução.",
+        )
+    show = cluster_summary.sort_values("mean_risk_score", ascending=False, kind="mergesort").copy()
+    high = show.iloc[0]
+    low = show.iloc[-1]
+    description = "Cluster é uma leitura descritiva de perfis de professores depois que o score já existe."
+    detail = ""
+    if not cluster_profile.empty:
+        profile = cluster_profile.copy()
+        profile = profile[profile["feature_name"].astype(str).isin(["teacher_active_months_total", "avg_activity_events_active_month", "avg_active_days_active_month", "avg_strict_downloads_active_month", "avg_content_views_active_month"])].copy()
+        if not profile.empty:
+            pivot = profile.pivot(index="cluster_name", columns="feature_name", values="feature_mean")
+            if str(high.get("cluster_name")) in pivot.index and str(low.get("cluster_name")) in pivot.index:
+                high_profile = pivot.loc[str(high.get("cluster_name"))]
+                low_profile = pivot.loc[str(low.get("cluster_name"))]
+                detail = (
+                    f" O grupo menos arriscado tem mais histórico e intensidade: {format_number(low_profile.get('teacher_active_months_total'), 1)} meses ativos totais, "
+                    f"{format_number(low_profile.get('avg_activity_events_active_month'), 1)} eventos por mês ativo, {format_number(low_profile.get('avg_active_days_active_month'), 1)} dias ativos por mês "
+                    f"e {format_number(low_profile.get('avg_content_views_active_month'), 1)} views por mês, contra "
+                    f"{format_number(high_profile.get('teacher_active_months_total'), 1)}, {format_number(high_profile.get('avg_activity_events_active_month'), 1)}, "
+                    f"{format_number(high_profile.get('avg_active_days_active_month'), 1)} e {format_number(high_profile.get('avg_content_views_active_month'), 1)} no grupo mais arriscado."
+                )
+    finding = (
+        f"O grupo mais arriscado concentrou <b>{format_percent(high.get('share'))}</b> da base e ficou com <b>{format_percent(high.get('realized_inactivity_rate'))}</b> de não realização; "
+        f"o menos arriscado ficou em <b>{format_percent(low.get('realized_inactivity_rate'))}</b>.{detail}"
+    )
+    return description, finding
+
+
+def build_heavy_user_block_text(heavy_user_summary: pd.DataFrame, heavy_user_profile: pd.DataFrame) -> tuple[str, str, str, str, str]:
+    if heavy_user_summary.empty:
+        return (
+            "Heavy-user é um marcador retrospectivo de uso futuro intenso.",
+            "A camada de heavy-user não ficou materializada nesta execução.",
+            "Sem isso, não dá para separar quem parecia risco, mas ainda usou bastante, de quem de fato abandonou.",
+            "A camada de heavy-user não ficou materializada nesta execução.",
+            "Sem essa camada, a leitura retrospectiva de intensidade fica incompleta.",
+        )
+    show = heavy_user_summary[heavy_user_summary["policy_name"].astype(str) == "heavy_top_10_percent"].copy()
+    if show.empty:
+        show = heavy_user_summary.copy()
+    heavy = show[show["heavy_user_flag"] == 1].head(1)
+    non_heavy = show[show["heavy_user_flag"] == 0].head(1)
+    quick_definition = "Heavy-user é uma leitura retrospectiva de quem ainda usou bastante depois de parecer risco."
+    how_text = (
+        "Depois que o score já ficou pronto, o pipeline olha só o comportamento futuro realizado e separa o grupo com uso mais intenso. Essa separação usa semanas ativas, sessões, minutos, dias ativos e eventos futuros, sempre medidos depois do momento da previsão."
+    )
+    why_text = (
+        "Isso ajuda porque nem todo caso que parecia risco termina do mesmo jeito. Uma parte realmente some; outra parte continua usando bastante. O heavy-user marca esse segundo caso ao comparar o grupo de intensidade futura mais alta com o restante da base."
+    )
+    if heavy.empty or non_heavy.empty:
+        return quick_definition, how_text, why_text, "A camada de heavy-user ficou incompleta nesta execução.", "Use essa camada só como leitura retrospectiva."
+    heavy_row = heavy.iloc[0]
+    non_heavy_row = non_heavy.iloc[0]
+    profile_text = ""
+    if not heavy_user_profile.empty:
+        profile = heavy_user_profile[heavy_user_profile["policy_name"].astype(str) == "heavy_top_10_percent"].copy()
+        if not profile.empty:
+            pivot = profile.pivot(index="heavy_user_flag", columns="metric_name", values="metric_mean")
+            if 1 in pivot.index and 0 in pivot.index:
+                heavy_profile = pivot.loc[1]
+                base_profile = pivot.loc[0]
+                profile_text = (
+                    f" Entre os heavy-users, a média foi de {format_number(heavy_profile.get('future_sessions'), 1)} sessões futuras, "
+                    f"{format_number(heavy_profile.get('future_session_minutes'), 1)} minutos e {format_number(heavy_profile.get('future_active_days'), 1)} dias ativos, "
+                    f"contra {format_number(base_profile.get('future_sessions'), 1)}, {format_number(base_profile.get('future_session_minutes'), 1)} e {format_number(base_profile.get('future_active_days'), 1)} no restante."
+                )
+    what_text = (
+        f"No grupo de uso forte, a taxa observada de inatividade caiu para <b>{format_percent(heavy_row.get('realized_inactivity_rate'))}</b>; "
+        f"no restante da base, ficou em <b>{format_percent(non_heavy_row.get('realized_inactivity_rate'))}</b>.{profile_text}"
+    )
+    conclusion_text = "Use essa camada como bandeira retrospectiva na análise salva, não como regra do score."
+    return quick_definition, how_text, why_text, what_text, conclusion_text
+
+
+def build_navigation_block_text(navigation_sequences: pd.DataFrame) -> tuple[str, str]:
+    if navigation_sequences.empty:
+        return (
+            "Navegação resume os caminhos iniciais mais frequentes.",
+            "A camada de navegação não ficou materializada nesta execução.",
+        )
+    show = navigation_sequences.copy()
+    inactive = show[show["label_value"] == 0].sort_values("teachers", ascending=False, kind="mergesort").head(3)
+    active = show[show["label_value"] == 1].sort_values("teachers", ascending=False, kind="mergesort").head(3)
+    description = "Navegação não substitui o score. Ela ajuda a ler os caminhos mais comuns do começo da jornada."
+    inactive_text = ", ".join(format_navigation_sequence(value) for value in inactive["step_sequence_first5"].tolist())
+    active_text = ", ".join(format_navigation_sequence(value) for value in active["step_sequence_first5"].tolist())
+    finding = (
+        f"Entre quem não realizou a atividade futura, os caminhos mais frequentes foram <b>{inactive_text}</b>. "
+        f"Entre quem realizou, apareceram mais <b>{active_text}</b>. O começo da jornada é parecido nos dois grupos, mas a mistura entre download, view e ausência de ação ajuda a qualificar o risco."
+    )
+    return description, finding
+
+
+def build_beginner_guide_section(
+    *,
+    build_dir: Path,
+    summary: dict[str, Any],
+    track_registry: pd.DataFrame,
+    arbitrariness: pd.DataFrame,
+    feature_registry: pd.DataFrame,
+    candidate_metric_registry: pd.DataFrame,
+    definition_selection: pd.DataFrame,
+    definition_frontier: pd.DataFrame,
+    scoring_scenarios: pd.DataFrame,
+    model_frontier: pd.DataFrame,
+    cv_metric_folds: pd.DataFrame,
+    cv_threshold_summary: pd.DataFrame,
+    cv_confusion_summary: pd.DataFrame,
+    threshold_metrics: pd.DataFrame,
+    confusion_df: pd.DataFrame,
+    band_summary: pd.DataFrame,
+    predictions: pd.DataFrame,
+    feature_importance: pd.DataFrame,
+    definition_b_feature_block_gain_summary: pd.DataFrame,
+    cluster_summary: pd.DataFrame,
+    cluster_profile: pd.DataFrame,
+    heavy_user_summary: pd.DataFrame,
+    heavy_user_profile: pd.DataFrame,
+    serving_manifest: dict[str, Any],
+) -> str:
+    primary_problem_key, primary_model_name = _resolve_primary_problem_model(model_frontier, serving_manifest)
+    primary_model_frontier = model_frontier[
+        (model_frontier["problem_key"].astype(str) == primary_problem_key)
+        & (model_frontier["model_name"].astype(str) == primary_model_name)
+    ].copy() if not model_frontier.empty else pd.DataFrame()
+    primary_cv_metric_folds = cv_metric_folds[
+        (cv_metric_folds["problem_key"].astype(str) == primary_problem_key)
+        & (cv_metric_folds["model_name"].astype(str) == primary_model_name)
+    ].copy() if not cv_metric_folds.empty else pd.DataFrame()
+    primary_cv_threshold_summary = cv_threshold_summary[
+        (cv_threshold_summary["problem_key"].astype(str) == primary_problem_key)
+        & (cv_threshold_summary["model_name"].astype(str) == primary_model_name)
+    ].copy() if not cv_threshold_summary.empty else pd.DataFrame()
+    primary_threshold_metrics = threshold_metrics[
+        (threshold_metrics["problem_key"].astype(str) == primary_problem_key)
+        & (threshold_metrics["model_name"].astype(str) == primary_model_name)
+    ].copy() if not threshold_metrics.empty else pd.DataFrame()
+    primary_confusion_df = confusion_df[
+        (confusion_df["problem_key"].astype(str) == primary_problem_key)
+        & (confusion_df["model_name"].astype(str) == primary_model_name)
+    ].copy() if not confusion_df.empty else pd.DataFrame()
+    primary_predictions = predictions[
+        (predictions["problem_key"].astype(str) == primary_problem_key)
+        & (predictions["model_name"].astype(str) == primary_model_name)
+    ].copy() if not predictions.empty else pd.DataFrame()
+    primary_feature_importance = feature_importance[
+        (feature_importance["problem_key"].astype(str) == primary_problem_key)
+        & (feature_importance["model_name"].astype(str) == primary_model_name)
+    ].copy() if not feature_importance.empty else pd.DataFrame()
+    primary_band_summary = band_summary[
+        (band_summary["problem_key"].astype(str) == primary_problem_key)
+        & (band_summary["model_name"].astype(str) == primary_model_name)
+    ].copy() if not band_summary.empty else pd.DataFrame()
+    primary_heavy_user_summary = heavy_user_summary[
+        (heavy_user_summary["problem_key"].astype(str) == primary_problem_key)
+        & (heavy_user_summary["model_name"].astype(str) == primary_model_name)
+    ].copy() if not heavy_user_summary.empty else pd.DataFrame()
+
+    assumption_points = build_assumption_event_points(track_registry, arbitrariness)
+    score_deciles = build_score_decile_summary(primary_predictions)
+    comparison_problem_keys: list[str] = []
+    for prefix in ["definition_a", "definition_b"]:
+        best = _best_model_row_for_definition(model_frontier, prefix, ranking_priority=False)
+        if best is not None:
+            comparison_problem_keys.append(str(best.get("problem_key", "")))
+    model_selection_df = model_frontier.copy()
+    if comparison_problem_keys:
+        model_selection_df = model_selection_df[
+            model_selection_df["problem_key"].astype(str).isin(comparison_problem_keys)
+        ].copy()
+    if not model_selection_df.empty:
+        model_selection_df["selected_flag"] = 0
+        if serving_manifest:
+            rows = serving_manifest.get("reference_scope_rows", [])
+            if rows:
+                primary_problem_key = str(rows[0].get("problem_key", ""))
+                primary_model_name = str(rows[0].get("model_name", ""))
+                mask = (
+                    model_selection_df["problem_key"].astype(str).eq(primary_problem_key)
+                    & model_selection_df["model_name"].astype(str).eq(primary_model_name)
+                )
+                model_selection_df.loc[mask, "selected_flag"] = 1
+
+    methodology_protocol_block = build_methodology_protocol_block_text(
+        build_dir=build_dir,
+        summary=summary,
+        future_metrics=future_metrics,
+        definition_selection=definition_selection,
+        candidate_metric_registry=candidate_metric_registry,
+    )
+    methodology_gaps_block = build_methodology_gaps_block_text(
+        build_dir=build_dir,
+        definition_selection=definition_selection,
+        serving_manifest=serving_manifest,
+    )
+    assumptions_block = build_assumptions_block_text(track_registry, arbitrariness, feature_registry)
+    definition_block = build_activity_definition_block_text(definition_frontier)
+    scenarios_block = build_scenarios_block_text(scoring_scenarios)
+    model_comparison_block = build_model_comparison_block_text(model_selection_df, definition_frontier, serving_manifest)
+    trust_block = build_trust_block_text(primary_model_frontier, primary_cv_metric_folds, primary_cv_threshold_summary, cv_confusion_summary)
+    final_model_block = build_final_model_block_text(primary_model_frontier, primary_threshold_metrics, primary_confusion_df)
+    score_block = build_score_block_text(score_deciles, primary_threshold_metrics, primary_band_summary)
+    driver_block = build_driver_block_text(primary_feature_importance, definition_b_feature_block_gain_summary)
+    heavy_user_block = build_heavy_user_block_text(primary_heavy_user_summary, heavy_user_profile)
+
+    return f"""
+    <section>
+      <div class="guide-grid">
+        {render_checklist_block(
+            title="0. Qual é o protocolo metodológico declarado do estudo?",
+            quick_definition=methodology_protocol_block[0],
+            how_text=methodology_protocol_block[1],
+            why_text=methodology_protocol_block[2],
+            sections=methodology_protocol_block[3],
+            conclusion_text=methodology_protocol_block[4],
+            lineage_items=[
+                ("Base usada", "<code>build/tables</code> + política metodológica registrada no repositório"),
+                ("Escopo", "Guardrails do alvo, da modelagem, do serving e da trilha de auditoria."),
+            ],
+        )}
+        {render_checklist_block(
+            title="0B. O que o material atual ainda não resolve sozinho?",
+            quick_definition=methodology_gaps_block[0],
+            how_text=methodology_gaps_block[1],
+            why_text=methodology_gaps_block[2],
+            sections=methodology_gaps_block[3],
+            conclusion_text=methodology_gaps_block[4],
+            lineage_items=[
+                ("Base usada", "<code>build/tables</code>, <code>build/serving/serving_manifest.json</code> e estado atual do código"),
+                ("Leitura correta", "Este bloco separa fato materializado, política corrigida e gap ainda pendente."),
+            ],
+        )}
+        {render_teaching_block(
+            title="1. O que o modelo pode ver antes de prever?",
+            quick_definition=assumptions_block[0],
+            how_text=assumptions_block[1],
+            why_text=assumptions_block[2],
+            chart_html=render_assumptions_timeline(assumption_points, feature_registry),
+            detail_html=render_strict_context_note(feature_registry),
+            what_text=assumptions_block[3],
+            conclusion_text=assumptions_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>governance_track_registry_v1</code>, <code>governance_arbitrariness_registry_v1</code> e <code>governance_feature_registry_v1</code>"),
+                ("Unidade do gráfico", "Cada linha mostra quando cada trilha já tem dado suficiente para prever e quando o resultado passa a poder ser medido."),
+            ],
+        )}
+        {render_teaching_block(
+            title="2. O que é atividade futura aqui?",
+            quick_definition=definition_block[0],
+            how_text=definition_block[1],
+            why_text=definition_block[2],
+            chart_html=render_plotly(definition_frontier, "definition"),
+            what_text=definition_block[3],
+            conclusion_text=definition_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_definition_frontier_v1</code>, <code>core_definition_external_validation_v1</code> e <code>governance_label_registry_v1</code>"),
+                ("Unidade do gráfico", "Cada barra é o gap observado entre grupos ativos e não ativos nos validadores externos pós-label."),
+            ],
+        )}
+        {render_teaching_block(
+            title="3. Quais definições, trilhas e combinações foram testadas?",
+            quick_definition=scenarios_block[0],
+            how_text=scenarios_block[1],
+            why_text=scenarios_block[2],
+            chart_html=render_plotly(scoring_scenarios, "scenarios_tested"),
+            what_text=scenarios_block[3],
+            conclusion_text=scenarios_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_scoring_scenarios_v1</code> e <code>governance_feature_registry_v1</code>"),
+                ("Unidade do gráfico", "Cada barra mostra quantas variáveis elegíveis entraram em cada definição + trilha."),
+            ],
+        )}
+        {render_teaching_block(
+            title="4. Quais modelos foram comparados e como o melhor foi escolhido?",
+            quick_definition=model_comparison_block[0],
+            how_text=model_comparison_block[1],
+            why_text=model_comparison_block[2],
+            chart_html=render_model_selection_board(model_selection_df),
+            what_text=model_comparison_block[3],
+            conclusion_text=model_comparison_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_model_frontier_v1</code> e <code>build/serving/serving_manifest.json</code>"),
+                ("Unidade da matriz", "Cada linha é uma combinação definição + modelo; a posição mostra o ranking dentro de cada combinação publicada."),
+            ],
+        )}
+        {render_teaching_block(
+            title="5. Por que dá para confiar no modelo?",
+            quick_definition=trust_block[0],
+            how_text=trust_block[1],
+            why_text=trust_block[2],
+            chart_html=render_plotly(primary_cv_metric_folds, "cv_metric_drift"),
+            what_text=trust_block[3],
+            conclusion_text=trust_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_cv_metric_folds_v1</code> e <code>post_model_cv_threshold_summary_v1</code>"),
+                ("Unidade do gráfico", "Cada ponto é um mês futuro nunca visto no treino."),
+            ],
+        )}
+        {render_teaching_block(
+            title="6. Qual é o modelo final e onde ele acerta e erra?",
+            quick_definition=final_model_block[0],
+            how_text=final_model_block[1],
+            why_text=final_model_block[2],
+            chart_html=render_confusion_matrix_panel(primary_confusion_df),
+            what_text=final_model_block[3],
+            conclusion_text=final_model_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_model_frontier_v1</code>, <code>post_model_threshold_metrics_v1</code> e <code>post_model_confusion_matrix_v1</code>"),
+                ("Unidade da matriz", "A matriz usa só o teste futuro concatenado do modelo final com a política <code>tercis</code>."),
+            ],
+        )}
+        {render_teaching_block(
+            title="7. O que é o score e como usar cutoff e faixas?",
+            quick_definition=score_block[0],
+            how_text=score_block[1],
+            why_text=score_block[2],
+            chart_html=render_plotly(score_deciles, "score_deciles"),
+            what_text=score_block[3],
+            conclusion_text=score_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>core_model_predictions_v1</code>, <code>post_model_threshold_metrics_v1</code> e <code>post_model_band_summary_v1</code>"),
+                ("Unidade do gráfico", "A curva mostra score previsto e taxa observada por decil; cutoff e faixas ficam resumidos no texto do bloco."),
+            ],
+        )}
+        {render_teaching_block(
+            title="8. Quais sinais mais puxam a previsão de atividade?",
+            quick_definition=driver_block[0],
+            how_text=driver_block[1],
+            why_text=driver_block[2],
+            chart_html=render_plotly(primary_feature_importance, "feature_importance"),
+            what_text=driver_block[3],
+            conclusion_text=driver_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>post_model_feature_importance_v1</code> e <code>core_definition_b_feature_block_gain_summary_v1</code>"),
+                ("Unidade do gráfico", "As barras mostram o impacto médio de embaralhar um sinal no modelo final."),
+            ],
+        )}
+      </div>
+    </section>
+    <section>
+      <h2>Camadas complementares</h2>
+      <div class="guide-grid">
+        {render_teaching_block(
+            title="Heavy-user",
+            quick_definition=heavy_user_block[0],
+            how_text=heavy_user_block[1],
+            why_text=heavy_user_block[2],
+            chart_html=render_heavy_user_panel(primary_heavy_user_summary, heavy_user_profile),
+            what_text=heavy_user_block[3],
+            conclusion_text=heavy_user_block[4],
+            lineage_items=[
+                ("Tabelas usadas", "<code>post_model_heavy_user_summary_v1</code> e <code>post_model_heavy_user_profile_v1</code>"),
+                ("Unidade do gráfico", "Cada barra mostra quantas vezes o grupo heavy-user difere do restante da base em inatividade e intensidade futura."),
+            ],
+        )}
+      </div>
+    </section>
+    <section>
+      {render_product_block()}
+    </section>
+    """
+
+
 def main() -> None:
     args = parse_args()
     build_dir = (args.build_dir or (PROJECT_DIR / "build")).resolve()
     summary = read_summary(build_dir)
+    serving_manifest = read_serving_manifest(build_dir)
     track_registry = read_table(build_dir, "governance_track_registry_v1")
     arbitrariness = read_table(build_dir, "governance_arbitrariness_registry_v1")
     policy_registry = read_table(build_dir, "governance_policy_registry_v1")
+    candidate_metric_registry = read_table(build_dir, "governance_definition_candidate_metric_registry_v1")
     feature_registry = read_table(build_dir, "governance_feature_registry_v1")
     label_registry = read_table(build_dir, "governance_label_registry_v1")
+    future_metrics = read_table(build_dir, "mart_future_metrics_v1")
     definition_selection = read_table(build_dir, "core_definition_selection_v1")
     definition_frontier = read_table(build_dir, "core_definition_frontier_v1")
     definition_external_validation = read_table(build_dir, "core_definition_external_validation_v1")
@@ -2688,8 +4825,6 @@ def main() -> None:
     definition_b_feature_block_gain_summary = read_table(build_dir, "core_definition_b_feature_block_gain_summary_v1")
     definition_b_feature_block_gain_summary_full = definition_b_feature_block_gain_summary.copy()
     definition_b_excessive_separation = read_table(build_dir, "core_definition_b_excessive_separation_v1")
-    navigation_sequences = read_table(build_dir, "core_navigation_sequences_v1")
-    navigation_transitions = read_table(build_dir, "core_navigation_transitions_v1")
     bootstrap = read_table(build_dir, "core_prediction_bootstrap_v1")
     threshold_metrics = read_table(build_dir, "post_model_threshold_metrics_v1")
     confusion_df = read_table(build_dir, "post_model_confusion_matrix_v1")
@@ -2707,6 +4842,19 @@ def main() -> None:
     heavy_user_summary = read_table(build_dir, "post_model_heavy_user_summary_v1")
     heavy_user_profile = read_table(build_dir, "post_model_heavy_user_profile_v1")
 
+    definition_frontier_all = definition_frontier.copy()
+    scoring_scenarios_all = scoring_scenarios.copy()
+    model_frontier_all = model_frontier.copy()
+    predictions_all = predictions.copy()
+    cv_metric_folds_all = cv_metric_folds.copy()
+    cv_threshold_summary_all = cv_threshold_summary.copy()
+    threshold_metrics_all = threshold_metrics.copy()
+    confusion_df_all = confusion_df.copy()
+    band_summary_all = band_summary.copy()
+    feature_importance_all = feature_importance.copy()
+    cluster_summary_all = cluster_summary.copy()
+    heavy_user_summary_all = heavy_user_summary.copy()
+
     definition_frontier = filter_to_reference_definitions(definition_frontier, reference_scope)
     definition_selection = filter_to_reference_definitions(definition_selection, reference_scope)
     definition_external_validation = filter_to_reference_definitions(definition_external_validation, reference_scope)
@@ -2723,8 +4871,6 @@ def main() -> None:
     leakage_summary = filter_to_reference_scope(leakage_summary, reference_scope)
     definition_b_feature_block_gain_summary = filter_to_reference_scope(definition_b_feature_block_gain_summary, reference_scope)
     definition_b_excessive_separation = filter_to_reference_scope(definition_b_excessive_separation, reference_scope)
-    navigation_sequences = filter_to_reference_definitions(navigation_sequences, reference_scope)
-    navigation_transitions = filter_to_reference_definitions(navigation_transitions, reference_scope)
     bootstrap = filter_to_reference_scope(bootstrap, reference_scope)
     threshold_metrics = filter_to_reference_scope(threshold_metrics, reference_scope)
     confusion_df = filter_to_reference_scope(confusion_df, reference_scope)
@@ -2742,239 +4888,74 @@ def main() -> None:
     heavy_user_profile = filter_to_reference_scope(heavy_user_profile, reference_scope)
 
     presentation_scope = select_presentation_scope(reference_scope)
-    presentation_definition_frontier = filter_to_reference_definitions(definition_frontier, presentation_scope)
-    presentation_scoring_scenarios = filter_to_reference_scope(scoring_scenarios, presentation_scope)
-    presentation_model_frontier = filter_to_reference_scope(model_frontier, presentation_scope)
-    presentation_predictions = filter_to_reference_scope(predictions, presentation_scope)
-    presentation_cv_score_folds = filter_to_reference_scope(cv_score_folds, presentation_scope)
-    presentation_cv_score_summary = filter_to_reference_scope(cv_score_summary, presentation_scope)
-    presentation_cv_metric_folds = filter_to_reference_scope(cv_metric_folds, presentation_scope)
-    presentation_cv_metric_summary = filter_to_reference_scope(cv_metric_summary, presentation_scope)
-    presentation_leakage_audit = filter_to_reference_scope(leakage_audit, presentation_scope)
-    presentation_leakage_summary = filter_to_reference_scope(leakage_summary, presentation_scope)
+    primary_scope = build_primary_scope(reference_scope, serving_manifest)
+    presentation_definition_frontier = filter_to_reference_definitions(definition_frontier_all, presentation_scope)
+    presentation_scoring_scenarios = filter_to_reference_definitions(scoring_scenarios_all, presentation_scope)
+    comparison_model_frontier = filter_to_problem_keys(model_frontier_all, presentation_scope)
+    primary_model_frontier = filter_to_reference_scope(model_frontier_all, primary_scope)
+    primary_predictions = filter_to_reference_scope(predictions_all, primary_scope)
+    primary_cv_metric_folds = filter_to_reference_scope(cv_metric_folds_all, primary_scope)
+    primary_cv_threshold_summary = filter_to_reference_scope(cv_threshold_summary_all, primary_scope)
+    primary_cv_confusion_summary = filter_to_reference_scope(cv_confusion_summary, primary_scope)
+    primary_threshold_metrics = filter_to_reference_scope(threshold_metrics_all, primary_scope)
+    primary_confusion_df = filter_to_reference_scope(confusion_df_all, primary_scope)
+    primary_band_summary = filter_to_reference_scope(band_summary_all, primary_scope)
+    primary_feature_importance = filter_to_reference_scope(feature_importance_all, primary_scope)
+    primary_cluster_summary = filter_to_reference_scope(cluster_summary_all, primary_scope)
+    primary_heavy_user_summary = filter_to_reference_scope(heavy_user_summary_all, primary_scope)
     presentation_definition_b_feature_block_gain_summary = filter_definition_b_feature_block_gain_for_report(
         definition_b_feature_block_gain_summary_full,
         presentation_scope,
     )
-    presentation_definition_b_excessive_separation = filter_to_reference_scope(definition_b_excessive_separation, presentation_scope)
-    presentation_navigation_sequences = filter_to_reference_definitions(navigation_sequences, presentation_scope)
-    presentation_navigation_transitions = filter_to_reference_definitions(navigation_transitions, presentation_scope)
-    presentation_bootstrap = filter_to_reference_scope(bootstrap, presentation_scope)
-    presentation_threshold_metrics = filter_to_reference_scope(threshold_metrics, presentation_scope)
-    presentation_confusion_df = filter_to_reference_scope(confusion_df, presentation_scope)
-    presentation_band_summary = filter_to_reference_scope(band_summary, presentation_scope)
-    presentation_monthly_fit = filter_to_reference_scope(monthly_fit, presentation_scope)
-    presentation_cv_threshold_folds = filter_to_reference_scope(cv_threshold_folds, presentation_scope)
-    presentation_cv_threshold_summary = filter_to_reference_scope(cv_threshold_summary, presentation_scope)
-    presentation_cv_confusion_folds = filter_to_reference_scope(cv_confusion_folds, presentation_scope)
-    presentation_cv_confusion_summary = filter_to_reference_scope(cv_confusion_summary, presentation_scope)
-    presentation_feature_importance = filter_to_reference_scope(feature_importance, presentation_scope)
-    presentation_cluster_summary = filter_to_reference_scope(cluster_summary, presentation_scope)
-    presentation_cluster_profile = filter_to_reference_scope(cluster_profile, presentation_scope)
-    presentation_cluster_validation = filter_to_reference_scope(cluster_validation, presentation_scope)
-    presentation_heavy_user_summary = filter_to_reference_scope(heavy_user_summary, presentation_scope)
-    presentation_heavy_user_profile = filter_to_reference_scope(heavy_user_profile, presentation_scope)
-
-    intro_rows = build_intro_rows(summary, track_registry, presentation_definition_frontier, presentation_model_frontier)
-    method_text_1, method_text_2 = build_method_text(model_frontier, summary)
-    operational_text_1, operational_text_2 = build_operational_snapshot_text(presentation_scope, presentation_threshold_metrics, presentation_confusion_df, presentation_band_summary)
-    cluster_text = build_cluster_text(presentation_cluster_summary, presentation_cluster_profile)
-    heavy_user_text = build_heavy_user_text(presentation_heavy_user_summary)
-    definition_b_feature_block_text_1, definition_b_feature_block_text_2 = build_definition_b_feature_block_gain_text(
-        presentation_definition_b_feature_block_gain_summary,
-    )
-    calibration_text_1, calibration_text_2 = build_calibration_text(model_inner_split_audit, model_fold_metrics)
-    validator_guide = build_external_validator_guide()
-    selected_problem_model_comparison = display_selected_problem_model_comparison(presentation_model_frontier, presentation_scope)
-    selected_problem_operational_comparison = display_selected_problem_operational_comparison(presentation_predictions, presentation_scope)
-    selected_problem_story = build_problem_level_model_text(
-        selected_problem_model_comparison,
-        selected_problem_operational_comparison,
-        presentation_scope,
-    )
-    definition_conclusion = build_definition_conclusion(presentation_model_frontier)
-    model_conclusion = build_model_conclusion(presentation_model_frontier)
-    definition_family_summary = display_definition_family_summary(presentation_model_frontier, presentation_scoring_scenarios)
-    model_family_summary = display_model_family_summary(presentation_model_frontier, presentation_scoring_scenarios)
-    definition_answer = build_definition_answer(definition_family_summary)
-    model_answer = build_model_answer(model_family_summary)
-    definition_a_rule = ""
-    definition_b_rule = ""
-    if not presentation_definition_frontier.empty:
-        a_rows = presentation_definition_frontier[presentation_definition_frontier["definition_name"].astype(str).str.startswith("definition_a")].copy()
-        b_rows = presentation_definition_frontier[presentation_definition_frontier["definition_name"].astype(str).str.startswith("definition_b")].copy()
-        if not a_rows.empty:
-            definition_a_rule = format_rule_text(a_rows.iloc[0].get("rule_text", ""))
-        if not b_rows.empty:
-            definition_b_rule = format_rule_text(b_rows.iloc[0].get("rule_text", ""))
-
-    definition_external_display = definition_external_validation.copy()
-    if not definition_external_display.empty:
-        if "definition_name" in definition_external_display.columns:
-            definition_external_display["definition_name"] = definition_external_display["definition_name"].map(format_definition_name)
-        if "split_role" in definition_external_display.columns:
-            definition_external_display["split_role"] = definition_external_display["split_role"].replace({"train": "treino", "test": "teste"})
-        if "metric_name" in definition_external_display.columns:
-            definition_external_display["metric_name"] = definition_external_display["metric_name"].map(format_metric_name)
-        definition_external_display = definition_external_display.rename(
-            columns={
-                "definition_name": "Definição",
-                "split_role": "Papel do fold",
-                "fold_id": "Fold",
-                "metric_name": "Métrica futura",
-                "threshold": "Corte",
-                "gap_returned_active_post_label_m1": "Gap retorno M+1",
-                "gap_returned_active_post_label_m2": "Gap retorno M+2",
-                "gap_returned_active_post_label_m3": "Gap retorno M+3",
-                "gap_active_days_post_label_3m": "Gap dias ativos 3m",
-                "gap_sustained_active_2of3_post_label": "Gap sustentação 2 de 3",
-                "candidate_valid_flag": "Label válido no fold",
-            }
-        )
-        wanted = [
-            "Definição",
-            "Papel do fold",
-            "Fold",
-            "Métrica futura",
-            "Corte",
-            "Gap retorno M+1",
-            "Gap retorno M+2",
-            "Gap retorno M+3",
-            "Gap dias ativos 3m",
-            "Gap sustentação 2 de 3",
-            "Label válido no fold",
-        ]
-        definition_external_display = definition_external_display[[c for c in wanted if c in definition_external_display.columns]]
 
     report_title = "Previsão de atividade futura"
-    subtitle = "Build único com base modelada oficial, comparação temporal entre Definição A e Definição B, score contínuo calibrado e relatório final em português."
-    label_registry_detail = render_details(
-        "Ver tabela técnica dos rótulos",
-        render_clean_table(display_label_registry(label_registry)),
+    intro_rows = int(pd.to_numeric(presentation_scoring_scenarios["rows"], errors="coerce").dropna().max() or 0) if not presentation_scoring_scenarios.empty else 0
+    intro_months = int(pd.to_numeric(presentation_scoring_scenarios["months"], errors="coerce").dropna().max() or 0) if not presentation_scoring_scenarios.empty else 0
+    eligible_population = future_metrics.copy()
+    if not eligible_population.empty and "full_followup_observed_flag" in eligible_population.columns:
+        eligible_population = eligible_population[eligible_population["full_followup_observed_flag"] == 1].copy()
+    if (
+        not eligible_population.empty
+        and str(summary.get("official_population_filter", "")) == "same_month_entry_only"
+        and "same_month_entry_flag" in eligible_population.columns
+    ):
+        eligible_population = eligible_population[eligible_population["same_month_entry_flag"] == 1].copy()
+    eligible_month_start = "n/d"
+    eligible_month_end = "n/d"
+    if not eligible_population.empty and "first_month" in eligible_population.columns:
+        eligible_months = pd.to_datetime(eligible_population["first_month"], errors="coerce").dropna()
+        if not eligible_months.empty:
+            eligible_month_start = eligible_months.min().strftime("%Y-%m")
+            eligible_month_end = eligible_months.max().strftime("%Y-%m")
+    population_note = ""
+    if str(summary.get("official_population_filter", "")) == "same_month_entry_only":
+        population_note = " O estudo principal foi restringido a professores com primeiro uso observado no mesmo mês do cadastro."
+    beginner_guide_section = build_beginner_guide_section(
+        build_dir=build_dir,
+        summary=summary,
+        track_registry=track_registry,
+        arbitrariness=arbitrariness,
+        feature_registry=feature_registry,
+        candidate_metric_registry=candidate_metric_registry,
+        definition_selection=definition_selection,
+        definition_frontier=presentation_definition_frontier,
+        scoring_scenarios=presentation_scoring_scenarios,
+        model_frontier=comparison_model_frontier,
+        cv_metric_folds=primary_cv_metric_folds,
+        cv_threshold_summary=primary_cv_threshold_summary,
+        cv_confusion_summary=primary_cv_confusion_summary,
+        threshold_metrics=primary_threshold_metrics,
+        confusion_df=primary_confusion_df,
+        band_summary=primary_band_summary,
+        predictions=primary_predictions,
+        feature_importance=primary_feature_importance,
+        definition_b_feature_block_gain_summary=presentation_definition_b_feature_block_gain_summary,
+        cluster_summary=primary_cluster_summary,
+        cluster_profile=cluster_profile,
+        heavy_user_summary=primary_heavy_user_summary,
+        heavy_user_profile=heavy_user_profile,
+        serving_manifest=serving_manifest,
     )
-    definition_validation_detail = render_details(
-        "Ver tabela técnica da validação externa por fold",
-        render_clean_table(definition_external_display, limit=24),
-    )
-    validator_guide_detail = render_details(
-        "Ver definição de cada validador externo",
-        render_clean_table(validator_guide),
-        open_by_default=True,
-    )
-    calibration_audit_detail = render_details(
-        "Ver auditoria técnica do bloco temporal de calibração",
-        render_clean_table(display_inner_split_summary(model_inner_split_audit), limit=20),
-    )
-    arbitrariness_detail = render_details(
-        "Ver tabela técnica das convenções",
-        render_clean_table(display_arbitrariness(arbitrariness), limit=20),
-    )
-    track_detail = render_details(
-        "Ver trilhas oficiais",
-        render_clean_table(display_track_registry(track_registry)),
-    )
-    feature_detail = render_details(
-        "Ver variáveis elegíveis por bloco e trilha",
-        render_clean_table(display_feature_summary(feature_registry)),
-    )
-    policy_detail = render_details(
-        "Ver políticas registradas do build",
-        render_clean_table(display_policy_registry(policy_registry), limit=20),
-    )
-    strict_context_detail = render_details(
-        "Ver exatamente o que entra no STRICT_CONTEXT",
-        render_clean_table(display_strict_context_features(feature_registry)),
-        open_by_default=True,
-    )
-    model_fold_validity_detail = render_details(
-        "Ver validade dos outer folds",
-        render_clean_table(display_model_fold_validity(model_fold_metrics), limit=20),
-    )
-
-    operational_sections = f"""
-    <section>
-      <h2>Uso do score</h2>
-      <div class="chart-card">
-        <p class="section-text">O produto central continua sendo o <b>score contínuo calibrado</b>. Aqui, <code>score</code> é a probabilidade calibrada de realizar a atividade futura e <code>risk_score = 1 - score</code> é a probabilidade calibrada de não realizar. Essa leitura como probabilidade só é aceitável porque o score bruto foi recalibrado em um bloco temporal separado do treino e depois checado em meses futuros nunca vistos.</p>
-        <h3>Como o score é composto e para que ele serve</h3>
-        <h4>1. Entrada do modelo</h4>
-        <p class="section-text">Em <code>S1</code>, entram apenas sinais disponíveis até o fim da 1ª sessão. Em <code>S7</code>, entram apenas sinais disponíveis até o fim dos primeiros 7 dias. Em <code>S1+S7</code>, os dois blocos entram juntos. Em <code>STRICT_CONTEXT</code>, entram só variáveis já conhecidas no começo da jornada ou flags de <b>completude do contexto inicial</b>, como origem, dispositivo e ausência de metadados básicos. Ele funciona como o cenário mais conservador do build, porque exclui sinais de comportamento do produto.</p>
-        {strict_context_detail}
-        <h4>2. Score contínuo</h4>
-        <p class="section-text">O uso central do score é ordenar a base e comparar professores com mais ou menos chance de voltar a usar produto. A interpretação correta é sempre esta: quanto maior o <code>score</code>, maior a chance de realizar a atividade futura; quanto maior o <code>risk_score</code>, maior o risco de não realizar.</p>
-        <h4>3. Uso prático</h4>
-        <p class="section-text">Cutoffs, faixas e outras leituras operacionais entram depois, como políticas registradas por cima desse núcleo. Por isso, primeiro o relatório mostra a comparação probabilística principal; só depois entra em cutoff, matriz de confusão, bandas e ajuste mensal.</p>
-        {render_clean_table(display_reference_scope(presentation_scope), limit=4)}
-        <p class="section-text">{operational_text_1}</p>
-        <p class="section-text">{operational_text_2}</p>
-        <h3>Como os modelos finais se comportaram sob as mesmas políticas</h3>
-        <p class="section-text">A tabela abaixo compara, nas combinações finais, como cada modelo se comporta quando entra uma política operacional comparável. É aqui que aparecem juntos <code>F1</code>, matriz de confusão resumida e ajuste mensal por <code>R2</code>/<code>MAPE</code>.</p>
-        {render_clean_table(selected_problem_operational_comparison, limit=12)}
-        <h3>Onde o modelo de ativação acerta e erra no teste futuro</h3>
-        <p class="section-text">As tabelas abaixo mostram o que acontece quando a probabilidade contínua vira decisão por cutoff. Aqui, a <b>classe positiva é “não realiza”</b>. Então: <b>TP</b> = marcou alto risco e depois realmente não realizou; <b>FP</b> = marcou alto risco e depois realizou; <b>TN</b> = não marcou alto risco e depois realizou; <b>FN</b> = não marcou alto risco e depois não realizou.</p>
-        <p class="section-text">Importante: <b>matriz de confusão e métricas por cutoff não escolhem a definição de atividade</b>. Elas entram depois, como leitura operacional de um score contínuo já escolhido, porque dependem da política de corte.</p>
-        <h3>Precision, recall, F1 e accuracy por cutoff</h3>
-        {render_clean_table(display_threshold_metrics(presentation_threshold_metrics), limit=4)}
-        <h3>Matriz de confusão por cutoff</h3>
-        <p class="section-text">A matriz abaixo já está resumida em <code>TP</code>, <code>FP</code>, <code>TN</code> e <code>FN</code> para facilitar a leitura de quem não quer navegar pela matriz aberta linha a linha.</p>
-        {render_clean_table(display_confusion_matrix(presentation_confusion_df), limit=4)}
-        <h3>Como cutoff e métricas operacionais variaram entre folds</h3>
-        <p class="section-text">Os outer folds também funcionam aqui como pequenas variações do contexto de uso. A pergunta é: quando o mês muda, a política operacional continua parecida ou muda demais?</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_cv_threshold_folds, "cv_threshold_drift")}
-        </div>
-        {render_details("Ver tabela do drift operacional por cutoff", render_clean_table(display_cv_threshold_summary(presentation_cv_threshold_summary), limit=12))}
-        <h3>Como a matriz de confusão variou entre folds</h3>
-        <p class="section-text">Os outer folds funcionam aqui como pequenas variações temporais do problema: muda o mês de teste, muda um pouco a composição da base e vemos se a leitura operacional continua parecida. Quando a matriz de confusão salta demais entre folds, a política fica menos confiável para uso recorrente.</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_cv_confusion_folds, "cv_confusion_drift")}
-        </div>
-        {render_details("Ver tabela do drift da matriz de confusão", render_clean_table(display_cv_confusion_summary(presentation_cv_confusion_summary), limit=12))}
-        <h3>Como o score foi separado em faixas e o que aconteceu em cada faixa</h3>
-        <p class="section-text">As faixas não substituem o score; elas só resumem a distribuição operacional da base. A leitura útil é: qual share da base caiu em cada faixa e como a taxa realizada muda quando saímos das faixas de menor risco para as de maior risco.</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_band_summary, "band_summary")}
-        </div>
-        {render_details("Ver tabela completa das faixas", render_clean_table(display_band_summary(presentation_band_summary), limit=12))}
-        <h3>R2 e MAPE em risco mensal realizado</h3>
-        <p class="section-text"><code>R2</code> e <code>MAPE</code> não são métricas linha a linha do alvo binário. Aqui eles medem uma coisa diferente: o quanto a média mensal do <code>risk_score</code> acompanha a taxa mensal observada de não realização. Isso ajuda a ver se o score continua útil para leitura agregada de risco ao longo do tempo.</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_monthly_fit, "monthly_fit")}
-        </div>
-        {render_details("Ver tabela do ajuste mensal", render_clean_table(display_monthly_fit(presentation_monthly_fit), limit=12))}
-      </div>
-    </section>
-
-    <section>
-        <h2>Leitura do comportamento</h2>
-      <div class="chart-card">
-        <p class="section-text">Esta seção ajuda a interpretar o score sem redefinir o núcleo oficial. Tudo que aparece aqui é leitura complementar: ajuda a entender quais sinais parecem puxar mais o risco, quem concentra intensidade futura e quais caminhos iniciais aparecem com mais frequência, mas não muda a definição oficial nem o modelo escolhido.</p>
-        <h3>Quais sinais mais puxam o score de ativação</h3>
-        <p class="section-text">A importância por permutação mostra quanto o erro probabilístico piora quando um sinal é embaralhado no conjunto de teste externo. Ela serve para interpretação e robustez, não para decidir se a variável entra ou sai do caminho oficial.</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_feature_importance, "feature_importance")}
-        </div>
-        {render_details("Ver tabela da importância por permutação", render_clean_table(display_feature_importance(presentation_feature_importance), limit=12))}
-        <h3>O que a 1ª sessão e os 7 dias acrescentam além do contexto</h3>
-        <p class="section-text">{definition_b_feature_block_text_1}</p>
-        <p class="section-text">{definition_b_feature_block_text_2}</p>
-        {render_details("Ver teste por blocos de features da Definição B", render_clean_table(display_definition_b_feature_block_gain(presentation_definition_b_feature_block_gain_summary), limit=12))}
-        <h3>Heavy-user descritivo</h3>
-        <p class="section-text">{heavy_user_text}</p>
-        {render_clean_table(display_heavy_user_summary(presentation_heavy_user_summary), limit=6)}
-        {render_details("Ver perfil técnico do heavy-user", render_clean_table(display_heavy_user_profile(presentation_heavy_user_profile), limit=12))}
-        <h3>Clusters descritivos complementares</h3>
-        <p class="section-text">{cluster_text}</p>
-        {render_clean_table(display_cluster_summary(presentation_cluster_summary), limit=4)}
-        {render_details("Ver perfil detalhado dos clusters", render_clean_table(display_cluster_profile(presentation_cluster_profile), limit=16))}
-        {render_details("Ver validação técnica dos clusters", render_clean_table(display_cluster_validation(presentation_cluster_validation), limit=12))}
-        <h3>Sequências iniciais mais frequentes</h3>
-        <p class="section-text">Aqui a comparação é entre <b>ativo</b> e <b>não ativo</b> realizados no futuro, não entre grupos artificiais de risco. A ideia é ver quais caminhos iniciais aparecem mais em quem depois ficou ativo e em quem depois não ficou.</p>
-        {render_clean_table(display_navigation(presentation_navigation_sequences), limit=10)}
-        {render_details("Ver transições iniciais mais frequentes", render_clean_table(display_navigation_transitions(presentation_navigation_transitions), limit=12))}
-      </div>
-    </section>
-"""
 
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2991,145 +4972,152 @@ def main() -> None:
     h4 {{ margin: 14px 0 8px 0; font-size: 16px; color: #102A43; }}
     .subtitle {{ margin: 0 0 14px 0; color: #486581; font-size: 14px; }}
     .section-text {{ margin: 0 0 16px 0; color: #486581; font-size: 16px; line-height: 1.55; }}
-    .intro-card {{ background: white; border: 1px solid #D9E2EC; border-radius: 14px; padding: 20px 22px; margin-bottom: 28px; }}
-    .intro-card h2 {{ margin: 0 0 12px 0; font-size: 27px; }}
-    .intro-card p {{ margin: 10px 0; font-size: 16px; line-height: 1.65; color: #243B53; }}
-    .clean-table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
-    .clean-table th {{ text-align: left; background: #102A43; color: white; padding: 12px 14px; font-size: 14px; }}
-    .clean-table td {{ vertical-align: top; padding: 12px 14px; border-bottom: 1px solid #D9E2EC; font-size: 14px; line-height: 1.6; color: #243B53; }}
-    .clean-table td:first-child {{ width: 220px; font-weight: 700; color: #102A43; }}
     .chart-card {{ background: white; border: 1px solid #D9E2EC; border-radius: 14px; padding: 18px 20px; margin: 18px 0 34px 0; }}
     .note {{ background: #E6FFFA; border: 1px solid #81E6D9; border-radius: 10px; padding: 12px 14px; margin: 18px 0 16px 0; font-size: 15px; line-height: 1.6; color: #234E52; }}
     .lineage {{ background: #F8FAFC; border: 1px solid #D9E2EC; border-radius: 10px; padding: 12px 14px; margin-top: 18px; }}
     .lineage p {{ margin: 8px 0; font-size: 13.5px; line-height: 1.55; color: #334E68; }}
-    .two-col {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 28px; align-items: start; }}
-    .definition-card {{ background: #F8FAFC; border: 1px solid #D9E2EC; border-radius: 12px; padding: 14px 16px; }}
-    .definition-card h4 {{ margin: 0 0 8px 0; font-size: 16px; color: #102A43; }}
-    .definition-card p {{ margin: 0; font-size: 14px; line-height: 1.55; color: #334E68; }}
-    .embedded-chart-wrap {{ margin-top: 10px; }}
+    .embedded-chart-wrap {{ margin: 18px 0 22px 0; }}
+    .definition-note {{ background: #F8FAFC; border: 1px solid #D9E2EC; border-radius: 12px; padding: 14px 16px; margin: 0 0 18px 0; }}
+    .definition-note strong {{ display: block; font-size: 15px; color: #102A43; margin-bottom: 6px; }}
+    .definition-note p {{ margin: 0 0 10px 0; font-size: 14px; color: #486581; line-height: 1.5; }}
+    .protocol-wrap {{ display: grid; gap: 14px; margin: 18px 0 20px 0; }}
+    .protocol-section {{ background: #F8FAFC; border: 1px solid #D9E2EC; border-radius: 12px; padding: 14px 16px; }}
+    .protocol-section h4 {{ margin: 0 0 10px 0; }}
+    .protocol-list {{ margin: 0; padding-left: 20px; color: #334E68; }}
+    .protocol-list li {{ margin: 0 0 8px 0; line-height: 1.55; }}
+    .definition-note ul {{ margin: 0; padding-left: 18px; display: grid; gap: 6px; }}
+    .definition-note li {{ color: #334E68; font-size: 14px; line-height: 1.5; }}
+    .definition-note-compact {{ padding: 8px 10px; margin: 8px 0 14px 0; }}
+    .definition-note-compact strong {{ font-size: 12.5px; margin-bottom: 3px; }}
+    .definition-note-compact p {{ margin: 0; font-size: 11.75px; line-height: 1.45; }}
+    .definition-chip-list {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+    .definition-chip-list span {{ display: inline-flex; align-items: center; gap: 4px; background: white; border: 1px solid #D9E2EC; border-radius: 999px; padding: 4px 8px; font-size: 12px; line-height: 1.35; color: #486581; }}
     .chart-card .plotly-graph-div {{ margin-top: 10px; }}
-    .detail-card {{ margin-top: 14px; border: 1px solid #D9E2EC; border-radius: 10px; background: #FAFCFF; padding: 10px 12px; }}
-    .detail-card summary {{ cursor: pointer; font-weight: 700; color: #102A43; }}
-    .detail-card[open] summary {{ margin-bottom: 10px; }}
+    .guide-grid {{ display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; margin: 20px 0 34px 0; }}
+    .guide-card {{ background: white; border: 1px solid #D9E2EC; border-radius: 14px; padding: 18px 20px; }}
+    .compact-card {{ padding-bottom: 14px; }}
+    .guide-card h3 {{ margin-bottom: 12px; }}
+    .lead-text {{ font-size: 17px; color: #243B53; }}
+    .compact-grid {{ grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }}
+    .button-link {{ display: inline-block; background: #0F766E; color: white; text-decoration: none; padding: 10px 14px; border-radius: 10px; font-weight: 600; }}
+    .button-link:hover {{ background: #115E59; }}
+    .secondary-link {{ background: #0F172A; margin-left: 8px; }}
+    .secondary-link:hover {{ background: #111827; }}
     code {{ background: #F0F4F8; padding: 1px 4px; border-radius: 4px; }}
+    .assumption-panel {{ background: #FFFFFF; border: 1px solid #D4E1EE; border-radius: 12px; padding: 18px 20px 22px 20px; }}
+    .assumption-legend {{ display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 32px; color: #385170; font-size: 13px; }}
+    .legend-dot {{ display: inline-block; width: 14px; height: 14px; border-radius: 999px; margin-right: 8px; vertical-align: -2px; }}
+    .legend-start {{ background: #FFFFFF; border: 2px solid #36537A; box-sizing: border-box; }}
+    .legend-predict {{ background: {COLOR_INFO}; }}
+    .legend-result-shape {{ width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid {COLOR_POSITIVE}; border-radius: 0; margin-right: 8px; vertical-align: -2px; }}
+    .assumption-header {{ display: grid; grid-template-columns: 160px repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 8px; }}
+    .assumption-header-cell {{ text-align: center; font-size: 12px; line-height: 1.35; color: #36506B; font-weight: 700; }}
+    .assumption-matrix {{ display: grid; gap: 14px; }}
+    .assumption-matrix-row {{ display: grid; grid-template-columns: 160px 1fr; gap: 14px; align-items: center; }}
+    .assumption-track {{ font-weight: 700; color: #102A43; font-size: 16px; }}
+    .assumption-trackline {{ position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; min-height: 38px; }}
+    .assumption-rail-line {{ position: absolute; left: 12.5%; right: 12.5%; top: 50%; transform: translateY(-50%); height: 4px; background: #6C88B4; border-radius: 999px; }}
+    .assumption-cell {{ position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; min-height: 38px; }}
+    .assumption-axis-title {{ text-align: center; color: #36506B; font-size: 13px; margin-top: 12px; }}
+    .status-pill {{ display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: #E2E8F0; color: #334155; }}
+    .selected-pill {{ background: #CCFBF1; color: #115E59; }}
+    .winner-pill {{ background: #DBEAFE; color: #1D4ED8; }}
+    .metric-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }}
+    .metric-mini {{ background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 10px; display: grid; gap: 3px; }}
+    .metric-mini span {{ font-size: 12px; color: #64748B; }}
+    .metric-mini strong {{ font-size: 15px; color: #102A43; }}
+    .bar-label {{ font-size: 12px; color: #64748B; margin: 6px 0 4px 0; }}
+    .metric-bar {{ background: #E2E8F0; border-radius: 999px; height: 10px; overflow: hidden; }}
+    .metric-bar-fill {{ height: 100%; border-radius: 999px; }}
+    .ap-fill {{ background: {COLOR_INFO}; }}
+    .brier-fill {{ background: {COLOR_POSITIVE}; }}
+    .comparison-sections {{ display: grid; gap: 16px; }}
+    .comparison-section {{ border: 1px solid #D9E2EC; border-radius: 12px; overflow: hidden; background: #F8FAFC; }}
+    .comparison-section-a {{ border-left: 4px solid {COLOR_INFO}; }}
+    .comparison-section-b {{ border-left: 4px solid {COLOR_NEGATIVE}; }}
+    .comparison-section-title {{ padding: 12px 14px; font-weight: 700; color: #102A43; background: white; border-bottom: 1px solid #E2E8F0; }}
+    .comparison-table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+    .comparison-table th {{ background: #102A43; color: white; padding: 10px 12px; text-align: center; font-size: 12px; }}
+    .comparison-table td {{ padding: 12px 14px; border-top: 1px solid #E2E8F0; color: #243B53; text-align: center; }}
+    .comparison-table td:nth-child(2) {{ text-align: left; }}
+    .comparison-table-row-selected td {{ background: #ECFDF5; }}
+    .rank-pill {{ display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 3px 8px; border-radius: 999px; background: #E0F2FE; color: #1D4ED8; font-weight: 700; font-size: 12px; }}
+    .trust-kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }}
+    .trust-card {{ border: 1px solid #D9E2EC; border-radius: 12px; padding: 12px 14px; background: #F8FAFC; display: grid; gap: 4px; }}
+    .trust-card span {{ font-size: 12px; color: #64748B; }}
+    .trust-card strong {{ font-size: 18px; color: #102A43; }}
+    .trust-card small {{ font-size: 12px; color: #486581; line-height: 1.45; }}
+    .fold-strip {{ display: grid; gap: 10px; }}
+    .fold-line {{ display: grid; grid-template-columns: 84px 1fr 1fr; gap: 12px; border: 1px solid #D9E2EC; border-radius: 12px; padding: 10px 12px; background: #F8FAFC; font-size: 14px; color: #334E68; }}
+    .confusion-grid {{ display: grid; grid-template-columns: 160px repeat(2, minmax(220px, 1fr)); gap: 12px; align-items: stretch; }}
+    .confusion-head {{ background: #102A43; color: white; border-radius: 12px; padding: 14px; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; text-align: center; }}
+    .empty-head {{ background: transparent; padding: 0; }}
+    .side-head {{ background: #334155; }}
+    .top-head-risk {{ background: #334155; }}
+    .top-head-active {{ background: #334155; }}
+    .side-head-risk {{ background: #334155; }}
+    .side-head-active {{ background: #334155; }}
+    .confusion-cell {{ border-radius: 12px; padding: 16px; display: grid; gap: 6px; border: 1px solid #D9E2EC; }}
+    .conf-label {{ font-size: 12px; font-weight: 700; color: #0F172A; letter-spacing: 0.02em; text-transform: uppercase; }}
+    .confusion-cell strong {{ font-size: 28px; color: #102A43; }}
+    .confusion-cell small {{ font-size: 13px; line-height: 1.45; color: #486581; }}
+    .tp-cell {{ background: #DBEAFE; border-color: {COLOR_INFO}; }}
+    .fp-cell {{ background: #FEE2E2; border-color: {COLOR_ERROR}; }}
+    .tn-cell {{ background: #DBEAFE; border-color: {COLOR_INFO}; }}
+    .fn-cell {{ background: #FEE2E2; border-color: {COLOR_ERROR}; }}
+    .policy-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }}
+    .policy-card {{ border: 1px solid #D9E2EC; border-radius: 12px; padding: 14px; background: #F8FAFC; }}
+    .policy-card h4 {{ margin: 0 0 10px 0; }}
+    .decile-panel {{ display: grid; gap: 10px; }}
+    .decile-legend {{ display: flex; gap: 16px; flex-wrap: wrap; color: #486581; font-size: 13px; }}
+    .legend-box {{ display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }}
+    .decile-row {{ display: grid; grid-template-columns: 48px 1fr 1fr; gap: 12px; align-items: center; }}
+    .decile-label {{ font-weight: 700; color: #102A43; }}
+    .decile-metric {{ display: grid; gap: 6px; font-size: 13px; color: #486581; }}
+    .decile-track {{ background: #E2E8F0; border-radius: 999px; height: 12px; overflow: hidden; }}
+    .decile-fill {{ height: 100%; border-radius: 999px; }}
+    .decile-pred-fill {{ background: {COLOR_INFO}; }}
+    .decile-real-fill {{ background: {COLOR_POSITIVE}; }}
+    .feature-bar-list {{ display: grid; gap: 12px; }}
+    .feature-bar-row {{ display: grid; grid-template-columns: minmax(180px, 1.2fr) 2fr 72px; gap: 12px; align-items: center; }}
+    .feature-bar-label {{ font-size: 14px; color: #243B53; }}
+    .feature-bar-track {{ background: #E2E8F0; border-radius: 999px; height: 12px; overflow: hidden; }}
+    .feature-bar-fill {{ background: linear-gradient(90deg, {COLOR_INFO}, {COLOR_POSITIVE_LIGHT}); height: 100%; border-radius: 999px; }}
+    .feature-bar-value {{ font-size: 13px; color: #102A43; font-weight: 700; text-align: right; }}
+    .signal-chip-grid {{ display: grid; gap: 12px; margin-top: 16px; }}
+    .signal-chip {{ border: 1px solid #D9E2EC; border-radius: 12px; padding: 12px 14px; background: #F8FAFC; display: grid; gap: 4px; }}
+    .signal-chip strong {{ font-size: 14px; color: #102A43; }}
+    .signal-chip span {{ font-size: 14px; line-height: 1.5; color: #486581; }}
+    .profile-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
+    .profile-card {{ border: 1px solid #D9E2EC; border-radius: 12px; padding: 14px; background: #F8FAFC; }}
+    .profile-card h4 {{ margin: 0 0 10px 0; }}
+    .profile-list {{ display: grid; gap: 6px; font-size: 14px; color: #486581; }}
+    .product-list {{ display: grid; gap: 10px; margin-bottom: 18px; font-size: 15px; line-height: 1.5; color: #486581; }}
+    @media (max-width: 980px) {{
+      .assumption-row,
+      .confusion-grid,
+      .feature-bar-row,
+      .decile-row,
+      .fold-line {{ grid-template-columns: 1fr; }}
+      .assumption-axis {{ margin-left: 0; }}
+      .empty-head {{ display: none; }}
+    }}
   </style>
 </head>
 <body>
   <div class="container">
     <h1>{report_title}</h1>
-    <p class="subtitle">{subtitle}</p>
-
-    <div class="intro-card">
-      {render_intro_table(intro_rows)}
-    </div>
 
     <section>
-      <h2>Leitura executiva</h2>
+      <h2>Introdução</h2>
       <div class="chart-card">
-        <p class="section-text">Este relatório responde a uma pergunta simples: <b>dado o que o professor fez no começo da jornada, qual é a probabilidade de voltar e usar produto de forma observável depois disso?</b></p>
-        <p class="section-text">A leitura correta para alguém totalmente de fora é esta: <b>1)</b> entender qual atividade futura está sendo chamada de sucesso, <b>2)</b> ver como essa probabilidade se comportou em teste futuro de verdade, <b>3)</b> só então olhar cutoff, faixas, heavy-user, cluster e navegação como <b>camadas complementares</b>.</p>
-        <p class="section-text">Nesta versão final, o relatório publica uma <b>Definição A oficial</b>, mais estrita que a Definição B, e mantém a <b>Definição B</b> como comparador. No lado do modelo, a leitura principal mostra o melhor par <b>definição + trilha + modelo</b> para cada uma delas; o restante entra como leitura complementar, não como critério central.</p>
-        <div class="note"><b>Como ler.</b> Primeiro leia <b>Escolha do alvo</b>. Depois veja <b>Desempenho do modelo</b> para entender por que a probabilidade publicada é confiável. Só então entre em <b>Uso do score</b> e <b>Leitura do comportamento</b>.</div>
+        <p class="section-text">Probabilidade de atividade futura a partir do começo da jornada.</p>
+        <p class="section-text"><b>Base modelada</b> é a versão limpa em fatos e dimensões usada pelo ML. Nesta execução, a comparação principal usou <b>{intro_rows}</b> linhas distribuídas entre <b>{eligible_month_start}</b> e <b>{eligible_month_end}</b>. Esses <b>{intro_months}</b> meses são os meses em que a base já permite observar, do começo ao fim, a janela futura de 30 dias usada para medir o resultado.{population_note}</p>
+        <p class="section-text"><b>Score</b> é a probabilidade de o professor entrar no grupo definido como ativo no período futuro deste relatório. <b>risk_score</b> é a probabilidade complementar de ficar fora desse grupo.</p>
       </div>
     </section>
 
-    <section>
-        <h2>Escolha do alvo</h2>
-      <div class="chart-card">
-        <h3>O que chamamos de atividade futura aqui</h3>
-        <p class="section-text">A pergunta central do build foi: <b>qual definição de “ativo” faz mais sentido para o negócio, sem leakage, e continua separando melhor o comportamento futuro?</b> Para responder isso, o pipeline comparou a Definição B literal contra uma família de candidatas para a Definição A, geradas a partir de métricas futuras nativas como semanas ativas, dias ativos, minutos de sessão, diversidade de ações e outros sinais de uso observável na janela futura.</p>
-        <p class="section-text">O protocolo foi este: gerar candidatas com cortes observados na própria base, deduplicar regras que marcavam exatamente o mesmo vetor de usuários, descartar candidatas que escorregavam para <b>superatividade</b> estreita demais e, no conjunto sobrevivente, comparar prevalência, leakage estrutural, validadores externos pós-label e sensibilidade a pequenas variações dos cortes. A Definição A oficial foi escolhida porque ficou <b>mais estrita que a B</b>, continuou com escala de negócio plausível e foi a que melhor sustentou a combinação de <b>recorrência + profundidade mínima</b> sem virar uma regra extrema de elite de uso.</p>
-        <div class="two-col">
-          <div class="definition-card">
-            <h4>Definição A</h4>
-            <p><b>Regra vencedora:</b> <code>{definition_a_rule}</code>. Em português: o professor precisa mostrar recorrência futura e também um mínimo de profundidade futura. Essa foi a regra que ficou mais robusta a pequenas variações sem ficar trivial nem instável demais.</p>
-          </div>
-          <div class="definition-card">
-            <h4>Definição B</h4>
-            <p><b>Regra comparadora:</b> <code>{definition_b_rule}</code>. Em português: o professor é considerado ativo se tiver pelo menos uma semana futura com sessão e atividade observável na mesma semana. Ela entra como baseline literal e comparador fixo.</p>
-          </div>
-        </div>
-        <h3>Quando cada previsão pode ser feita e quando cada resultado é medido</h3>
-        <p class="section-text">O caminho oficial usa uma única cadeia: <code>base_modelada_v2</code> para ML e ML para HTML. Primeiro, o build reconstrói o começo da jornada do professor. Depois, define até onde a entrada pode ir em cada trilha. Só então mede o resultado futuro depois dessa janela inicial. Isso garante que a previsão seja feita antes do resultado, e não misturada com ele.</p>
-        <p class="section-text">As variáveis de entrada do score não entram por “teste mágico”. Elas entram porque fazem parte do contrato oficial do problema, estão disponíveis no momento do score e passam na checagem de <code>PIT-safe</code>, isto é, não usam informação do futuro. A tabela abaixo mostra exatamente quais variáveis entram em cada bloco e em quais trilhas elas podem ser usadas.</p>
-        <div class="lineage">
-          <p><b>Base modelada usada:</b> <code>base_modelada_v2</code>, <code>dim_teacher</code>, <code>fct_session_clean</code>, <code>fct_interaction_clean</code>, <code>fct_formation_clean</code>, <code>fct_mari_conversation_resolved</code>, <code>fct_mari_help_resolved</code>, <code>mart_teacher_cluster_ready</code> e <code>mart_teacher_persona_ready</code>.</p>
-          <p><b>Marts desta trilha:</b> <code>mart_onboarding_population_v1</code>, <code>mart_first_session_journey_v1</code>, <code>mart_future_metrics_v1</code>.</p>
-        </div>
-        {track_detail}
-        {feature_detail}
-        {policy_detail}
-        <p class="section-text">A tabela abaixo mostra <b>o que é sucesso futuro</b>, em que janela ele é medido e em qual base ele foi calculado. Isso é importante porque o score é treinado para prever exatamente esse resultado.</p>
-        {label_registry_detail}
-        <h3>Validação externa das definições</h3>
-        <p class="section-text">Depois que a janela principal do label termina, o build ainda olha <b>três blocos adicionais de 30 dias</b>. A ideia é simples: se uma definição realmente faz sentido, quem foi marcado como ativo por ela deveria continuar mostrando mais retorno e mais sustentação também depois da janela que criou o próprio label. Isso impede escolher uma definição que “parece boa” só porque está colada no próprio rótulo.</p>
-        {validator_guide_detail}
-        <p class="section-text">Na prática, a comparação final entre A e B ficou assim: a Definição A oficial marca menos usuários como ativos, mas entrega gaps maiores nos validadores externos, o que sustenta a leitura de que ela é uma versão mais exigente e mais forte de atividade futura.</p>
-        {render_clean_table(display_definition_frontier(presentation_definition_frontier), limit=4)}
-        {definition_validation_detail}
-        <div class="note"><b>{definition_answer}</b></div>
-        <p class="section-text">Aqui, “melhor definição” quer dizer a melhor leitura <b>na família da definição</b> depois do protocolo temporal completo. A escolha do alvo olha principalmente validadores externos, modelabilidade e robustez. Matriz de confusão, bandas e cutoff entram depois, como uso do score.</p>
-        <div class="note"><b>{definition_conclusion}</b></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Desempenho do modelo</h2>
-      <div class="chart-card">
-        <p class="section-text">{method_text_1}</p>
-        <p class="section-text">{method_text_2}</p>
-        <h3>Qualidade dos modelos</h3>
-        <p class="section-text">Em cada outer fold, o problema é separado em quatro partes, sempre respeitando o tempo: <b>treino para ajuste</b>, <b>validação temporal interna para tuning</b>, <b>holdout temporal de calibração</b> e <b>teste futuro final</b>. O mês de teste nunca entra nem no tuning nem na calibração.</p>
-        <p class="section-text">Pré-processamento também respeita essa separação. Imputação, padronização e one-hot encoding ficam dentro de <code>Pipeline</code> e <code>ColumnTransformer</code>, então são ajustados apenas com dados de treino antes de serem aplicados ao teste. A calibração usa <code>sigmoid</code> em um bloco temporal mais recente dentro do treino, separado do ajuste do estimador cru.</p>
-        <p class="section-text">{calibration_text_1}</p>
-        <p class="section-text">{calibration_text_2}</p>
-        <p class="section-text">O problema é desbalanceado, então o relatório publica quantos casos ficaram como <b>ativos futuros</b> e <b>não ativos futuros</b> em cada cenário. No núcleo do modelo, a classe positiva é <b>realiza a atividade futura</b>. Já na camada operacional de risco, a classe positiva vira <b>não realiza</b>, porque o uso de cutoff e matriz de confusão está olhando risco de não retorno.</p>
-        {render_clean_table(display_scenario_balance(presentation_scoring_scenarios), limit=8)}
-        <p class="section-text">O build não usa reamostragem nem SMOTE. <code>class_weight</code> pode entrar quando o tuning temporal escolhe isso para uma família de modelo, mas o resumo principal continua priorizando métricas compatíveis com probabilidade e evento raro, como <code>AP</code>, <code>Brier</code> e <code>log loss</code>.</p>
-        <h3>Drift do score dentro do CV</h3>
-        <p class="section-text">Aqui, cada outer fold funciona como uma pequena mudança temporal na amostra. O relatório mostra a média do <code>risk_score</code> por fold, o maior salto de um fold para o seguinte e um p-valor por permutação para tendência temporal. A pergunta é simples: quando o mês muda, o score muda pouco e de forma gradual, ou pula demais?</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_cv_score_folds, "cv_score_drift")}
-        </div>
-        {render_details("Ver tabela do drift do score por fold", render_clean_table(display_cv_score_summary(presentation_cv_score_summary), limit=12))}
-        <h3>Drift das métricas dentro do CV</h3>
-        <p class="section-text">A mesma lógica vale para <code>AP</code>, <code>ROC AUC</code>, <code>Brier</code>, <code>log loss</code> e calibração. O que importa aqui não é só a média; é o quanto cada métrica varia entre folds e se essa variação sugere fragilidade temporal.</p>
-        <div class="embedded-chart-wrap">
-          {render_plotly(presentation_cv_metric_folds, "cv_metric_drift")}
-        </div>
-        {render_details("Ver tabela do drift das métricas por fold", render_clean_table(display_cv_metric_summary(presentation_cv_metric_summary), limit=12))}
-        <h3>Como os três modelos se saíram nas combinações finais</h3>
-        <p class="section-text">A tabela abaixo compara <b>Regressão logística</b>, <b>Random Forest</b> e <b>CatBoost</b> dentro das combinações finais publicadas. É aqui que se vê, sem misturar problemas diferentes, como cada família se comportou em AP, ROC AUC, Brier, log loss e calibração pooled.</p>
-        <div class="note"><b>{model_answer}</b></div>
-        {render_clean_table(selected_problem_model_comparison, limit=12)}
-        <div class="note"><b>{model_conclusion}</b></div>
-        <p class="section-text">{selected_problem_story}</p>
-        <h3>Quais combinações finais ficaram publicáveis</h3>
-        <p class="section-text">A tabela abaixo mostra só o subconjunto final usado para leitura principal do relatório.</p>
-        {render_clean_table(display_reference_scope(presentation_scope), limit=4)}
-        {model_fold_validity_detail}
-        {calibration_audit_detail}
-        {render_details("Ver intervalos bootstrap das métricas de probabilidade", render_clean_table(display_bootstrap(presentation_bootstrap), limit=12))}
-        <h3>Auditoria de leakage</h3>
-        <p class="section-text">A auditoria oficial checa compartilhamento de colunas-fonte entre entrada e rótulo, violação de janela temporal e qualquer toque estrutural da origem da feature com a mesma tabela ou nomenclatura futura usada no label. O ponto central é este: a entrada termina na 1ª sessão ou no fim dos primeiros 7 dias, e o resultado começa apenas depois disso.</p>
-        {render_clean_table(display_leak_summary(presentation_leakage_audit))}
-        <h3>Definição B: auditoria estrutural expandida</h3>
-        <p class="section-text">Para a Definição B, o build cruza cada feature elegível com <code>source_table</code>, <code>source_columns</code>, <code>pit_class</code> e o fim da janela de score. A leitura correta é: se alguma variável tocasse a mesma origem futura do label, isso apareceria aqui explicitamente.</p>
-        {render_clean_table(display_definition_b_leakage_summary(presentation_leakage_summary), limit=6)}
-        <p class="section-text">O teste incremental por blocos da Definição B não entra aqui como auditoria de leakage. Ele aparece depois, em <b>Leitura do comportamento</b>, porque serve para interpretar ganho incremental de sinal e hoje foi rodado só em <b>regressão logística</b> como modelo linear de referência.</p>
-        {render_details("Ver diagnóstico de separação excessiva da Definição B", render_clean_table(display_definition_b_excessive_separation(presentation_definition_b_excessive_separation), limit=6))}
-      </div>
-    </section>
-
-    <section>
-      <h2>O que ainda é convenção</h2>
-      <div class="chart-card">
-        <p class="section-text">O build oficial não esconde convenções. Se alguma escolha ainda não foi derivada dos dados nem de uma regra de negócio formal, ela aparece aqui com nome, valor, tipo e motivo. Isso evita vender convenção como se fosse descoberta do modelo.</p>
-        {render_clean_table(display_arbitrariness(arbitrariness), limit=8)}
-        {arbitrariness_detail}
-      </div>
-    </section>
-    {operational_sections}
+    {beginner_guide_section}
   </div>
 </body>
 </html>

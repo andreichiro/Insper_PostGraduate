@@ -10,6 +10,26 @@ import pandas as pd
 
 from . import analysis_setup as setup
 
+"""Fixed continuation construct for the 90-day post-label validators.
+
+This is intentionally separate from:
+- Definition A candidate rules
+- the fixed literal Definition B benchmark
+- the broad legacy ``is_activity_event`` proxy
+
+The goal is to ask one common downstream question for every candidate definition:
+"did the teacher later keep engaging in meaningful pedagogical workflows?"
+"""
+
+MEANINGFUL_POST_LABEL_INTERACTION_SQL = """
+(
+  (COALESCE(i.event_action, 'missing') = 'download' AND COALESCE(i.event_family, 'missing') NOT IN ('conquista', 'missing'))
+  OR (COALESCE(i.event_action, 'missing') = 'create' AND COALESCE(i.event_family, 'missing') IN ('plano', 'prova', 'relatorio'))
+  OR (COALESCE(i.event_action, 'missing') = 'share' AND COALESCE(i.event_family, 'missing') IN ('aula', 'plano', 'prova'))
+  OR (COALESCE(i.event_action, 'missing') = 'view' AND COALESCE(i.event_family, 'missing') IN ('aula', 'plano', 'prova', 'metodologia'))
+)
+"""
+
 def build_onboarding_mart(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     query = """
     WITH first_touch AS (
@@ -437,6 +457,17 @@ def build_first_session_journey_mart(conn: duckdb.DuckDBPyConnection) -> pd.Data
     return journey
 
 def build_future_metrics(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+    """Build future-window metrics plus post-label definition validators.
+
+    The output intentionally mixes two different roles:
+    - 30-day future metrics used to define activity inside the label window
+    - fixed 90-day post-label validators used only to judge whether a definition
+      separates teachers who continue engaging later
+
+    The 90-day validators are not model outputs and do not relabel teachers.
+    They are downstream continuation outcomes measured after the 30-day label
+    window so candidate definitions can be compared on a common external yardstick.
+    """
     max_observed_ts = conn.execute(
         """
         SELECT MAX(ts) AS max_ts
@@ -459,6 +490,7 @@ def build_future_metrics(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
       SELECT
         teacher_unique_id,
         first_month,
+        months_after_entry,
         onboarding_anchor_ts AS anchor_ts,
         onboarding_anchor_ts + INTERVAL 7 DAY AS label_start_ts,
         onboarding_anchor_ts + INTERVAL {setup.LABEL_WINDOW_DAYS + 7} DAY AS label_end_ts,
@@ -530,90 +562,104 @@ def build_future_metrics(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
        AND c.mari_created_ts < b.label_end_ts
       GROUP BY 1
     ),
-    weekly_sessions AS (
-      SELECT
-        b.teacher_unique_id,
-        FLOOR(DATE_DIFF('day', b.label_start_ts, s.session_start_ts) / 7.0) AS week_idx,
-        COUNT(*) AS session_count
-      FROM base b
-      INNER JOIN fct_session_clean s
-        ON b.teacher_unique_id = s.teacher_unique_id
-       AND s.session_start_ts >= b.label_start_ts
-       AND s.session_start_ts < b.label_end_ts
-      GROUP BY 1, 2
-    ),
-    weekly_activity AS (
+    weekly_definition_b_interactions AS (
       SELECT
         b.teacher_unique_id,
         FLOOR(DATE_DIFF('day', b.label_start_ts, i.interaction_ts) / 7.0) AS week_idx,
-        SUM(COALESCE(i.is_activity_event, 0)) AS activity_event_count
+        COUNT(*) AS qualifying_business_events
       FROM base b
       INNER JOIN fct_interaction_clean i
         ON b.teacher_unique_id = i.teacher_unique_id
        AND i.interaction_ts >= b.label_start_ts
        AND i.interaction_ts < b.label_end_ts
+      WHERE (
+        i.event_type_lower IN (
+          'visualizacao_aula',
+          'download_aula',
+          'botao_criar_plano_aula',
+          'criacao_plano_aula',
+          'botao_criar_plano_sem_aula',
+          'visualizacao_plano_aula',
+          'download_plano_aula',
+          'visualizacao_prova',
+          'visualizacao_avaliacao',
+          'visualizacao_prova_aprendizap',
+          'visualizacao_prova_saeb',
+          'download_avaliacao',
+          'prova_criada_edicao',
+          'prova_salva',
+          'rascunho_prova',
+          'envio_email_ou_baixou_prova',
+          'criacao_turma_relatorio',
+          'criacao_anotacao_relatorio',
+          'visualizacao_metodologia_ativa',
+          'download_conteudo_ia',
+          'acesso_comunidade',
+          'botao_baixar_conquista_modal',
+          'botao_baixar_conquista_completada',
+          'botao_compartilhar_conquista_modal',
+          'botao_compartilhar_conquista_completada'
+        )
+      )
+      GROUP BY 1, 2
+    ),
+    weekly_definition_b_formation AS (
+      SELECT
+        b.teacher_unique_id,
+        FLOOR(DATE_DIFF('day', b.label_start_ts, f.formation_ts) / 7.0) AS week_idx
+      FROM base b
+      INNER JOIN fct_formation_clean f
+        ON b.teacher_unique_id = f.teacher_unique_id
+       AND f.formation_ts >= b.label_start_ts
+       AND f.formation_ts < b.label_end_ts
+      GROUP BY 1, 2
+    ),
+    weekly_definition_b_mari AS (
+      SELECT
+        b.teacher_unique_id,
+        FLOOR(DATE_DIFF('day', b.label_start_ts, c.mari_created_ts) / 7.0) AS week_idx
+      FROM base b
+      INNER JOIN fct_mari_conversation_resolved c
+        ON b.teacher_unique_id = c.teacher_unique_id
+       AND c.mari_created_ts >= b.label_start_ts
+       AND c.mari_created_ts < b.label_end_ts
+      WHERE COALESCE(c.has_user_message, 0) = 1
       GROUP BY 1, 2
     ),
     weekly_business AS (
-      SELECT
-        COALESCE(ws.teacher_unique_id, wa.teacher_unique_id) AS teacher_unique_id,
-        COALESCE(ws.week_idx, wa.week_idx) AS week_idx,
-        COALESCE(ws.session_count, 0) AS session_count,
-        COALESCE(wa.activity_event_count, 0) AS activity_event_count
-      FROM weekly_sessions ws
-      FULL OUTER JOIN weekly_activity wa
-        ON ws.teacher_unique_id = wa.teacher_unique_id
-       AND ws.week_idx = wa.week_idx
+      SELECT teacher_unique_id, week_idx FROM weekly_definition_b_interactions
+      UNION
+      SELECT teacher_unique_id, week_idx FROM weekly_definition_b_formation
+      UNION
+      SELECT teacher_unique_id, week_idx FROM weekly_definition_b_mari
     ),
     weekly_business_count AS (
       SELECT
         teacher_unique_id,
-        COUNT(*) FILTER (WHERE session_count > 0 AND activity_event_count > 0) AS future_business_active_weeks
+        COUNT(*) AS future_business_active_weeks
       FROM weekly_business
       GROUP BY 1
     ),
-    post_sessions AS (
-      SELECT
-        b.teacher_unique_id,
-        FLOOR(DATE_DIFF('day', b.label_end_ts, s.session_start_ts) / {setup.POST_LABEL_BLOCK_DAYS}.0) AS block_idx,
-        COUNT(*) AS session_count
-      FROM base b
-      INNER JOIN fct_session_clean s
-        ON b.teacher_unique_id = s.teacher_unique_id
-       AND s.session_start_ts >= b.label_end_ts
-       AND s.session_start_ts < b.validator_3_end_ts
-      GROUP BY 1, 2
-    ),
-    post_activity AS (
+    post_meaningful_activity AS (
       SELECT
         b.teacher_unique_id,
         FLOOR(DATE_DIFF('day', b.label_end_ts, i.interaction_ts) / {setup.POST_LABEL_BLOCK_DAYS}.0) AS block_idx,
-        SUM(COALESCE(i.is_activity_event, 0)) AS activity_event_count
+        COUNT(*) AS meaningful_event_count
       FROM base b
       INNER JOIN fct_interaction_clean i
         ON b.teacher_unique_id = i.teacher_unique_id
        AND i.interaction_ts >= b.label_end_ts
        AND i.interaction_ts < b.validator_3_end_ts
+      WHERE {MEANINGFUL_POST_LABEL_INTERACTION_SQL}
       GROUP BY 1, 2
-    ),
-    post_active AS (
-      SELECT
-        COALESCE(ps.teacher_unique_id, pa.teacher_unique_id) AS teacher_unique_id,
-        COALESCE(ps.block_idx, pa.block_idx) AS block_idx,
-        COALESCE(ps.session_count, 0) AS session_count,
-        COALESCE(pa.activity_event_count, 0) AS activity_event_count
-      FROM post_sessions ps
-      FULL OUTER JOIN post_activity pa
-        ON ps.teacher_unique_id = pa.teacher_unique_id
-       AND ps.block_idx = pa.block_idx
     ),
     post_validator AS (
       SELECT
         teacher_unique_id,
-        MAX(CASE WHEN block_idx = 0 AND session_count > 0 AND activity_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m1,
-        MAX(CASE WHEN block_idx = 1 AND session_count > 0 AND activity_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m2,
-        MAX(CASE WHEN block_idx = 2 AND session_count > 0 AND activity_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m3
-      FROM post_active
+        MAX(CASE WHEN block_idx = 0 AND meaningful_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m1,
+        MAX(CASE WHEN block_idx = 1 AND meaningful_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m2,
+        MAX(CASE WHEN block_idx = 2 AND meaningful_event_count > 0 THEN 1 ELSE 0 END) AS returned_active_post_label_m3
+      FROM post_meaningful_activity
       GROUP BY 1
     ),
     post_days AS (
@@ -625,12 +671,13 @@ def build_future_metrics(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
         ON b.teacher_unique_id = i.teacher_unique_id
        AND i.interaction_ts >= b.label_end_ts
        AND i.interaction_ts < b.validator_3_end_ts
-       AND COALESCE(i.is_activity_event, 0) = 1
+       AND {MEANINGFUL_POST_LABEL_INTERACTION_SQL}
       GROUP BY 1
     )
     SELECT
       b.teacher_unique_id,
       b.first_month,
+      b.months_after_entry,
       b.anchor_ts,
       b.label_start_ts,
       b.label_end_ts,
@@ -638,6 +685,7 @@ def build_future_metrics(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
       b.validator_2_end_ts,
       b.validator_3_end_ts,
       CASE WHEN b.validator_3_end_ts <= TIMESTAMP '{pd.Timestamp(max_observed_ts).strftime("%Y-%m-%d %H:%M:%S")}' THEN 1 ELSE 0 END AS full_followup_observed_flag,
+      CASE WHEN COALESCE(b.months_after_entry, -1) = 0 THEN 1 ELSE 0 END AS same_month_entry_flag,
       COALESCE(sl.future_sessions, 0) AS future_sessions,
       COALESCE(sl.future_session_minutes, 0) AS future_session_minutes,
       COALESCE(il.future_interactions, 0) AS future_interactions,
@@ -824,9 +872,16 @@ def summarize_leakage_audit(leakage_audit: pd.DataFrame) -> pd.DataFrame:
     grouped["any_leakage_flag"] = (grouped["features_with_leakage_flag"] > 0).astype(int)
     return grouped
 
-def build_official_frame(journey: pd.DataFrame, future_metrics: pd.DataFrame, selection_df: pd.DataFrame) -> pd.DataFrame:
+def build_analysis_frame(
+    journey: pd.DataFrame,
+    future_metrics: pd.DataFrame,
+    selection_df: pd.DataFrame,
+    apply_population_filter: bool = True,
+) -> pd.DataFrame:
     frame = journey.merge(future_metrics, on=["teacher_unique_id", "first_month"], how="inner", suffixes=("", "_future"))
     frame = frame.loc[frame["full_followup_observed_flag"] == 1].copy()
+    if apply_population_filter:
+        frame = setup.apply_official_population_filter(frame)
     official_a = selection_df[(selection_df["definition_group"] == "definition_a") & selection_df["official_status"].str.startswith("official")]
     label_columns: dict[str, pd.Series] = {}
     for row in official_a.to_dict(orient="records"):
@@ -841,3 +896,12 @@ def build_official_frame(journey: pd.DataFrame, future_metrics: pd.DataFrame, se
     if label_columns:
         frame = pd.concat([frame, pd.DataFrame(label_columns, index=frame.index)], axis=1)
     return frame
+
+
+def build_official_frame(journey: pd.DataFrame, future_metrics: pd.DataFrame, selection_df: pd.DataFrame) -> pd.DataFrame:
+    return build_analysis_frame(
+        journey=journey,
+        future_metrics=future_metrics,
+        selection_df=selection_df,
+        apply_population_filter=True,
+    )

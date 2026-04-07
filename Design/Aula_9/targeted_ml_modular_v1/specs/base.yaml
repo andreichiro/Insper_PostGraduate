@@ -7,6 +7,9 @@ data:
   rebuild_modelled_if_missing: false
   modeled_duckdb_relative_path: data/modelled/duckdb/base_modelada_v2.duckdb
 
+population:
+  official_population: same_month_entry_only
+
 label:
   window_days: 30
   post_label_block_days: 30
@@ -19,7 +22,8 @@ label:
     - sustained_active_2of3_post_label
   definition_a:
     enabled: true
-    strategy: univariate_exact
+    strategy: screened_pairwise_compound_weighted
+    promoted_candidate_limit: 3
     candidate_metrics:
       - future_business_active_weeks
       - future_sessions
@@ -47,11 +51,26 @@ tracks:
     - STRICT_CONTEXT
 
 modeling:
-  max_outer_test_months: 5
+  # Split temporal oficial:
+  # development = meses mais antigos usados para busca da Definition A
+  # definition lock = meses seguintes usados para congelar a Definition A
+  # final model evaluation = meses mais recentes reservados para a avaliacao final do modelo
+  max_outer_test_months: 6
+  definition_selection_holdout_months: 6
+  definition_lock_months: 6
   min_official_valid_outer_folds: 2
+  # Gate minimo de suporte por fold oficial.
   min_official_test_rows: 50
   min_official_test_positives: 5
   min_official_test_negatives: 20
+  # Regra dura do lock da Definition A sobre o bootstrap do gap principal.
+  # Padrao atual: ci_low > 0.
+  # Pode ser trocado, por exemplo, para ci_width < 0.20 alterando:
+  # column_name / operator / threshold.
+  definition_lock_bootstrap_gate:
+    column_name: lock_gap_sustained_active_2of3_post_label_ci_low
+    operator: ">"
+    threshold: 0.0
   tuning_enabled: true
   tuning_n_iter: 8
   tuning_max_inner_splits: 3
@@ -60,7 +79,7 @@ modeling:
     - logistic_regression
     - random_forest
     - catboost
-  workers: 5
+  workers: 6
   calibration_method: sigmoid
   skip_post_model_refit: false
 

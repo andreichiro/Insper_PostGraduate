@@ -3,7 +3,7 @@ PYTHON ?= python
 SPEC ?= $(PROJECT_DIR)/specs/activity.yaml
 OUTPUT_ROOT ?= $(PROJECT_DIR)/build
 
-.PHONY: validate-spec build build-modelled build-ml build-report export-serving score-modelled score-frame score-raw streamlit-app check-compatibility test docker-build dbt-parse dbt-docs clean-local trim-delivery-view
+.PHONY: validate-spec build build-modelled build-ml build-report export-serving score-modelled score-frame score-raw streamlit-app refresh-ui-stack check-compatibility test docker-build dbt-parse dbt-docs clean-local trim-delivery-view
 
 validate-spec:
 	$(PYTHON) -m targeted_ml validate-spec --analysis-spec $(SPEC)
@@ -34,6 +34,9 @@ score-raw:
 
 streamlit-app:
 	$(PYTHON) -m streamlit run $(PROJECT_DIR)/targeted_ml/apps/streamlit_app.py
+
+refresh-ui-stack:
+	bash $(PROJECT_DIR)/scripts/refresh_ui_stack.sh
 
 check-compatibility:
 	$(PYTHON) -m targeted_ml check-compatibility --output-root $(OUTPUT_ROOT)

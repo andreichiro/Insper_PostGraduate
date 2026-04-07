@@ -41,6 +41,20 @@ INFERENCE_MODE_LABELS = {
     "Arquivo para score (CSV/Parquet)": "scoring_frame_file",
     "Raw do projeto": "raw_dataset_root",
 }
+DELIVERY_PREVIEW_COLUMNS = [
+    "teacher_unique_id",
+    "risk_score",
+    "risk_rank",
+    "flag_top_10_percent",
+    "flag_tercis",
+    "flag_score_ge_0_70",
+]
+DELIVERY_RUN_ARTIFACTS = [
+    ("all_scored_clients.parquet", "Base inteira rankeada"),
+    ("high_risk_clients_top10.parquet", "Fila filtrada: top 10%"),
+    ("high_risk_clients_tercis.parquet", "Fila filtrada: tercis"),
+    ("high_risk_clients_score_ge_0_70.parquet", "Fila filtrada: risk_score >= 0,70"),
+]
 SPEC_LABELS = {
     "activity.yaml": "Atividade (principal)",
     "churn_m1.yaml": "Churn M1",
@@ -180,18 +194,81 @@ def _append_optional_arg(command: list[str], flag: str, value: str) -> None:
         command.extend([flag, value.strip()])
 
 
-def _render_latest_high_risk_preview(paths: dict[str, Path]) -> None:
+def _download_binary_button(label: str, path: Path, *, file_name: str | None = None, mime: str = "application/octet-stream") -> None:
+    st.download_button(
+        label,
+        data=path.read_bytes(),
+        file_name=file_name or path.name,
+        mime=mime,
+        use_container_width=True,
+    )
+
+
+def _preview_delivery_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    preferred = [col for col in DELIVERY_PREVIEW_COLUMNS if col in frame.columns]
+    if preferred:
+        return frame[preferred].copy()
+    return frame.copy()
+
+
+def _render_run_delivery_artifacts(run_dir: Path, *, section_title: str) -> None:
+    if not run_dir.exists():
+        st.info("Run de inferência não encontrado.")
+        return
+    st.subheader(section_title)
+    run_manifest_path = run_dir / "run_manifest.json"
+    if run_manifest_path.exists():
+        st.markdown("**Manifesto do run**")
+        st.json(_read_json(run_manifest_path))
+        _download_binary_button("Baixar manifesto do run", run_manifest_path, mime="application/json")
+    for filename, label in DELIVERY_RUN_ARTIFACTS:
+        artifact_path = run_dir / filename
+        if not artifact_path.exists():
+            continue
+        frame = pd.read_parquet(artifact_path)
+        st.markdown(f"**{label}**")
+        st.caption(f"{len(frame):,} linhas")
+        preview = _preview_delivery_frame(frame).head(100)
+        st.dataframe(preview, use_container_width=True, hide_index=True)
+        _download_binary_button(f"Baixar {label.lower()}", artifact_path, mime="application/octet-stream")
+
+
+def _render_latest_delivery_preview(paths: dict[str, Path]) -> None:
     latest_run_path = paths["inference_runs_dir"] / "latest.json"
     if not latest_run_path.exists():
         return
     latest_run = _read_json(latest_run_path).get("latest_run_dir")
     if not latest_run:
         return
-    st.info(f"Último run: {latest_run}")
-    high_risk_path = Path(latest_run) / "high_risk_users.parquet"
-    if high_risk_path.exists():
-        st.subheader("High risk do último run")
-        st.dataframe(pd.read_parquet(high_risk_path).head(100), use_container_width=True, hide_index=True)
+    run_dir = Path(latest_run)
+    st.info(f"Último run: {run_dir}")
+    _render_run_delivery_artifacts(run_dir, section_title="Artefatos de entrega do último run")
+
+
+def _render_serving_artifacts(paths: dict[str, Path]) -> None:
+    serving_manifest_path = paths["serving_dir"] / "serving_manifest.json"
+    if not serving_manifest_path.exists():
+        st.warning("Ainda não existe serving_manifest.json. Use Export serving primeiro.")
+        return
+
+    manifest = _read_json(serving_manifest_path)
+    st.success(f"Serving pronto: {manifest.get('serving_status', 'desconhecido')}")
+    st.json(
+        {
+            "primary_model_artifact_id": manifest.get("primary_model_artifact_id"),
+            "export_id": manifest.get("export_id"),
+            "inference_contract_path": manifest.get("inference_contract_path"),
+            "exported_model_count": manifest.get("exported_model_count"),
+        }
+    )
+
+    model_id = manifest.get("primary_model_artifact_id")
+    if model_id:
+        model_path = paths["serving_dir"] / "models" / f"{model_id}.joblib"
+        if model_path.exists():
+            st.markdown("**Modelo salvo**")
+            st.code(str(model_path), language="text")
+            _download_binary_button("Baixar modelo salvo (.joblib)", model_path)
 
 
 def _render_training_tab(paths: dict[str, Path], selected_spec: Path) -> None:
@@ -235,20 +312,7 @@ def _render_training_tab(paths: dict[str, Path], selected_spec: Path) -> None:
 
 def _render_inference_tab(paths: dict[str, Path], selected_spec: Path) -> None:
     active_spec = Path(st.session_state.get("active_app_spec_path", str(selected_spec)))
-    serving_manifest_path = paths["serving_dir"] / "serving_manifest.json"
-    if serving_manifest_path.exists():
-        manifest = _read_json(serving_manifest_path)
-        st.success(f"Serving pronto: {manifest.get('serving_status', 'desconhecido')}")
-        st.json(
-            {
-                "primary_model_artifact_id": manifest.get("primary_model_artifact_id"),
-                "export_id": manifest.get("export_id"),
-                "inference_contract_path": manifest.get("inference_contract_path"),
-                "exported_model_count": manifest.get("exported_model_count"),
-            }
-        )
-    else:
-        st.warning("Ainda não existe serving_manifest.json. Use Export serving primeiro.")
+    _render_serving_artifacts(paths)
 
     contract_path = paths["serving_dir"] / "inference_contract.json"
     if contract_path.exists():
@@ -265,12 +329,7 @@ def _render_inference_tab(paths: dict[str, Path], selected_spec: Path) -> None:
             st.dataframe(pd.DataFrame({"required_scoring_column": required_cols}), use_container_width=True, hide_index=True)
         template_path = paths["serving_dir"] / "scoring_frame_template.csv"
         if template_path.exists():
-            st.download_button(
-                "Baixar template de scoring frame",
-                data=template_path.read_bytes(),
-                file_name=template_path.name,
-                mime="text/csv",
-            )
+            _download_binary_button("Baixar template de scoring frame", template_path, mime="text/csv")
 
     score_mode_label = st.radio("Entrada para inferência", list(INFERENCE_MODE_LABELS.keys()), horizontal=True)
     score_mode = INFERENCE_MODE_LABELS[score_mode_label]
@@ -322,7 +381,7 @@ def _render_inference_tab(paths: dict[str, Path], selected_spec: Path) -> None:
             _append_optional_arg(command, "--run-name", run_name)
             _run_cli(command, PROJECT_ROOT)
 
-    _render_latest_high_risk_preview(paths)
+    _render_latest_delivery_preview(paths)
 
 
 def _render_saved_outputs_tab(paths: dict[str, Path]) -> None:
@@ -334,12 +393,8 @@ def _render_saved_outputs_tab(paths: dict[str, Path]) -> None:
     run_manifest_path = selected / "run_manifest.json"
     if run_manifest_path.exists():
         st.json(_read_json(run_manifest_path))
-    high_risk_path = selected / "high_risk_users.parquet"
     validation_path = selected / "validation_report.parquet"
-    if high_risk_path.exists():
-        high_risk = pd.read_parquet(high_risk_path)
-        st.subheader("High risk users")
-        st.dataframe(high_risk.head(200), use_container_width=True, hide_index=True)
+    _render_run_delivery_artifacts(selected, section_title="Artefatos de entrega do run selecionado")
     if validation_path.exists():
         st.subheader("Validation report")
         st.dataframe(pd.read_parquet(validation_path), use_container_width=True, hide_index=True)

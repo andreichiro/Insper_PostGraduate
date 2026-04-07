@@ -13,7 +13,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,7 @@ def load_runtime_overrides() -> dict[str, Any]:
 @dataclass(frozen=True)
 class RuntimeBuildConfig:
     analysis_kind: str
+    official_population_filter: str
     enabled_tracks: list[str]
     label_window_days: int
     post_label_block_days: int
@@ -42,16 +43,20 @@ class RuntimeBuildConfig:
     definition_a_enabled: bool
     definition_a_strategy: str
     definition_a_candidate_metrics: list[str]
+    definition_a_promoted_candidate_limit: int
     definition_a_sql_file: str
     definition_a_python_strategy: str
     definition_b: dict[str, Any]
     definition_b_sql_file: str
     definition_b_python_strategy: str
     max_outer_test_months: int
+    definition_selection_holdout_months: int
+    definition_lock_months: int
     min_official_valid_outer_folds: int
     min_official_test_rows: int
     min_official_test_positives: int
     min_official_test_negatives: int
+    definition_lock_bootstrap_gate: dict[str, Any]
     tuning_enabled: bool
     tuning_n_iter: int
     tuning_max_inner_splits: int
@@ -74,30 +79,35 @@ class RuntimeBuildConfig:
     def from_payload(cls, payload: dict[str, Any]) -> "RuntimeBuildConfig":
         return cls(
             analysis_kind=str(payload.get("analysis_kind", "activity")),
+            official_population_filter=str(payload.get("official_population_filter", "all_observed_first_use")),
             enabled_tracks=[str(value) for value in payload.get("enabled_tracks", ["S1", "S7", "S1_PLUS_S7", "STRICT_CONTEXT"])],
             label_window_days=int(payload.get("label_window_days", 30)),
             post_label_block_days=int(payload.get("post_label_block_days", 30)),
             post_label_block_count=int(payload.get("post_label_block_count", 3)),
             external_validators=[str(value) for value in payload.get("external_validators", [])],
             definition_a_enabled=bool(payload.get("definition_a_enabled", True)),
-            definition_a_strategy=str(payload.get("definition_a_strategy", "univariate_exact")),
+            definition_a_strategy=str(payload.get("definition_a_strategy", "screened_pairwise_compound_weighted")),
             definition_a_candidate_metrics=[str(value) for value in payload.get("definition_a_candidate_metrics", [])],
+            definition_a_promoted_candidate_limit=int(payload.get("definition_a_promoted_candidate_limit", 3)),
             definition_a_sql_file=str(payload.get("definition_a_sql_file", "") or ""),
             definition_a_python_strategy=str(payload.get("definition_a_python_strategy", "") or ""),
             definition_b=dict(payload.get("definition_b", {})),
             definition_b_sql_file=str(payload.get("definition_b_sql_file", "") or ""),
             definition_b_python_strategy=str(payload.get("definition_b_python_strategy", "") or ""),
-            max_outer_test_months=int(payload.get("max_outer_test_months", 5)),
+            max_outer_test_months=int(payload.get("max_outer_test_months", 6)),
+            definition_selection_holdout_months=int(payload.get("definition_selection_holdout_months", 6)),
+            definition_lock_months=int(payload.get("definition_lock_months", 6)),
             min_official_valid_outer_folds=int(payload.get("min_official_valid_outer_folds", 2)),
             min_official_test_rows=int(payload.get("min_official_test_rows", 50)),
             min_official_test_positives=int(payload.get("min_official_test_positives", 5)),
             min_official_test_negatives=int(payload.get("min_official_test_negatives", 20)),
+            definition_lock_bootstrap_gate=dict(payload.get("definition_lock_bootstrap_gate", {})),
             tuning_enabled=bool(payload.get("tuning_enabled", True)),
             tuning_n_iter=int(payload.get("tuning_n_iter", 4)),
             tuning_max_inner_splits=int(payload.get("tuning_max_inner_splits", 3)),
             tuning_scoring=str(payload.get("tuning_scoring", "neg_brier_score")),
             model_family_scope=[str(value) for value in payload.get("model_family_scope", ["logistic_regression", "random_forest", "catboost"])],
-            model_comparison_workers=int(payload.get("model_comparison_workers", 3)),
+            model_comparison_workers=int(payload.get("model_comparison_workers", 6)),
             calibration_method=str(payload.get("calibration_method", "sigmoid")),
             feature_importance_permutation_repeats=int(payload.get("feature_importance_permutation_repeats", 5)),
             cluster_k_candidates=[int(value) for value in payload.get("cluster_k_candidates", [2, 3, 4, 5, 6])],
@@ -131,6 +141,7 @@ MODELLED_TABLES = [
     "mart_teacher_month_panel",
 ]
 OFFICIAL_DEFINITION_B = "definition_b"
+OFFICIAL_POPULATION_FILTER = "all_observed_first_use"
 ENABLED_TRACKS = ["S1", "S7", "S1_PLUS_S7", "STRICT_CONTEXT"]
 EXTERNAL_VALIDATORS = [
     "returned_active_post_label_m1",
@@ -139,7 +150,8 @@ EXTERNAL_VALIDATORS = [
     "active_days_post_label_3m",
     "sustained_active_2of3_post_label",
 ]
-DEFINITION_A_STRATEGY = "univariate_exact"
+DEFINITION_A_STRATEGY = "screened_pairwise_compound_weighted"
+DEFINITION_A_PROMOTED_CANDIDATE_LIMIT = 3
 OFFICIAL_METRIC_OBJECTIVES = {
     "valid_folds": "max",
     "mean_ap": "max",
@@ -166,18 +178,41 @@ TEST_DEFINITION_OBJECTIVES = {
     "test_gap_returned_active_post_label_m3": "max",
     "test_gap_active_days_post_label_3m": "max",
     "test_gap_sustained_active_2of3_post_label": "max",
+    "test_gap_sustained_active_2of3_post_label_ci_width": "min",
     "test_prevalence_entropy": "max",
     "test_monthly_prevalence_std": "min",
     "test_bootstrap_prevalence_ci_width": "min",
+}
+LOCK_DEFINITION_OBJECTIVES = {
+    "lock_months": "max",
+    "lock_gap_returned_active_post_label_m1": "max",
+    "lock_gap_returned_active_post_label_m2": "max",
+    "lock_gap_returned_active_post_label_m3": "max",
+    "lock_gap_active_days_post_label_3m": "max",
+    "lock_gap_sustained_active_2of3_post_label": "max",
+    "lock_gap_sustained_active_2of3_post_label_ci_width": "min",
+    "lock_max_gap_std": "min",
+    "lock_max_gap_jump": "min",
+    "lock_min_label_jaccard": "max",
+    "lock_max_neighbor_gap_delta": "min",
+    "lock_max_neighbor_prevalence_delta": "min",
+    "lock_prevalence_entropy": "max",
+    "lock_bootstrap_prevalence_ci_width": "min",
+    "lock_prevalence_std": "min",
 }
 BOOTSTRAP_ITERATIONS = 200
 LABEL_WINDOW_DAYS = 30
 POST_LABEL_BLOCK_DAYS = 30
 POST_LABEL_BLOCK_COUNT = 3
 # Outer fold mensal: treina em meses acumulados e testa no mes seguinte.
-# O limite de 5 meses continua sendo uma convencao de execucao/custo e aparece
+# O limite de meses continua sendo uma convencao de execucao/custo e aparece
 # no registro de arbitrariedade; nao e uma "descoberta" dos dados.
-MAX_OUTER_TEST_MONTHS = 5
+MAX_OUTER_TEST_MONTHS = 6
+# A escolha da Definicao A acontece em um periodo de development separado.
+# Depois disso, um bloco intermediario fecha a definicao final sem usar modelo.
+# Os ultimos N meses ficam intocados para a comparacao oficial dos modelos.
+DEFINITION_SELECTION_HOLDOUT_MONTHS = 6
+DEFINITION_LOCK_MONTHS = 6
 # Para publicar media e dispersao entre folds, exigimos pelo menos 2 folds
 # validos. Resultado com 1 fold pode aparecer como diagnostico, mas nao como
 # resumo oficial.
@@ -188,6 +223,14 @@ MIN_OFFICIAL_VALID_OUTER_FOLDS = 2
 MIN_OFFICIAL_TEST_ROWS = 50
 MIN_OFFICIAL_TEST_POSITIVES = 5
 MIN_OFFICIAL_TEST_NEGATIVES = 20
+# O lock da Definition A usa uma regra configuravel sobre o bootstrap do gap
+# principal. O padrao atual exige que o limite inferior do IC bootstrap fique
+# estritamente acima de zero.
+DEFINITION_LOCK_BOOTSTRAP_GATE = {
+    "column_name": "lock_gap_sustained_active_2of3_post_label_ci_low",
+    "operator": ">",
+    "threshold": 0.0,
+}
 TUNING_ENABLED = True
 TUNING_N_ITER = 8
 TUNING_MAX_INNER_SPLITS = 3
@@ -197,7 +240,7 @@ PUBLISHED_PVALUE_PERMUTATIONS = 1000
 CLUSTER_K_CANDIDATES = [2, 3, 4, 5, 6]
 CLUSTER_BOOTSTRAP_ITERATIONS = 20
 CLUSTER_SAMPLE_SIZE = 10000
-MODEL_COMPARISON_WORKERS = max(1, min(3, os.cpu_count() or 1))
+MODEL_COMPARISON_WORKERS = max(1, min(6, os.cpu_count() or 1))
 CALIBRATION_METHOD = "sigmoid"
 HEAVY_USER_PERCENTILE_POLICIES = [
     {
@@ -246,6 +289,7 @@ BUILD_PROGRESS_STAGE_SPECS = [
     {"key": "definition_comparison", "label": "definition comparison", "weight": 2.0},
     {"key": "leakage_audit", "label": "leakage audit", "weight": 1.0},
     {"key": "model_evaluation", "label": "model evaluation", "weight": 34.0},
+    {"key": "train_test_audit", "label": "train vs test audit", "weight": 1.0},
     {"key": "cv_score_robustness", "label": "cv score robustness", "weight": 1.0},
     {"key": "cv_metric_robustness", "label": "cv metric robustness", "weight": 1.0},
     {"key": "prediction_bootstrap", "label": "prediction bootstrap", "weight": 1.5},
@@ -273,6 +317,7 @@ DEFAULT_DEFINITION_B_SPEC = {
 RUNTIME_CONFIG = RuntimeBuildConfig.from_payload(
     {
         "analysis_kind": RUNTIME_OVERRIDES.get("analysis_kind", "activity"),
+        "official_population_filter": RUNTIME_OVERRIDES.get("official_population_filter", OFFICIAL_POPULATION_FILTER),
         "enabled_tracks": RUNTIME_OVERRIDES.get("enabled_tracks", ENABLED_TRACKS),
         "label_window_days": RUNTIME_OVERRIDES.get("label_window_days", LABEL_WINDOW_DAYS),
         "post_label_block_days": RUNTIME_OVERRIDES.get("post_label_block_days", POST_LABEL_BLOCK_DAYS),
@@ -281,16 +326,32 @@ RUNTIME_CONFIG = RuntimeBuildConfig.from_payload(
         "definition_a_enabled": RUNTIME_OVERRIDES.get("definition_a_enabled", True),
         "definition_a_strategy": RUNTIME_OVERRIDES.get("definition_a_strategy", DEFINITION_A_STRATEGY),
         "definition_a_candidate_metrics": RUNTIME_OVERRIDES.get("definition_a_candidate_metrics", []),
+        "definition_a_promoted_candidate_limit": RUNTIME_OVERRIDES.get(
+            "definition_a_promoted_candidate_limit",
+            DEFINITION_A_PROMOTED_CANDIDATE_LIMIT,
+        ),
         "definition_a_sql_file": RUNTIME_OVERRIDES.get("definition_a_sql_file", ""),
         "definition_a_python_strategy": RUNTIME_OVERRIDES.get("definition_a_python_strategy", ""),
         "definition_b": RUNTIME_OVERRIDES.get("definition_b", DEFAULT_DEFINITION_B_SPEC),
         "definition_b_sql_file": RUNTIME_OVERRIDES.get("definition_b_sql_file", ""),
         "definition_b_python_strategy": RUNTIME_OVERRIDES.get("definition_b_python_strategy", ""),
         "max_outer_test_months": RUNTIME_OVERRIDES.get("max_outer_test_months", MAX_OUTER_TEST_MONTHS),
+        "definition_selection_holdout_months": RUNTIME_OVERRIDES.get(
+            "definition_selection_holdout_months",
+            DEFINITION_SELECTION_HOLDOUT_MONTHS,
+        ),
+        "definition_lock_months": RUNTIME_OVERRIDES.get(
+            "definition_lock_months",
+            DEFINITION_LOCK_MONTHS,
+        ),
         "min_official_valid_outer_folds": RUNTIME_OVERRIDES.get("min_official_valid_outer_folds", MIN_OFFICIAL_VALID_OUTER_FOLDS),
         "min_official_test_rows": RUNTIME_OVERRIDES.get("min_official_test_rows", MIN_OFFICIAL_TEST_ROWS),
         "min_official_test_positives": RUNTIME_OVERRIDES.get("min_official_test_positives", MIN_OFFICIAL_TEST_POSITIVES),
         "min_official_test_negatives": RUNTIME_OVERRIDES.get("min_official_test_negatives", MIN_OFFICIAL_TEST_NEGATIVES),
+        "definition_lock_bootstrap_gate": RUNTIME_OVERRIDES.get(
+            "definition_lock_bootstrap_gate",
+            DEFINITION_LOCK_BOOTSTRAP_GATE,
+        ),
         "tuning_enabled": RUNTIME_OVERRIDES.get("tuning_enabled", TUNING_ENABLED),
         "tuning_n_iter": RUNTIME_OVERRIDES.get("tuning_n_iter", TUNING_N_ITER),
         "tuning_max_inner_splits": RUNTIME_OVERRIDES.get("tuning_max_inner_splits", TUNING_MAX_INNER_SPLITS),
@@ -321,17 +382,22 @@ RUNTIME_CONFIG = RuntimeBuildConfig.from_payload(
 def apply_runtime_config(runtime_config: RuntimeBuildConfig) -> None:
     global RUNTIME_CONFIG
     global OFFICIAL_DEFINITION_B
+    global OFFICIAL_POPULATION_FILTER
     global ENABLED_TRACKS
     global EXTERNAL_VALIDATORS
     global DEFINITION_A_STRATEGY
+    global DEFINITION_A_PROMOTED_CANDIDATE_LIMIT
     global LABEL_WINDOW_DAYS
     global POST_LABEL_BLOCK_DAYS
     global POST_LABEL_BLOCK_COUNT
     global MAX_OUTER_TEST_MONTHS
+    global DEFINITION_SELECTION_HOLDOUT_MONTHS
+    global DEFINITION_LOCK_MONTHS
     global MIN_OFFICIAL_VALID_OUTER_FOLDS
     global MIN_OFFICIAL_TEST_ROWS
     global MIN_OFFICIAL_TEST_POSITIVES
     global MIN_OFFICIAL_TEST_NEGATIVES
+    global DEFINITION_LOCK_BOOTSTRAP_GATE
     global TUNING_ENABLED
     global TUNING_N_ITER
     global TUNING_MAX_INNER_SPLITS
@@ -347,17 +413,22 @@ def apply_runtime_config(runtime_config: RuntimeBuildConfig) -> None:
 
     RUNTIME_CONFIG = runtime_config
     OFFICIAL_DEFINITION_B = str(runtime_config.definition_b.get("definition_name", OFFICIAL_DEFINITION_B))
+    OFFICIAL_POPULATION_FILTER = str(runtime_config.official_population_filter)
     ENABLED_TRACKS = list(runtime_config.enabled_tracks)
     EXTERNAL_VALIDATORS = list(runtime_config.external_validators)
     DEFINITION_A_STRATEGY = str(runtime_config.definition_a_strategy)
+    DEFINITION_A_PROMOTED_CANDIDATE_LIMIT = int(runtime_config.definition_a_promoted_candidate_limit)
     LABEL_WINDOW_DAYS = int(runtime_config.label_window_days)
     POST_LABEL_BLOCK_DAYS = int(runtime_config.post_label_block_days)
     POST_LABEL_BLOCK_COUNT = int(runtime_config.post_label_block_count)
     MAX_OUTER_TEST_MONTHS = int(runtime_config.max_outer_test_months)
+    DEFINITION_SELECTION_HOLDOUT_MONTHS = int(runtime_config.definition_selection_holdout_months)
+    DEFINITION_LOCK_MONTHS = int(runtime_config.definition_lock_months)
     MIN_OFFICIAL_VALID_OUTER_FOLDS = int(runtime_config.min_official_valid_outer_folds)
     MIN_OFFICIAL_TEST_ROWS = int(runtime_config.min_official_test_rows)
     MIN_OFFICIAL_TEST_POSITIVES = int(runtime_config.min_official_test_positives)
     MIN_OFFICIAL_TEST_NEGATIVES = int(runtime_config.min_official_test_negatives)
+    DEFINITION_LOCK_BOOTSTRAP_GATE = dict(runtime_config.definition_lock_bootstrap_gate)
     TUNING_ENABLED = bool(runtime_config.tuning_enabled)
     TUNING_N_ITER = int(runtime_config.tuning_n_iter)
     TUNING_MAX_INNER_SPLITS = int(runtime_config.tuning_max_inner_splits)
@@ -383,6 +454,15 @@ def get_definition_b_spec() -> dict[str, Any]:
     spec["rule_text"] = str(spec.get("rule_text", f'{spec["metric_name"]} {spec["operator"]} {spec["threshold"]:g}'))
     return spec
 
+
+def get_definition_lock_bootstrap_gate_spec() -> dict[str, Any]:
+    spec = DEFINITION_LOCK_BOOTSTRAP_GATE.copy()
+    spec.update(RUNTIME_CONFIG.definition_lock_bootstrap_gate)
+    spec["column_name"] = str(spec.get("column_name", "lock_gap_sustained_active_2of3_post_label_ci_low")).strip()
+    spec["operator"] = str(spec.get("operator", ">")).strip()
+    spec["threshold"] = float(spec.get("threshold", 0.0))
+    return spec
+
 def apply_operator(series: pd.Series, operator: str, threshold: float) -> pd.Series:
     values = pd.to_numeric(series, errors="coerce").fillna(0)
     if operator == ">=":
@@ -405,6 +485,141 @@ def make_atomic_rule(metric_name: str, threshold: float, operator: str = ">=") -
         "threshold": float(threshold),
     }
 
+
+def make_weighted_rule(
+    components: list[dict[str, Any]],
+    threshold: float,
+    operator: str = ">=",
+    normalization: str = "empirical_percentile",
+    reference_payload: dict[str, list[float]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "kind": "weighted",
+        "components": [
+            {
+                "metric_name": str(component["metric_name"]),
+                "weight": float(component["weight"]),
+            }
+            for component in components
+        ],
+        "operator": str(operator),
+        "threshold": float(threshold),
+        "normalization": str(normalization),
+        "reference_payload": {
+            str(metric_name): [float(value) for value in values]
+            for metric_name, values in (reference_payload or {}).items()
+        },
+    }
+
+
+def _canonicalize_weighted_components(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    total_weight = 0.0
+    for component in components:
+        weight = float(component.get("weight", 0.0))
+        normalized.append(
+            {
+                "metric_name": str(component["metric_name"]),
+                "weight": weight,
+            }
+        )
+        total_weight += weight
+    if total_weight <= 0:
+        raise ValueError("Weighted rule must have positive total weight")
+    normalized = sorted(normalized, key=lambda row: (row["metric_name"], row["weight"]))
+    return [
+        {
+            "metric_name": row["metric_name"],
+            "weight": float(row["weight"] / total_weight),
+        }
+        for row in normalized
+    ]
+
+
+def empirical_percentile_from_reference(values: Sequence[float], reference_values: Sequence[float]) -> np.ndarray:
+    reference = np.asarray(reference_values, dtype=float)
+    reference = reference[np.isfinite(reference)]
+    if reference.size == 0:
+        return np.zeros(len(values), dtype=float)
+    reference = np.sort(reference)
+    arr = np.asarray(values, dtype=float)
+    arr = np.where(np.isfinite(arr), arr, 0.0)
+    left = np.searchsorted(reference, arr, side="left")
+    right = np.searchsorted(reference, arr, side="right")
+    return (left + right) / (2.0 * len(reference))
+
+
+def build_percentile_reference_payload(frame: pd.DataFrame, metric_names: Sequence[str]) -> dict[str, list[float]]:
+    payload: dict[str, list[float]] = {}
+    for metric_name in sorted({str(value) for value in metric_names}):
+        if metric_name not in frame.columns:
+            raise KeyError(f"Metric {metric_name} not found in frame")
+        values = pd.to_numeric(frame[metric_name], errors="coerce").fillna(0).astype(float).to_numpy()
+        payload[metric_name] = [float(value) for value in np.sort(values)]
+    return payload
+
+
+def freeze_rule(rule: dict[str, Any], reference_frame: pd.DataFrame | None = None) -> dict[str, Any]:
+    normalized = canonicalize_rule(rule)
+    if normalized["kind"] == "atomic":
+        return normalized
+    if normalized["kind"] == "compound":
+        return canonicalize_rule(
+            {
+                "kind": "compound",
+                "combiner": normalized["combiner"],
+                "rules": [freeze_rule(child, reference_frame=reference_frame) for child in normalized["rules"]],
+            }
+        )
+    if reference_frame is None:
+        if normalized.get("reference_payload"):
+            return normalized
+        raise ValueError("Weighted rules require a reference_frame or frozen reference_payload")
+    metric_names = [str(component["metric_name"]) for component in normalized["components"]]
+    payload = build_percentile_reference_payload(reference_frame, metric_names)
+    return canonicalize_rule(
+        {
+            **normalized,
+            "reference_payload": payload,
+        }
+    )
+
+
+def compute_weighted_rule_score(
+    frame: pd.DataFrame,
+    rule: dict[str, Any],
+    reference_frame: pd.DataFrame | None = None,
+) -> pd.Series:
+    normalized = canonicalize_rule(rule)
+    if normalized["kind"] != "weighted":
+        raise ValueError("compute_weighted_rule_score requires a weighted rule")
+    if normalized.get("normalization", "empirical_percentile") != "empirical_percentile":
+        raise ValueError(f'Unsupported weighted normalization: {normalized.get("normalization")}')
+    if normalized.get("reference_payload"):
+        reference_payload = {
+            str(metric_name): np.asarray(values, dtype=float)
+            for metric_name, values in normalized["reference_payload"].items()
+        }
+    else:
+        if reference_frame is None:
+            raise ValueError("Weighted rules require reference_frame when reference_payload is absent")
+        reference_payload = {
+            str(metric_name): np.asarray(values, dtype=float)
+            for metric_name, values in build_percentile_reference_payload(
+                reference_frame,
+                [component["metric_name"] for component in normalized["components"]],
+            ).items()
+        }
+    score = np.zeros(len(frame), dtype=float)
+    for component in normalized["components"]:
+        metric_name = str(component["metric_name"])
+        if metric_name not in frame.columns:
+            raise KeyError(f"Metric {metric_name} not found in frame")
+        values = pd.to_numeric(frame[metric_name], errors="coerce").fillna(0).astype(float).to_numpy()
+        pct = empirical_percentile_from_reference(values, reference_payload.get(metric_name, np.array([], dtype=float)))
+        score += float(component["weight"]) * pct
+    return pd.Series(score, index=frame.index, dtype=float)
+
 def canonicalize_rule(rule: dict[str, Any]) -> dict[str, Any]:
     kind = str(rule.get("kind", "atomic"))
     if kind == "atomic":
@@ -412,6 +627,18 @@ def canonicalize_rule(rule: dict[str, Any]) -> dict[str, Any]:
             metric_name=str(rule["metric_name"]),
             threshold=float(rule["threshold"]),
             operator=str(rule.get("operator", ">=")),
+        )
+    if kind == "weighted":
+        reference_payload = rule.get("reference_payload") or {}
+        return make_weighted_rule(
+            components=_canonicalize_weighted_components(list(rule.get("components", []))),
+            threshold=float(rule["threshold"]),
+            operator=str(rule.get("operator", ">=")),
+            normalization=str(rule.get("normalization", "empirical_percentile")),
+            reference_payload={
+                str(metric_name): [float(value) for value in values]
+                for metric_name, values in reference_payload.items()
+            },
         )
     combiner = str(rule.get("combiner", "AND")).upper()
     normalized_children = [canonicalize_rule(dict(child)) for child in rule.get("rules", [])]
@@ -428,6 +655,8 @@ def extract_rule_metric_names(rule: dict[str, Any]) -> list[str]:
     normalized = canonicalize_rule(rule)
     if normalized["kind"] == "atomic":
         return [str(normalized["metric_name"])]
+    if normalized["kind"] == "weighted":
+        return sorted({str(component["metric_name"]) for component in normalized["components"]})
     metric_names: list[str] = []
     for child in normalized["rules"]:
         metric_names.extend(extract_rule_metric_names(child))
@@ -437,11 +666,15 @@ def rule_size(rule: dict[str, Any]) -> int:
     normalized = canonicalize_rule(rule)
     if normalized["kind"] == "atomic":
         return 1
+    if normalized["kind"] == "weighted":
+        return int(len(normalized["components"]))
     return int(sum(rule_size(child) for child in normalized["rules"]))
 
 def rule_operator_label(rule: dict[str, Any]) -> str:
     normalized = canonicalize_rule(rule)
     if normalized["kind"] == "atomic":
+        return str(normalized.get("operator", ">="))
+    if normalized["kind"] == "weighted":
         return str(normalized.get("operator", ">="))
     return str(normalized.get("combiner", "AND"))
 
@@ -452,6 +685,12 @@ def build_rule_text(rule: dict[str, Any]) -> str:
     normalized = canonicalize_rule(rule)
     if normalized["kind"] == "atomic":
         return f'{normalized["metric_name"]} {normalized["operator"]} {float(normalized["threshold"]):g}'
+    if normalized["kind"] == "weighted":
+        pieces = [
+            f'{float(component["weight"]):.2f}*pctl({component["metric_name"]})'
+            for component in normalized["components"]
+        ]
+        return f'({" + ".join(pieces)}) {normalized["operator"]} {float(normalized["threshold"]):g}'
     joiner = f' {normalized["combiner"]} '
     child_text = [build_rule_text(child) for child in normalized["rules"]]
     return "(" + joiner.join(child_text) + ")"
@@ -459,14 +698,17 @@ def build_rule_text(rule: dict[str, Any]) -> str:
 def build_definition_a_label_name(rule: dict[str, Any]) -> str:
     return f"definition_a::{build_rule_text(rule)}"
 
-def apply_rule_to_frame(frame: pd.DataFrame, rule: dict[str, Any]) -> pd.Series:
+def apply_rule_to_frame(frame: pd.DataFrame, rule: dict[str, Any], reference_frame: pd.DataFrame | None = None) -> pd.Series:
     normalized = canonicalize_rule(rule)
     if normalized["kind"] == "atomic":
         metric_name = str(normalized["metric_name"])
         if metric_name not in frame.columns:
             raise KeyError(f"Metric {metric_name} not found in frame")
         return apply_operator(frame[metric_name], normalized["operator"], float(normalized["threshold"])).astype(int)
-    child_labels = [apply_rule_to_frame(frame, child).astype(bool).to_numpy() for child in normalized["rules"]]
+    if normalized["kind"] == "weighted":
+        score = compute_weighted_rule_score(frame, normalized, reference_frame=reference_frame)
+        return apply_operator(score, normalized["operator"], float(normalized["threshold"])).astype(int)
+    child_labels = [apply_rule_to_frame(frame, child, reference_frame=reference_frame).astype(bool).to_numpy() for child in normalized["rules"]]
     if not child_labels:
         return pd.Series(np.zeros(len(frame), dtype=int), index=frame.index)
     if normalized["combiner"] == "AND":
@@ -487,6 +729,122 @@ def normalize_text(value: Any, default: str = "missing") -> str:
 
 def stable_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True)
+
+
+def build_official_population_mask(frame: pd.DataFrame) -> pd.Series:
+    filter_name = str(OFFICIAL_POPULATION_FILTER or "all_observed_first_use")
+    if frame.empty:
+        return pd.Series(dtype=bool, index=frame.index)
+    if filter_name == "all_observed_first_use":
+        return pd.Series(True, index=frame.index, dtype=bool)
+    if filter_name == "same_month_entry_only":
+        months_after_entry = pd.to_numeric(frame.get("months_after_entry"), errors="coerce")
+        return months_after_entry.eq(0).fillna(False)
+    raise ValueError(f"Unsupported official population filter: {filter_name}")
+
+
+def apply_official_population_filter(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    return frame.loc[build_official_population_mask(frame)].copy()
+
+
+def official_population_filter_description() -> str:
+    filter_name = str(OFFICIAL_POPULATION_FILTER or "all_observed_first_use")
+    if filter_name == "same_month_entry_only":
+        return "same_month_entry_only"
+    return "all_observed_first_use"
+
+
+def ordered_unique_months(frame: pd.DataFrame, month_col: str = "first_month") -> list[pd.Timestamp]:
+    if frame.empty or month_col not in frame.columns:
+        return []
+    month_series = pd.to_datetime(frame[month_col], errors="coerce").dt.to_period("M").dt.to_timestamp()
+    return sorted(month_series.dropna().unique().tolist())
+
+
+def split_definition_workflow_frame(
+    frame: pd.DataFrame,
+    month_col: str = "first_month",
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[pd.Timestamp], list[pd.Timestamp], list[pd.Timestamp]]:
+    if frame.empty:
+        empty = frame.copy()
+        return empty, empty, empty, [], [], []
+    months = ordered_unique_months(frame, month_col=month_col)
+    final_eval_months_requested = max(0, int(max(MAX_OUTER_TEST_MONTHS, DEFINITION_SELECTION_HOLDOUT_MONTHS)))
+    lock_months_requested = max(0, int(DEFINITION_LOCK_MONTHS))
+    if len(months) <= final_eval_months_requested + 1:
+        return frame.copy(), frame.iloc[0:0].copy(), frame.iloc[0:0].copy(), months, [], []
+    if len(months) <= final_eval_months_requested + lock_months_requested + 1:
+        adjusted_lock = max(1, len(months) - final_eval_months_requested - 1)
+    else:
+        adjusted_lock = lock_months_requested
+    final_eval_months = months[-final_eval_months_requested:] if final_eval_months_requested > 0 else []
+    development_end_idx = max(0, len(months) - final_eval_months_requested - adjusted_lock)
+    development_months = months[:development_end_idx]
+    lock_months = months[development_end_idx: len(months) - final_eval_months_requested]
+    month_series = pd.to_datetime(frame[month_col], errors="coerce").dt.to_period("M").dt.to_timestamp()
+    development_frame = frame.loc[month_series.isin(development_months)].copy()
+    lock_frame = frame.loc[month_series.isin(lock_months)].copy()
+    final_eval_frame = frame.loc[month_series.isin(final_eval_months)].copy()
+    return development_frame, lock_frame, final_eval_frame, development_months, lock_months, final_eval_months
+
+
+def build_definition_selection_period_registry(
+    frame: pd.DataFrame,
+    month_col: str = "first_month",
+) -> pd.DataFrame:
+    development_frame, lock_frame, final_eval_frame, development_months, lock_months, final_eval_months = split_definition_workflow_frame(
+        frame,
+        month_col=month_col,
+    )
+    rows: list[dict[str, Any]] = []
+    for month in development_months:
+        rows.append(
+            {
+                "month": pd.Timestamp(month),
+                "period_role": "definition_selection_development",
+                "rows": int(
+                    len(
+                        development_frame[
+                            pd.to_datetime(development_frame[month_col], errors="coerce").dt.to_period("M").dt.to_timestamp()
+                            == pd.Timestamp(month)
+                        ]
+                    )
+                ),
+            }
+        )
+    for month in lock_months:
+        rows.append(
+            {
+                "month": pd.Timestamp(month),
+                "period_role": "definition_lock_holdout",
+                "rows": int(
+                    len(
+                        lock_frame[
+                            pd.to_datetime(lock_frame[month_col], errors="coerce").dt.to_period("M").dt.to_timestamp()
+                            == pd.Timestamp(month)
+                        ]
+                    )
+                ),
+            }
+        )
+    for month in final_eval_months:
+        rows.append(
+            {
+                "month": pd.Timestamp(month),
+                "period_role": "official_model_evaluation_holdout",
+                "rows": int(
+                    len(
+                        final_eval_frame[
+                            pd.to_datetime(final_eval_frame[month_col], errors="coerce").dt.to_period("M").dt.to_timestamp()
+                            == pd.Timestamp(month)
+                        ]
+                    )
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=["month", "period_role", "rows"])
 
 def build_track_registry() -> pd.DataFrame:
     rows = [
@@ -527,6 +885,15 @@ def build_track_registry() -> pd.DataFrame:
 def build_arbitrariness_registry() -> pd.DataFrame:
     rows = [
         {
+            "choice_name": "official_population_filter",
+            "choice_value": official_population_filter_description(),
+            "choice_type": "scope_definition",
+            "where_used": "definition search, definition comparison, official model evaluation and report",
+            "status": "kept",
+            "why": "O build oficial precisa declarar explicitamente qual populacao entra no estudo principal. O filtro de populacao evita misturar onboarding observado no mesmo mes com casos de primeira atividade observada tardia.",
+            "in_official_report_flag": 1,
+        },
+        {
             "choice_name": "label_window_days",
             "choice_value": str(LABEL_WINDOW_DAYS),
             "choice_type": "arbitrary_required",
@@ -566,9 +933,45 @@ def build_arbitrariness_registry() -> pd.DataFrame:
             "choice_name": "temporal_splitter_max_outer_test_months",
             "choice_value": str(MAX_OUTER_TEST_MONTHS),
             "choice_type": "arbitrary_required",
-            "where_used": "definition search and outer model backtest",
+            "where_used": "official definition comparison and outer model backtest",
             "status": "kept",
-            "why": "The published build limits the expanding outer backtest to the last 5 test months to keep the exact-threshold search and calibrated model comparison computationally feasible. This is surfaced explicitly instead of being hidden.",
+            "why": "The published build limits the official expanding outer backtest to the last configured test months to keep calibrated temporal comparison computationally feasible while prioritizing the most recent operation months.",
+            "in_official_report_flag": 1,
+        },
+        {
+            "choice_name": "definition_selection_holdout_months",
+            "choice_value": str(DEFINITION_SELECTION_HOLDOUT_MONTHS),
+            "choice_type": "scope_definition",
+            "where_used": "Definition A selection versus official temporal evaluation",
+            "status": "kept",
+            "why": "The official build reserves the last configured months as untouched temporal holdout for definition comparison and model evaluation. Definition A is selected only on the earlier development months.",
+            "in_official_report_flag": 1,
+        },
+        {
+            "choice_name": "definition_a_promoted_candidate_limit",
+            "choice_value": str(DEFINITION_A_PROMOTED_CANDIDATE_LIMIT),
+            "choice_type": "scope_definition",
+            "where_used": "promotion from admissible Definition A frontier to official model grid",
+            "status": "kept",
+            "why": "The official build promotes only the top ranked Definition A candidates from the development frontier into the untouched temporal evaluation, while keeping the remaining admissible candidates as sensitivity only.",
+            "in_official_report_flag": 1,
+        },
+        {
+            "choice_name": "definition_lock_months",
+            "choice_value": str(DEFINITION_LOCK_MONTHS),
+            "choice_type": "scope_definition",
+            "where_used": "final lock of Definition A before official model evaluation",
+            "status": "kept",
+            "why": "After the development search, the official build reserves an intermediate lock window to compare only the promoted Definition A candidates and freeze a single final winner before any official model comparison.",
+            "in_official_report_flag": 1,
+        },
+        {
+            "choice_name": "definition_lock_local_threshold_sensitivity",
+            "choice_value": "immediate_lower_and_upper_threshold_neighbors",
+            "choice_type": "mechanical",
+            "where_used": "Definition A lock-stage robustness check",
+            "status": "kept",
+            "why": "The official Definition A lock checks whether the target is stable to small threshold perturbations by comparing each promoted candidate against its immediate lower and upper threshold neighbors on the lock period, without using any model metric.",
             "in_official_report_flag": 1,
         },
         {
@@ -605,6 +1008,15 @@ def build_arbitrariness_registry() -> pd.DataFrame:
             "where_used": "definition comparison and official model frontier",
             "status": "kept",
             "why": "O resumo oficial também exige um número mínimo de negativos no teste, para não publicar métricas baseadas em contraste quase inexistente entre as classes.",
+            "in_official_report_flag": 1,
+        },
+        {
+            "choice_name": "definition_lock_bootstrap_gate",
+            "choice_value": stable_json(get_definition_lock_bootstrap_gate_spec()),
+            "choice_type": "mechanical",
+            "where_used": "Definition A lock-stage survival rule",
+            "status": "kept",
+            "why": "Depois do gate mínimo de suporte, o lock da Definition A aplica uma regra configurável sobre o bootstrap do gap principal. O padrão atual exige ci_low > 0, mas a spec pode trocar coluna, operador e threshold.",
             "in_official_report_flag": 1,
         },
         {
@@ -1300,7 +1712,15 @@ def build_candidate_metric_registry() -> pd.DataFrame:
         {
             "metric_name": "future_business_active_weeks",
             "metric_type": "count",
-            "source_columns_json": stable_json(["session_start_ts", "interaction_ts", "is_activity_event"]),
+            "source_columns_json": stable_json(
+                [
+                    "interaction_ts",
+                    "event_type_lower",
+                    "formation_ts",
+                    "mari_created_ts",
+                    "has_user_message",
+                ]
+            ),
             "definition_role": "definition_b_literal_comparator",
             "definition_a_candidate_flag": 1,
             "semantic_group": "recurrence",

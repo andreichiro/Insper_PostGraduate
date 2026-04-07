@@ -24,6 +24,51 @@ def candidate_definition_group(problem_key: Any, definition_name: Any) -> str:
     return normalize_definition_group(definition_name)
 
 
+def rank_primary_definition_candidates(candidates: pd.DataFrame) -> pd.DataFrame:
+    if candidates is None or candidates.empty:
+        return pd.DataFrame()
+    ranked = candidates.copy()
+    if "pareto_frontier_flag" in ranked.columns:
+        pareto_flag = pd.to_numeric(ranked["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int)
+        if pareto_flag.any():
+            ranked = ranked.loc[pareto_flag == 1].copy()
+    if ranked.empty:
+        return ranked
+    numeric_defaults = {
+        "folds": (False, float("-inf")),
+        "test_gap_returned_active_post_label_m1": (False, float("-inf")),
+        "test_gap_returned_active_post_label_m2": (False, float("-inf")),
+        "test_gap_returned_active_post_label_m3": (False, float("-inf")),
+        "test_gap_active_days_post_label_3m": (False, float("-inf")),
+        "test_gap_sustained_active_2of3_post_label": (False, float("-inf")),
+        "test_gap_sustained_active_2of3_post_label_ci_width": (True, float("inf")),
+        "test_prevalence_entropy": (False, float("-inf")),
+        "test_bootstrap_prevalence_ci_width": (True, float("inf")),
+        "test_monthly_prevalence_std": (True, float("inf")),
+        "rule_size": (True, float("inf")),
+        "threshold": (True, float("inf")),
+    }
+    sort_cols: list[str] = []
+    ascending: list[bool] = []
+    for col, (asc, default) in numeric_defaults.items():
+        if col in ranked.columns:
+            ranked[col] = pd.to_numeric(ranked[col], errors="coerce").fillna(default)
+            sort_cols.append(col)
+            ascending.append(asc)
+    text_cols = [col for col in ["metric_name", "rule_operator", "rule_text", "rule_json"] if col in ranked.columns]
+    for col in text_cols:
+        ranked[col] = ranked[col].astype(str)
+        sort_cols.append(col)
+        ascending.append(True)
+    if not sort_cols:
+        ranked = ranked.reset_index(drop=True)
+        ranked["primary_selection_rank"] = np.arange(1, len(ranked) + 1)
+        return ranked
+    ranked = ranked.sort_values(sort_cols, ascending=ascending, kind="mergesort").reset_index(drop=True)
+    ranked["primary_selection_rank"] = np.arange(1, len(ranked) + 1)
+    return ranked
+
+
 def select_primary_definition_group(
     definition_selection: pd.DataFrame | None,
     definition_frontier: pd.DataFrame | None,
@@ -36,33 +81,33 @@ def select_primary_definition_group(
             groups = winners["definition_group"].map(normalize_definition_group).dropna().unique().tolist()
             if len(groups) == 1:
                 return str(groups[0]), f"definition_selection_winner_flag::{groups[0]}"
-    if definition_frontier is None or definition_frontier.empty:
-        return None, "definition_selection_unavailable"
-    candidates = definition_frontier.copy()
-    if "pareto_frontier_flag" in candidates.columns and pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int).any():
-        candidates = candidates[pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int) == 1].copy()
-    if candidates.empty:
-        return None, "definition_selection_unavailable"
-    candidates["definition_group"] = candidates["definition_name"].map(normalize_definition_group)
-    sort_cols = [
-        "test_gap_returned_active_post_label_m1",
-        "test_gap_returned_active_post_label_m2",
-        "test_gap_returned_active_post_label_m3",
-        "test_gap_active_days_post_label_3m",
-        "test_gap_sustained_active_2of3_post_label",
-        "folds",
-        "test_prevalence_entropy",
-        "test_bootstrap_prevalence_ci_width",
-        "test_monthly_prevalence_std",
-        "rule_size",
-    ]
-    available = [col for col in sort_cols if col in candidates.columns]
-    if not available:
-        first_group = candidates["definition_group"].iloc[0]
-        return str(first_group), f"definition_frontier_fallback::{first_group}"
-    ascending = [False, False, False, False, False, False, False, True, True, True][: len(available)]
-    chosen = candidates.sort_values(available, ascending=ascending, kind="mergesort").iloc[0]
-    return str(chosen["definition_group"]), "definition_frontier_external_validation_lexicographic"
+    if definition_frontier is not None and not definition_frontier.empty:
+        candidates = definition_frontier.copy()
+        if "pareto_frontier_flag" in candidates.columns and pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int).any():
+            candidates = candidates[pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int) == 1].copy()
+        if not candidates.empty:
+            candidates["definition_group"] = candidates["definition_name"].map(normalize_definition_group)
+            sort_cols = [
+                "test_gap_returned_active_post_label_m1",
+                "test_gap_returned_active_post_label_m2",
+                "test_gap_returned_active_post_label_m3",
+                "test_gap_active_days_post_label_3m",
+                "test_gap_sustained_active_2of3_post_label",
+                "test_gap_sustained_active_2of3_post_label_ci_width",
+                "folds",
+                "test_prevalence_entropy",
+                "test_bootstrap_prevalence_ci_width",
+                "test_monthly_prevalence_std",
+                "rule_size",
+            ]
+            available = [col for col in sort_cols if col in candidates.columns]
+            if not available:
+                first_group = candidates["definition_group"].iloc[0]
+                return str(first_group), f"definition_frontier_fallback::{first_group}"
+            ascending = [False, False, False, False, False, True, False, False, True, True, True][: len(available)]
+            chosen = candidates.sort_values(available, ascending=ascending, kind="mergesort").iloc[0]
+            return str(chosen["definition_group"]), "definition_frontier_external_validation_lexicographic"
+    return None, "definition_selection_unavailable"
 
 
 def build_serving_operational_summary(predictions: pd.DataFrame) -> pd.DataFrame:
@@ -115,52 +160,35 @@ def build_serving_operational_summary(predictions: pd.DataFrame) -> pd.DataFrame
     return merged
 
 
-def select_serving_scope(
-    model_frontier: pd.DataFrame,
+def _rank_serving_candidates(
+    candidates: pd.DataFrame,
     model_predictions: pd.DataFrame,
-    definition_selection: pd.DataFrame | None = None,
-    definition_frontier: pd.DataFrame | None = None,
-    scoring_scenarios: pd.DataFrame | None = None,
-    problem_keys: Iterable[str] | None = None,
-    model_names: Iterable[str] | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
-    candidates = model_frontier.copy()
-    if "pareto_frontier_flag" in candidates.columns and pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int).any():
-        candidates = candidates[pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int) == 1].copy()
-    if problem_keys:
-        candidates = candidates[candidates["problem_key"].isin(list(problem_keys))].copy()
-    if model_names:
-        candidates = candidates[candidates["model_name"].isin(list(model_names))].copy()
-    if candidates.empty:
-        raise ValueError("No serving candidates matched the requested filters.")
-    candidates["definition_group"] = [
-        candidate_definition_group(problem_key, definition_name)
-        for problem_key, definition_name in zip(candidates["problem_key"], candidates.get("definition_name", pd.Series([""] * len(candidates))))
-    ]
-    chosen_definition_group, definition_reason = select_primary_definition_group(definition_selection, definition_frontier)
+    scoring_scenarios: pd.DataFrame | None,
+) -> pd.DataFrame:
+    working = candidates.copy()
     candidate_predictions = model_predictions.merge(
-        candidates[["problem_key", "model_name"]].drop_duplicates(),
+        working[["problem_key", "model_name"]].drop_duplicates(),
         on=["problem_key", "model_name"],
         how="inner",
     )
     operational = build_serving_operational_summary(candidate_predictions)
     if scoring_scenarios is not None and not scoring_scenarios.empty and "score_window_end_day" in scoring_scenarios.columns:
         scenario_meta = scoring_scenarios[["problem_key", "score_window_end_day"]].drop_duplicates()
-        candidates = candidates.merge(scenario_meta, on="problem_key", how="left")
-    candidates = candidates.merge(operational, on=["problem_key", "model_name"], how="left")
-    candidates["max_probability_metric_std"] = candidates[["std_ap", "std_roc_auc", "std_brier", "std_log_loss"]].max(axis=1)
+        working = working.merge(scenario_meta, on="problem_key", how="left")
+    working = working.merge(operational, on=["problem_key", "model_name"], how="left")
+    working["max_probability_metric_std"] = working[["std_ap", "std_roc_auc", "std_brier", "std_log_loss"]].max(axis=1)
     for col in [
         "max_operational_metric_std",
         "max_operational_metric_jump",
         "max_confusion_share_std",
         "max_confusion_share_jump",
     ]:
-        if col not in candidates.columns:
-            candidates[col] = np.nan
-        candidates[col] = pd.to_numeric(candidates[col], errors="coerce").fillna(float("inf"))
-    if "score_window_end_day" not in candidates.columns:
-        candidates["score_window_end_day"] = np.nan
-    candidates["score_window_end_day"] = pd.to_numeric(candidates["score_window_end_day"], errors="coerce").fillna(float("-inf"))
+        if col not in working.columns:
+            working[col] = np.nan
+        working[col] = pd.to_numeric(working[col], errors="coerce").fillna(float("inf"))
+    if "score_window_end_day" not in working.columns:
+        working["score_window_end_day"] = np.nan
+    working["score_window_end_day"] = pd.to_numeric(working["score_window_end_day"], errors="coerce").fillna(float("-inf"))
     sort_cols = [
         "mean_brier",
         "mean_log_loss",
@@ -178,10 +206,93 @@ def select_serving_scope(
         "model_name",
     ]
     ascending = [True, True, True, True, True, True, True, True, True, False, False, False, True, True]
-    ordered = candidates.sort_values(sort_cols, ascending=ascending, kind="mergesort").reset_index(drop=True)
+    ordered = working.sort_values(sort_cols, ascending=ascending, kind="mergesort").reset_index(drop=True)
     ordered["serving_rank"] = np.arange(1, len(ordered) + 1)
+    return ordered
+
+
+def select_serving_scope(
+    model_frontier: pd.DataFrame,
+    model_predictions: pd.DataFrame,
+    definition_selection: pd.DataFrame | None = None,
+    definition_frontier: pd.DataFrame | None = None,
+    scoring_scenarios: pd.DataFrame | None = None,
+    problem_keys: Iterable[str] | None = None,
+    model_names: Iterable[str] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    candidates = model_frontier.copy()
+    if "pareto_frontier_flag" in candidates.columns and pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int).any():
+        candidates = candidates[pd.to_numeric(candidates["pareto_frontier_flag"], errors="coerce").fillna(0).astype(int) == 1].copy()
+    if problem_keys:
+        candidates = candidates[candidates["problem_key"].isin(list(problem_keys))].copy()
+    if model_names:
+        candidates = candidates[candidates["model_name"].isin(list(model_names))].copy()
+    if candidates.empty:
+        empty = pd.DataFrame(columns=list(model_frontier.columns) + ["definition_group", "serving_rank"])
+        return (
+            empty.iloc[0:0].copy(),
+            empty,
+            {
+                "definition_group_context": None,
+                "definition_context_reason": "no_model_candidates_after_requested_filters",
+                "selected_primary_definition_group": None,
+                "candidate_pool_size": 0,
+                "available_model_groups": [],
+                "selection_scope": "requested_filters_empty",
+                "serving_candidate_found": 0,
+                "serving_status": "no_model_candidates_after_requested_filters",
+                "selection_policy": [],
+            },
+        )
+    candidates["definition_group"] = [
+        candidate_definition_group(problem_key, definition_name)
+        for problem_key, definition_name in zip(candidates["problem_key"], candidates.get("definition_name", pd.Series([""] * len(candidates))))
+    ]
+    available_groups = sorted(candidates["definition_group"].dropna().astype(str).unique().tolist())
+    if len(available_groups) == 1:
+        chosen_definition_group = str(available_groups[0])
+        definition_reason = f"model_frontier_unique_definition_group::{chosen_definition_group}"
+    else:
+        chosen_definition_group, definition_reason = select_primary_definition_group(definition_selection, definition_frontier)
+    selection_scope = "all_pareto_frontier_candidates"
+    if chosen_definition_group:
+        selection_scope = "definition_group_matched_frontier_candidates"
+        matching_group = candidates[candidates["definition_group"] == chosen_definition_group].copy()
+        if matching_group.empty:
+            ordered = _rank_serving_candidates(candidates, model_predictions, scoring_scenarios)
+            empty_selected = ordered.iloc[0:0].copy()
+            return (
+                empty_selected,
+                ordered,
+                {
+                    "definition_group_context": chosen_definition_group,
+                    "definition_context_reason": definition_reason,
+                    "selected_primary_definition_group": None,
+                    "candidate_pool_size": 0,
+                    "available_model_groups": available_groups,
+                    "selection_scope": selection_scope,
+                    "serving_candidate_found": 0,
+                    "serving_status": "no_valid_model_for_selected_definition_group",
+                    "selection_policy": [
+                        "mean_brier asc",
+                        "mean_log_loss asc",
+                        "mean_calibration_slope_error asc",
+                        "mean_calibration_intercept_abs asc",
+                        "max_probability_metric_std asc",
+                        "max_operational_metric_std asc",
+                        "max_operational_metric_jump asc",
+                        "max_confusion_share_std asc",
+                        "max_confusion_share_jump asc",
+                        "mean_ap desc",
+                        "mean_roc_auc desc",
+                        "score_window_end_day desc",
+                    ],
+                },
+            )
+        candidates = matching_group
+    ordered = _rank_serving_candidates(candidates, model_predictions, scoring_scenarios)
     selected = ordered.head(1).copy()
-    selected["selection_reason"] = "serving_primary::all_frontier_candidates::probability_then_variability_then_information"
+    selected["selection_reason"] = f"serving_primary::{selection_scope}::probability_then_variability_then_information"
     selected_definition_group = (
         str(selected["definition_group"].iloc[0])
         if not selected.empty and "definition_group" in selected.columns
@@ -192,7 +303,10 @@ def select_serving_scope(
         "definition_context_reason": definition_reason,
         "selected_primary_definition_group": selected_definition_group,
         "candidate_pool_size": int(len(ordered)),
-        "selection_scope": "all_pareto_frontier_candidates",
+        "available_model_groups": available_groups,
+        "selection_scope": selection_scope,
+        "serving_candidate_found": int(not selected.empty),
+        "serving_status": "selected_primary_model" if not selected.empty else "no_selected_primary_model",
         "selection_policy": [
             "mean_brier asc",
             "mean_log_loss asc",
