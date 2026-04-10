@@ -1,0 +1,1272 @@
+version: 2
+models:
+- name: modeled_audit_base_modelada_validation
+  description: Auditoria final de validação estrutural da base modelada.
+  columns:
+  - name: check_name
+    description: Nome do check de validação.
+  - name: metric_value
+    description: Valor medido no check.
+  - name: status
+    description: Status do check.
+  - name: note
+    description: Observação complementar do check.
+- name: modeled_audit_persona_feature_readiness
+  description: Auditoria de prontidão das variáveis usadas em personas e clustering.
+  columns:
+  - name: feature_name
+    description: Nome da variável auditada.
+  - name: feature_level
+    description: Nível analítico da variável.
+  - name: feature_role
+    description: Papel analítico da variável.
+  - name: definition
+    description: Definição curta da variável.
+  - name: missing_rate
+    description: Proporção de valores ausentes.
+  - name: zero_share
+    description: Proporção de valores zero.
+  - name: std
+    description: Desvio-padrão da variável.
+  - name: recommended_for_persona_analysis
+    description: Flag indicando recomendação para personas.
+  - name: recommended_for_persona_ranges
+    description: Flag indicando recomendação para faixas.
+  - name: recommended_for_behavior_clustering
+    description: Flag indicando recomendação para clustering.
+  - name: caveat
+    description: Ressalva metodológica da variável.
+- name: modeled_base_modelada_v2
+  description: Painel mensal principal da base modelada com contexto e uso por professor.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: month
+    description: Mês de referência.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: teacher_utm_origin
+    description: Origem UTM do cadastro.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_tela_origem
+    description: Tela de origem do cadastro.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_total_alunos
+    description: Total de alunos informado.
+  - name: teacher_tipo_total_alunos
+    description: Tipo do total de alunos informado.
+  - name: teacher_alunos_diretos
+    description: Quantidade de alunos diretos.
+  - name: teacher_alunos_indiretos
+    description: Quantidade de alunos indiretos.
+  - name: teacher_login_google
+    description: Uso de login via Google.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_currentsubject
+    description: Disciplina atual do professor.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_selectedstages
+    description: Etapas selecionadas no cadastro.
+  - name: teacher_selectedsubjectsem
+    description: Disciplinas selecionadas no Ensino Médio.
+  - name: teacher_selectedsubjectsfundii
+    description: Disciplinas selecionadas no Fundamental II.
+  - name: teacher_visualizou_metodologia_ativa
+    description: Visualização de metodologia ativa.
+  - name: teacher_data_entrada
+    description: Data de entrada do professor.
+  - name: has_registered_entry
+    description: Flag indicando presença de sessão registrada.
+  - name: has_registered_interaction
+    description: Flag indicando presença de interação registrada.
+  - name: has_formation
+    description: Flag indicando presença de formação.
+  - name: is_estado_missing
+    description: Flag de ausência de estado informado.
+  - name: is_utm_missing
+    description: Flag de ausência de origem UTM.
+  - name: is_tela_origem_missing
+    description: Flag de ausência de tela de origem.
+  - name: is_total_alunos_missing
+    description: Flag de ausência de total de alunos.
+  - name: is_tipo_total_alunos_missing
+    description: Flag de ausência de tipo do total de alunos.
+  - name: is_alunos_diretos_missing
+    description: Flag de ausência de quantidade de alunos diretos.
+  - name: is_alunos_indiretos_missing
+    description: Flag de ausência de quantidade de alunos indiretos.
+  - name: is_login_google_missing
+    description: Flag de ausência de login via Google.
+  - name: is_currentstage_missing
+    description: Flag de ausência de etapa atual.
+  - name: is_currentsubject_missing
+    description: Flag de ausência de disciplina atual.
+  - name: is_selectedstages_missing
+    description: Flag de ausência de etapas selecionadas.
+  - name: is_selectedsubjectsem_missing
+    description: Flag de ausência de disciplinas selecionadas do Ensino Médio.
+  - name: is_selectedsubjectsfundii_missing
+    description: Flag de ausência de disciplinas selecionadas do Fundamental II.
+  - name: is_visualizou_metodologia_ativa_missing
+    description: Flag de ausência de visualização de metodologia ativa.
+  - name: is_total_alunos_negative
+    description: Flag de valor negativo em total de alunos.
+  - name: is_alunos_diretos_negative
+    description: Flag de valor negativo em quantidade de alunos diretos.
+  - name: is_alunos_indiretos_negative
+    description: Flag de valor negativo em quantidade de alunos indiretos.
+  - name: is_login_google_invalid
+    description: Flag de valor inválido em login via Google.
+  - name: raw_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada brutas.
+  - name: ping_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada do tipo ping.
+  - name: clean_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada limpas.
+  - name: clean_entry_total_session_minutes_month
+    description: Quantidade mensal de minutos em sessões de entrada limpas.
+  - name: clean_entry_avg_session_minutes_month
+    description: Média mensal de minutos por sessão de entrada limpa.
+  - name: interaction_rows_month
+    description: Quantidade mensal de linhas de interação.
+  - name: activity_events_month
+    description: Quantidade mensal de eventos de atividade.
+  - name: active_days_month
+    description: Quantidade mensal de dias ativos.
+  - name: aula_events_month
+    description: Quantidade mensal de eventos de aula.
+  - name: plano_events_month
+    description: Quantidade mensal de eventos de plano.
+  - name: prova_events_month
+    description: Quantidade mensal de eventos de prova.
+  - name: ia_events_month
+    description: Quantidade mensal de eventos de IA.
+  - name: download_count_month
+    description: Quantidade mensal de downloads.
+  - name: download_aula_count_month
+    description: Quantidade mensal de downloads de aula.
+  - name: download_plano_count_month
+    description: Quantidade mensal de downloads de plano.
+  - name: strict_download_count_month
+    description: Quantidade mensal de downloads estritos.
+  - name: content_views_month
+    description: Quantidade mensal de visualizações de conteúdo.
+  - name: other_activity_non_download_events_month
+    description: Quantidade mensal de eventos de atividade não ligados a download.
+  - name: mapped_lessons_month
+    description: Quantidade mensal de aulas mapeadas.
+  - name: interaction_signal_flag
+    description: Flag indicando presença de sinal de interação.
+  - name: entry_signal_flag
+    description: Flag indicando presença de sinal de sessão de entrada.
+  - name: clean_entry_signal_flag
+    description: Flag indicando presença de sinal de sessão limpa de entrada.
+  - name: only_ping_entry_flag
+    description: Flag indicando presença apenas de ping sessão de entrada.
+  - name: any_signal_flag
+    description: Flag indicando qualquer sinal observado.
+  - name: month_signal_class
+    description: Classe mensal de sinal observado.
+  - name: strict_value_flag
+    description: Flag indicando valor estrito.
+  - name: active_user_flag
+    description: Flag indicando usuário ativo no mês.
+  - name: viewed_aula_flag
+    description: Flag indicando visualização de aula.
+  - name: viewed_plano_flag
+    description: Flag indicando visualização de plano.
+  - name: viewed_prova_flag
+    description: Flag indicando visualização de prova.
+  - name: used_ia_flag
+    description: Flag indicando uso de IA.
+  - name: used_desktop_flag
+    description: Flag indicando uso de desktop.
+  - name: used_mobile_flag
+    description: Flag indicando uso de mobile.
+  - name: no_download_flag
+    description: Flag indicando ausência de download.
+  - name: no_download_view_only_flag
+    description: Flag indicando apenas visualização sem download.
+  - name: no_download_view_plus_action_flag
+    description: Flag indicando visualização e ação sem download.
+  - name: no_download_action_only_flag
+    description: Flag indicando ação sem download.
+  - name: clean_entry_exposed_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem download.
+  - name: clean_entry_exposed_no_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+  - name: clean_entry_exposed_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+  - name: month_num
+    description: Número sequencial do mês observado.
+  - name: next_month
+    description: Mês seguinte observado.
+  - name: next_month_observed_flag
+    description: Flag indicando observação de mês seguinte.
+  - name: returned_active_m1
+    description: Flag indicando retorno de atividade no 1º mês.
+  - name: returned_strict_value_m1
+    description: Flag indicando retorno de valor estrito no 1º mês.
+  - name: returned_any_download_m1
+    description: Flag indicando retorno de qualquer download no 1º mês.
+  - name: strict_user_flag
+    description: Flag indicando usuário estrito.
+  - name: strict_return_value_m1
+    description: Valor estrito realizado no 1º mês seguinte.
+  - name: lifetime_active_months
+    description: Quantidade histórica de meses ativos.
+  - name: lifetime_clean_entry_minutes_total
+    description: Total histórico de minutos em sessões de entrada limpas.
+  - name: active_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade.
+  - name: active_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade.
+  - name: strict_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade estrita.
+  - name: strict_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade estrita.
+- name: modeled_bridge_mari_conversation_teacher
+  description: Bridge de resolução entre identificadores da Mari e teacher_unique_id.
+  columns:
+  - name: id_mari
+    description: Identificador bruto da Mari.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: teacher_resolution_count
+    description: Quantidade de resoluções candidatas encontradas.
+  - name: is_unambiguous
+    description: Flag indicando resolução sem ambiguidade.
+  - name: resolution_source
+    description: Fonte usada na reconciliação.
+  - name: teacher_candidates
+    description: Lista de professores candidatos.
+  - name: report_rows
+    description: Quantidade de linhas de report associadas.
+  - name: conv_rows
+    description: Quantidade de linhas de conversa associadas.
+- name: modeled_bridge_teacher_identity_audit
+  description: Auditoria de reconciliação de identidade entre fontes raw e teacher_unique_id.
+  columns:
+  - name: source_table
+    description: Tabela de origem.
+  - name: source_key_name
+    description: Nome da chave observada na origem.
+  - name: source_key
+    description: Valor bruto da chave observada.
+  - name: source_user_types
+    description: Tipos de usuário observados na origem.
+  - name: resolution_path
+    description: Caminho usado na reconciliação.
+  - name: resolved_teacher_unique_id
+    description: Professor reconciliado.
+  - name: resolved_teacher_count
+    description: Quantidade de professores candidatos.
+  - name: is_unambiguous
+    description: Flag indicando resolução sem ambiguidade.
+  - name: source_key_domain
+    description: Domínio inferido da chave de origem.
+  - name: is_resolved_flag
+    description: Flag indicando se a chave foi resolvida.
+- name: modeled_dim_calendar
+  description: Dimensão de calendário escolar usada como contexto temporal.
+  columns:
+  - name: calendar_year
+    description: Ano do calendário.
+  - name: calendar_month
+    description: Mês do calendário.
+  - name: month_start
+    description: Início do mês de referência.
+  - name: uf
+    description: UF de referência.
+  - name: rede
+    description: Rede de ensino.
+  - name: business_days
+    description: Quantidade de dias úteis no mês.
+  - name: official_holiday_weekdays
+    description: Quantidade de feriados em dias úteis.
+  - name: school_days_estimate
+    description: Estimativa de dias letivos no mês.
+  - name: calendar_source
+    description: Fonte do calendário.
+  - name: school_phase
+    description: Fase do período escolar.
+- name: modeled_dim_device
+  description: Dimensão de dispositivo padronizado.
+  columns:
+  - name: device_group
+    description: Agrupamento padronizado do dispositivo.
+  - name: description
+    description: Descrição textual.
+- name: modeled_dim_event
+  description: Dimensão semântica dos eventos observados nas interações.
+  columns:
+  - name: event_type
+    description: Tipo bruto do evento.
+  - name: event_family
+    description: Família semântica do evento.
+  - name: event_action
+    description: Ação semântica do evento.
+  - name: raw_rows_total
+    description: Quantidade total de linhas raw.
+  - name: core_rows_total
+    description: Quantidade total de linhas mantidas na camada core.
+  - name: core_activity_rows_total
+    description: Quantidade total de linhas de atividade na camada core.
+  - name: core_download_rows_total
+    description: Quantidade total de linhas de download na camada core.
+  - name: is_strict_value_event
+    description: Is estrita valor evento.
+  - name: is_download_event
+    description: Is download evento.
+  - name: is_visualization_event
+    description: Is visualization evento.
+  - name: is_navigation_event
+    description: Is navigation evento.
+  - name: is_activity_event
+    description: Is atividade evento.
+- name: modeled_dim_lesson
+  description: Dimensão de aulas reconciliada com o catálogo educacional.
+  columns:
+  - name: lesson_id
+    description: Identificador reconciliado da aula.
+  - name: interaction_rows_total
+    description: Quantidade total de interações.
+  - name: distinct_teachers_total
+    description: Quantidade total de professores distintos.
+  - name: first_observed_ts
+    description: Primeiro timestamp observado.
+  - name: last_observed_ts
+    description: Último timestamp observado.
+  - name: download_events_total
+    description: Quantidade total de eventos de download.
+  - name: strict_download_events_total
+    description: Quantidade total de downloads estritos.
+  - name: content_view_events_total
+    description: Quantidade total de visualizações de conteúdo.
+  - name: lesson_metadata_matched_flag
+    description: Flag indicando se a aula foi conciliada ao catálogo.
+  - name: lesson_title
+    description: Título da aula.
+  - name: lesson_level
+    description: Nível de ensino da aula.
+  - name: lesson_year
+    description: Ano ou série da aula.
+  - name: lesson_year_em
+    description: Ano ou série conciliado para Ensino Médio.
+  - name: lesson_discipline
+    description: Disciplina da aula.
+  - name: lesson_discipline_group
+    description: Grupo analítico da disciplina da aula.
+  - name: lesson_unit
+    description: Unidade didática da aula.
+  - name: lesson_bncc
+    description: Lista de referências BNCC da aula.
+  - name: lesson_has_active_methodology
+    description: Flag indicando se a aula tem metodologia ativa.
+  - name: lesson_total_active_methodologies
+    description: Quantidade de metodologias ativas da aula.
+  - name: lesson_id_semantic
+    description: Identificador semântico da aula.
+  - name: raw_lesson_id_valid_flag
+    description: Flag indicando se o identificador bruto da aula é válido.
+  - name: is_active_methodology_missing
+    description: Flag de ausência da informação de metodologia ativa.
+  - name: is_metadata_missing
+    description: Flag de ausência de metadados da aula.
+- name: modeled_dim_persona_range_candidates
+  description: Candidatos de faixas para leitura de personas.
+  columns:
+  - name: feature_name
+    description: Nome da variável.
+  - name: feature_level
+    description: Nível analítico da variável.
+  - name: population_used
+    description: Population used.
+  - name: n_rows
+    description: Quantidade de linhas usadas no cálculo.
+  - name: min_value
+    description: Menor valor observado.
+  - name: p10
+    description: Percentil 10.
+  - name: p25
+    description: Percentil 25.
+  - name: p50
+    description: Percentil 50.
+  - name: p75
+    description: Percentil 75.
+  - name: p90
+    description: Percentil 90.
+  - name: p95
+    description: Percentil 95.
+  - name: max_value
+    description: Maior valor observado.
+  - name: zero_share
+    description: Proporção de valores zero.
+  - name: note
+    description: Observação complementar do check.
+- name: modeled_dim_teacher
+  description: Dimensão modelada de professores com cadastro, histórico e flags de qualidade.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: teacher_utm_origin
+    description: Origem UTM do cadastro.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_tela_origem
+    description: Tela de origem do cadastro.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_total_alunos
+    description: Total de alunos informado.
+  - name: teacher_tipo_total_alunos
+    description: Tipo do total de alunos informado.
+  - name: teacher_alunos_diretos
+    description: Quantidade de alunos diretos.
+  - name: teacher_alunos_indiretos
+    description: Quantidade de alunos indiretos.
+  - name: teacher_login_google
+    description: Uso de login via Google.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_currentsubject
+    description: Disciplina atual do professor.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_selectedstages
+    description: Etapas selecionadas no cadastro.
+  - name: teacher_selectedsubjectsem
+    description: Disciplinas selecionadas no Ensino Médio.
+  - name: teacher_selectedsubjectsfundii
+    description: Disciplinas selecionadas no Fundamental II.
+  - name: teacher_visualizou_metodologia_ativa
+    description: Visualização de metodologia ativa.
+  - name: teacher_data_entrada
+    description: Data de entrada do professor.
+  - name: teacher_first_observed_month
+    description: Primeiro mês observado do professor.
+  - name: teacher_last_observed_month
+    description: Último mês observado do professor.
+  - name: teacher_months_since_last_observed_month_dataset_end
+    description: Meses entre a última observação e o fim do dataset.
+  - name: teacher_observed_months_total
+    description: Quantidade total de meses observados.
+  - name: teacher_active_months_total
+    description: Quantidade total de meses ativos.
+  - name: teacher_strict_months_total
+    description: Quantidade total de meses ativos na definição estrita.
+  - name: teacher_total_strict_downloads
+    description: Total histórico de downloads estritos.
+  - name: teacher_total_downloads
+    description: Total histórico de downloads.
+  - name: teacher_total_clean_entry_sessions
+    description: Total histórico de sessões limpas.
+  - name: teacher_total_clean_entry_minutes
+    description: Total histórico de minutos em sessões limpas.
+  - name: teacher_active_streak_max_months
+    description: Maior sequência mensal de atividade.
+  - name: teacher_strict_streak_max_months
+    description: Maior sequência mensal de atividade estrita.
+  - name: has_registered_entry
+    description: Flag indicando presença de sessão registrada.
+  - name: has_registered_interaction
+    description: Flag indicando presença de interação registrada.
+  - name: has_formation
+    description: Flag indicando presença de formação.
+  - name: is_estado_missing
+    description: Flag de ausência de estado informado.
+  - name: is_utm_missing
+    description: Flag de ausência de origem UTM.
+  - name: is_tela_origem_missing
+    description: Flag de ausência de tela de origem.
+  - name: is_total_alunos_missing
+    description: Flag de ausência de total de alunos.
+  - name: is_tipo_total_alunos_missing
+    description: Flag de ausência de tipo do total de alunos.
+  - name: is_alunos_diretos_missing
+    description: Flag de ausência de quantidade de alunos diretos.
+  - name: is_alunos_indiretos_missing
+    description: Flag de ausência de quantidade de alunos indiretos.
+  - name: is_login_google_missing
+    description: Flag de ausência de login via Google.
+  - name: is_currentstage_missing
+    description: Flag de ausência de etapa atual.
+  - name: is_currentsubject_missing
+    description: Flag de ausência de disciplina atual.
+  - name: is_selectedstages_missing
+    description: Flag de ausência de etapas selecionadas.
+  - name: is_selectedsubjectsem_missing
+    description: Flag de ausência de disciplinas selecionadas do Ensino Médio.
+  - name: is_selectedsubjectsfundii_missing
+    description: Flag de ausência de disciplinas selecionadas do Fundamental II.
+  - name: is_visualizou_metodologia_ativa_missing
+    description: Flag de ausência de visualização de metodologia ativa.
+  - name: is_total_alunos_negative
+    description: Flag de valor negativo em total de alunos.
+  - name: is_alunos_diretos_negative
+    description: Flag de valor negativo em quantidade de alunos diretos.
+  - name: is_alunos_indiretos_negative
+    description: Flag de valor negativo em quantidade de alunos indiretos.
+  - name: is_login_google_invalid
+    description: Flag de valor inválido em login via Google.
+- name: modeled_fct_formation_clean
+  description: Fato de formação limpo por evento de curso.
+  columns:
+  - name: formation_row_hash
+    description: Hash técnico do evento de formação.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: formation_ts
+    description: Timestamp de formação.
+  - name: formation_month
+    description: Mês de formação.
+  - name: item_id
+    description: Item id.
+  - name: item_type
+    description: Tipo do item.
+  - name: completion_status
+    description: Completion status.
+  - name: progress
+    description: Progress.
+  - name: question_status
+    description: Question status.
+  - name: course_module_count
+    description: Quantidade de course module.
+  - name: module_block_count
+    description: Quantidade de module block.
+  - name: quiz_question_count
+    description: Quantidade de quiz question.
+  - name: teacher_matched_flag
+    description: Flag indicando teacher matched.
+  - name: is_missing_timestamp
+    description: Is missing timestamp.
+  - name: is_complete_status
+    description: Is complete status.
+- name: modeled_fct_interaction_clean
+  description: Fato de interações limpas com classificação semântica de evento.
+  columns:
+  - name: interaction_row_hash
+    description: Hash técnico da interação.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: interaction_month
+    description: Mês de interação.
+  - name: interaction_ts
+    description: Timestamp de interação.
+  - name: event_type
+    description: Tipo bruto do evento.
+  - name: content_type
+    description: Tipo de conteúdo.
+  - name: utm_source
+    description: Origem UTM da sessão.
+  - name: device_group
+    description: Agrupamento padronizado do dispositivo.
+  - name: event_family
+    description: Família semântica do evento.
+  - name: event_action
+    description: Ação semântica do evento.
+  - name: raw_lesson_id
+    description: Brutas aula id.
+  - name: id_aula_semantic
+    description: Id aulas semantic.
+  - name: lesson_join_allowed
+    description: Aula join allowed.
+  - name: lesson_mapped_flag
+    description: Flag indicando mapeamento de aula.
+  - name: lesson_id
+    description: Identificador reconciliado da aula.
+  - name: is_strict_value_event
+    description: Is estrita valor evento.
+  - name: is_download_event
+    description: Is download evento.
+  - name: is_visualization_event
+    description: Is visualization evento.
+  - name: is_navigation_event
+    description: Is navigation evento.
+  - name: is_activity_event
+    description: Is atividade evento.
+  - name: is_content_view_event
+    description: Is conteúdo visualização evento.
+  - name: is_other_activity_non_download_event
+    description: Is outras atividade não download evento.
+- name: modeled_fct_mari_conversation_resolved
+  description: Fato resolvido das conversas da Mari IA.
+  columns:
+  - name: id_mari
+    description: Identificador bruto da Mari.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: mari_created_ts
+    description: Timestamp de mari created.
+  - name: mari_updated_ts
+    description: Timestamp de mari updated.
+  - name: mari_month
+    description: Mês de mari.
+  - name: origin_source
+    description: Fonte de origem.
+  - name: user_reaction
+    description: User reaction.
+  - name: has_user_message
+    description: Flag indicando presença de user message.
+  - name: has_ai_message
+    description: Flag indicando presença de ai message.
+  - name: is_mari_created_ts_missing
+    description: Flag de ausência de mari created ts.
+  - name: is_mari_updated_ts_missing
+    description: Flag de ausência de mari updated ts.
+- name: modeled_fct_mari_help_resolved
+  description: Fato resolvido dos eventos de ajuda da Mari IA.
+  columns:
+  - name: id_mari
+    description: Identificador bruto da Mari.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: teacher_resolution_count
+    description: Quantidade de resoluções candidatas encontradas.
+  - name: is_unambiguous
+    description: Flag indicando resolução sem ambiguidade.
+  - name: resolution_source
+    description: Fonte usada na reconciliação.
+  - name: help_ts
+    description: Timestamp de ajuda.
+  - name: help_month
+    description: Mês de ajuda.
+  - name: turno
+    description: Turno.
+  - name: help_key
+    description: Ajuda key.
+  - name: isso_ajudou
+    description: Isso ajudou.
+  - name: isso_ajudou_num
+    description: Isso ajudou num.
+- name: modeled_fct_mari_reports_resolved
+  description: Fato resolvido dos reports estruturados da Mari IA.
+  columns:
+  - name: id_mari
+    description: Identificador bruto da Mari.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: report_ts
+    description: Timestamp de report.
+  - name: report_month
+    description: Mês de report.
+  - name: report_key
+    description: Report key.
+  - name: report_value
+    description: Report valor.
+  - name: report_metadata
+    description: Report metadata.
+- name: modeled_fct_session_clean
+  description: Fato de sessões limpas por sessão.
+  columns:
+  - name: session_row_hash
+    description: Hash técnico da sessão.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: user_type
+    description: Tipo de usuário.
+  - name: session_month
+    description: Mês de sessão.
+  - name: session_start_ts
+    description: Timestamp de sessão start.
+  - name: session_end_ts
+    description: Timestamp de sessão end.
+  - name: duration_sec
+    description: Duration em segundos.
+  - name: duration_min
+    description: Duration em minutos.
+- name: modeled_fct_session_raw
+  description: Fato bruto de sessões antes dos filtros de limpeza.
+  columns:
+  - name: session_row_hash
+    description: Hash técnico da sessão.
+  - name: source_unique_id
+    description: Source unique id.
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: user_type
+    description: Tipo de usuário.
+  - name: session_month
+    description: Mês de sessão.
+  - name: session_start_ts
+    description: Timestamp de sessão start.
+  - name: session_end_ts
+    description: Timestamp de sessão end.
+  - name: duration_sec
+    description: Duration em segundos.
+  - name: is_negative_duration
+    description: Is negative duration.
+  - name: is_ping_session_le_5s
+    description: Is ping sessão le 5s.
+  - name: is_core_teacher_session
+    description: Is core teacher sessão.
+  - name: is_session_month_missing
+    description: Flag de ausência de sessão month.
+  - name: is_session_start_missing
+    description: Flag de ausência de sessão start.
+  - name: is_session_end_missing
+    description: Flag de ausência de sessão end.
+- name: modeled_fct_teacher_month
+  description: Fato mensal por professor que sintetiza sessões e interações.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: month
+    description: Mês de referência.
+  - name: raw_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada brutas.
+  - name: ping_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada do tipo ping.
+  - name: clean_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada limpas.
+  - name: clean_entry_total_session_minutes_month
+    description: Quantidade mensal de minutos em sessões de entrada limpas.
+  - name: clean_entry_avg_session_minutes_month
+    description: Média mensal de minutos por sessão de entrada limpa.
+  - name: interaction_rows_month
+    description: Quantidade mensal de linhas de interação.
+  - name: activity_events_month
+    description: Quantidade mensal de eventos de atividade.
+  - name: active_days_month
+    description: Quantidade mensal de dias ativos.
+  - name: aula_events_month
+    description: Quantidade mensal de eventos de aula.
+  - name: plano_events_month
+    description: Quantidade mensal de eventos de plano.
+  - name: prova_events_month
+    description: Quantidade mensal de eventos de prova.
+  - name: ia_events_month
+    description: Quantidade mensal de eventos de IA.
+  - name: download_count_month
+    description: Quantidade mensal de downloads.
+  - name: download_aula_count_month
+    description: Quantidade mensal de downloads de aula.
+  - name: download_plano_count_month
+    description: Quantidade mensal de downloads de plano.
+  - name: strict_download_count_month
+    description: Quantidade mensal de downloads estritos.
+  - name: content_views_month
+    description: Quantidade mensal de visualizações de conteúdo.
+  - name: other_activity_non_download_events_month
+    description: Quantidade mensal de eventos de atividade não ligados a download.
+  - name: mapped_lessons_month
+    description: Quantidade mensal de aulas mapeadas.
+  - name: interaction_signal_flag
+    description: Flag indicando presença de sinal de interação.
+  - name: entry_signal_flag
+    description: Flag indicando presença de sinal de sessão de entrada.
+  - name: clean_entry_signal_flag
+    description: Flag indicando presença de sinal de sessão limpa de entrada.
+  - name: only_ping_entry_flag
+    description: Flag indicando presença apenas de ping sessão de entrada.
+  - name: any_signal_flag
+    description: Flag indicando qualquer sinal observado.
+  - name: month_signal_class
+    description: Classe mensal de sinal observado.
+  - name: strict_value_flag
+    description: Flag indicando valor estrito.
+  - name: active_user_flag
+    description: Flag indicando usuário ativo no mês.
+  - name: viewed_aula_flag
+    description: Flag indicando visualização de aula.
+  - name: viewed_plano_flag
+    description: Flag indicando visualização de plano.
+  - name: viewed_prova_flag
+    description: Flag indicando visualização de prova.
+  - name: used_ia_flag
+    description: Flag indicando uso de IA.
+  - name: used_desktop_flag
+    description: Flag indicando uso de desktop.
+  - name: used_mobile_flag
+    description: Flag indicando uso de mobile.
+  - name: no_download_flag
+    description: Flag indicando ausência de download.
+  - name: no_download_view_only_flag
+    description: Flag indicando apenas visualização sem download.
+  - name: no_download_view_plus_action_flag
+    description: Flag indicando visualização e ação sem download.
+  - name: no_download_action_only_flag
+    description: Flag indicando ação sem download.
+  - name: clean_entry_exposed_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem download.
+  - name: clean_entry_exposed_no_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+  - name: clean_entry_exposed_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+  - name: month_num
+    description: Número sequencial do mês observado.
+  - name: next_month
+    description: Mês seguinte observado.
+  - name: next_month_observed_flag
+    description: Flag indicando observação de mês seguinte.
+  - name: returned_active_m1
+    description: Flag indicando retorno de atividade no 1º mês.
+  - name: returned_strict_value_m1
+    description: Flag indicando retorno de valor estrito no 1º mês.
+  - name: returned_any_download_m1
+    description: Flag indicando retorno de qualquer download no 1º mês.
+  - name: strict_user_flag
+    description: Flag indicando usuário estrito.
+  - name: strict_return_value_m1
+    description: Valor estrito realizado no 1º mês seguinte.
+  - name: lifetime_active_months
+    description: Quantidade histórica de meses ativos.
+  - name: lifetime_clean_entry_minutes_total
+    description: Total histórico de minutos em sessões de entrada limpas.
+  - name: active_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade.
+  - name: active_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade.
+  - name: strict_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade estrita.
+  - name: strict_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade estrita.
+- name: modeled_mart_teacher_cluster_ready
+  description: Mart por professor pronto para segmentação exploratória.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: cluster_analysis_eligible_flag
+    description: Flag indicando elegibilidade para cluster analysis.
+  - name: teacher_active_months_total
+    description: Quantidade total de meses ativos.
+  - name: teacher_strict_months_total
+    description: Quantidade total de meses ativos na definição estrita.
+  - name: teacher_active_month_share
+    description: Teacher atividade month share.
+  - name: teacher_strict_month_share
+    description: Teacher estrita month share.
+  - name: avg_activity_events_active_month
+    description: Mês de média atividade eventos atividade.
+  - name: std_activity_events_active_month
+    description: Mês de std atividade eventos atividade.
+  - name: avg_active_days_active_month
+    description: Mês de média atividade dias atividade.
+  - name: std_active_days_active_month
+    description: Mês de std atividade dias atividade.
+  - name: avg_strict_downloads_active_month
+    description: Mês de média estrita downloads atividade.
+  - name: std_strict_downloads_active_month
+    description: Mês de std estrita downloads atividade.
+  - name: avg_downloads_active_month
+    description: Mês de média downloads atividade.
+  - name: avg_content_views_active_month
+    description: Mês de média conteúdo visualizações atividade.
+  - name: avg_other_actions_active_month
+    description: Mês de média outras ações atividade.
+  - name: avg_aula_events_active_month
+    description: Mês de média aulas eventos atividade.
+  - name: avg_plano_events_active_month
+    description: Mês de média planos eventos atividade.
+  - name: avg_prova_events_active_month
+    description: Mês de média provas eventos atividade.
+  - name: avg_ia_events_active_month
+    description: Mês de média IA eventos atividade.
+  - name: avg_mapped_lessons_active_month
+    description: Mês de média mapeadas aulas atividade.
+  - name: avg_clean_entry_sessions_active_month
+    description: Mês de média limpas sessão de entrada sessões atividade.
+  - name: avg_clean_entry_minutes_active_month
+    description: Mês de média limpas sessão de entrada minutos atividade.
+  - name: teacher_clean_entry_coverage_share
+    description: Teacher limpas sessão de entrada coverage share.
+  - name: teacher_only_ping_month_share
+    description: Teacher apenas ping month share.
+  - name: teacher_interaction_without_entry_share
+    description: Teacher interação without sessão de entrada share.
+  - name: teacher_mobile_month_share
+    description: Teacher mobile month share.
+  - name: teacher_desktop_month_share
+    description: Teacher desktop month share.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+- name: modeled_mart_teacher_month_cluster_ready
+  description: Mart mensal por professor pronto para segmentação exploratória.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: month
+    description: Mês de referência.
+  - name: month_num
+    description: Número sequencial do mês observado.
+  - name: cluster_analysis_eligible_flag
+    description: Flag indicando elegibilidade para cluster analysis.
+  - name: activity_events_month
+    description: Quantidade mensal de eventos de atividade.
+  - name: active_days_month
+    description: Quantidade mensal de dias ativos.
+  - name: strict_download_count_month
+    description: Quantidade mensal de downloads estritos.
+  - name: download_count_month
+    description: Quantidade mensal de downloads.
+  - name: content_views_month
+    description: Quantidade mensal de visualizações de conteúdo.
+  - name: other_activity_non_download_events_month
+    description: Quantidade mensal de eventos de atividade não ligados a download.
+  - name: aula_events_month
+    description: Quantidade mensal de eventos de aula.
+  - name: plano_events_month
+    description: Quantidade mensal de eventos de plano.
+  - name: prova_events_month
+    description: Quantidade mensal de eventos de prova.
+  - name: ia_events_month
+    description: Quantidade mensal de eventos de IA.
+  - name: mapped_lessons_month
+    description: Quantidade mensal de aulas mapeadas.
+  - name: clean_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada limpas.
+  - name: clean_entry_total_session_minutes_month
+    description: Quantidade mensal de minutos em sessões de entrada limpas.
+  - name: clean_entry_avg_session_minutes_month
+    description: Média mensal de minutos por sessão de entrada limpa.
+  - name: clean_entry_signal_flag
+    description: Flag indicando presença de sinal de sessão limpa de entrada.
+  - name: only_ping_entry_flag
+    description: Flag indicando presença apenas de ping sessão de entrada.
+  - name: interaction_signal_flag
+    description: Flag indicando presença de sinal de interação.
+  - name: month_signal_class
+    description: Classe mensal de sinal observado.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+  - name: used_desktop_flag
+    description: Flag indicando uso de desktop.
+  - name: used_mobile_flag
+    description: Flag indicando uso de mobile.
+- name: modeled_mart_teacher_month_panel
+  description: Painel mensal expandido com meses observados e não observados por professor.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: month
+    description: Mês de referência.
+  - name: month_num
+    description: Número sequencial do mês observado.
+  - name: observed_month_flag
+    description: Flag indicando observado month.
+  - name: no_signal_month_flag
+    description: Flag indicando no sinal month.
+  - name: any_signal_flag
+    description: Flag indicando qualquer sinal observado.
+  - name: interaction_signal_flag
+    description: Flag indicando presença de sinal de interação.
+  - name: entry_signal_flag
+    description: Flag indicando presença de sinal de sessão de entrada.
+  - name: clean_entry_signal_flag
+    description: Flag indicando presença de sinal de sessão limpa de entrada.
+  - name: only_ping_entry_flag
+    description: Flag indicando presença apenas de ping sessão de entrada.
+  - name: month_signal_class
+    description: Classe mensal de sinal observado.
+  - name: active_user_flag
+    description: Flag indicando usuário ativo no mês.
+  - name: strict_value_flag
+    description: Flag indicando valor estrito.
+  - name: strict_download_count_month
+    description: Quantidade mensal de downloads estritos.
+  - name: download_count_month
+    description: Quantidade mensal de downloads.
+  - name: activity_events_month
+    description: Quantidade mensal de eventos de atividade.
+  - name: active_days_month
+    description: Quantidade mensal de dias ativos.
+  - name: content_views_month
+    description: Quantidade mensal de visualizações de conteúdo.
+  - name: other_activity_non_download_events_month
+    description: Quantidade mensal de eventos de atividade não ligados a download.
+  - name: aula_events_month
+    description: Quantidade mensal de eventos de aula.
+  - name: plano_events_month
+    description: Quantidade mensal de eventos de plano.
+  - name: prova_events_month
+    description: Quantidade mensal de eventos de prova.
+  - name: ia_events_month
+    description: Quantidade mensal de eventos de IA.
+  - name: mapped_lessons_month
+    description: Quantidade mensal de aulas mapeadas.
+  - name: raw_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada brutas.
+  - name: ping_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada do tipo ping.
+  - name: clean_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada limpas.
+  - name: clean_entry_total_session_minutes_month
+    description: Quantidade mensal de minutos em sessões de entrada limpas.
+  - name: clean_entry_avg_session_minutes_month
+    description: Média mensal de minutos por sessão de entrada limpa.
+  - name: months_since_last_signal
+    description: Months since último sinal.
+  - name: months_since_last_active
+    description: Months since último atividade.
+  - name: months_since_last_strict_value
+    description: Months since último estrita valor.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+- name: modeled_mart_teacher_month_persona_ready
+  description: Mart mensal por professor pronto para leitura de personas.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: month
+    description: Mês de referência.
+  - name: month_num
+    description: Número sequencial do mês observado.
+  - name: observed_month_flag
+    description: Flag indicando observado month.
+  - name: persona_analysis_eligible_flag
+    description: Flag indicando elegibilidade para persona analysis.
+  - name: active_user_flag
+    description: Flag indicando usuário ativo no mês.
+  - name: strict_value_flag
+    description: Flag indicando valor estrito.
+  - name: strict_user_flag
+    description: Flag indicando usuário estrito.
+  - name: returned_active_m1
+    description: Flag indicando retorno de atividade no 1º mês.
+  - name: returned_any_download_m1
+    description: Flag indicando retorno de qualquer download no 1º mês.
+  - name: returned_strict_value_m1
+    description: Flag indicando retorno de valor estrito no 1º mês.
+  - name: strict_return_value_m1
+    description: Valor estrito realizado no 1º mês seguinte.
+  - name: next_month_observed_flag
+    description: Flag indicando observação de mês seguinte.
+  - name: interaction_rows_month
+    description: Quantidade mensal de linhas de interação.
+  - name: activity_events_month
+    description: Quantidade mensal de eventos de atividade.
+  - name: active_days_month
+    description: Quantidade mensal de dias ativos.
+  - name: raw_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada brutas.
+  - name: ping_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada do tipo ping.
+  - name: clean_entry_session_count_month
+    description: Quantidade mensal de sessões de entrada limpas.
+  - name: clean_entry_total_session_minutes_month
+    description: Quantidade mensal de minutos em sessões de entrada limpas.
+  - name: clean_entry_avg_session_minutes_month
+    description: Média mensal de minutos por sessão de entrada limpa.
+  - name: strict_download_count_month
+    description: Quantidade mensal de downloads estritos.
+  - name: download_count_month
+    description: Quantidade mensal de downloads.
+  - name: download_aula_count_month
+    description: Quantidade mensal de downloads de aula.
+  - name: download_plano_count_month
+    description: Quantidade mensal de downloads de plano.
+  - name: content_views_month
+    description: Quantidade mensal de visualizações de conteúdo.
+  - name: other_activity_non_download_events_month
+    description: Quantidade mensal de eventos de atividade não ligados a download.
+  - name: aula_events_month
+    description: Quantidade mensal de eventos de aula.
+  - name: plano_events_month
+    description: Quantidade mensal de eventos de plano.
+  - name: prova_events_month
+    description: Quantidade mensal de eventos de prova.
+  - name: ia_events_month
+    description: Quantidade mensal de eventos de IA.
+  - name: mapped_lessons_month
+    description: Quantidade mensal de aulas mapeadas.
+  - name: interaction_signal_flag
+    description: Flag indicando presença de sinal de interação.
+  - name: entry_signal_flag
+    description: Flag indicando presença de sinal de sessão de entrada.
+  - name: clean_entry_signal_flag
+    description: Flag indicando presença de sinal de sessão limpa de entrada.
+  - name: only_ping_entry_flag
+    description: Flag indicando presença apenas de ping sessão de entrada.
+  - name: any_signal_flag
+    description: Flag indicando qualquer sinal observado.
+  - name: month_signal_class
+    description: Classe mensal de sinal observado.
+  - name: used_desktop_flag
+    description: Flag indicando uso de desktop.
+  - name: used_mobile_flag
+    description: Flag indicando uso de mobile.
+  - name: used_ia_flag
+    description: Flag indicando uso de IA.
+  - name: no_download_flag
+    description: Flag indicando ausência de download.
+  - name: no_download_view_only_flag
+    description: Flag indicando apenas visualização sem download.
+  - name: no_download_view_plus_action_flag
+    description: Flag indicando visualização e ação sem download.
+  - name: no_download_action_only_flag
+    description: Flag indicando ação sem download.
+  - name: clean_entry_exposed_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem download.
+  - name: clean_entry_exposed_no_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+  - name: clean_entry_exposed_activity_no_download_flag
+    description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+  - name: lifetime_active_months
+    description: Quantidade histórica de meses ativos.
+  - name: lifetime_clean_entry_minutes_total
+    description: Total histórico de minutos em sessões de entrada limpas.
+  - name: active_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade.
+  - name: active_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade.
+  - name: strict_streak_current_months
+    description: Quantidade de meses na sequência corrente de atividade estrita.
+  - name: strict_streak_max_months
+    description: Quantidade de meses na maior sequência de atividade estrita.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_total_alunos
+    description: Total de alunos informado.
+  - name: teacher_tipo_total_alunos
+    description: Tipo do total de alunos informado.
+  - name: is_estado_missing
+    description: Flag de ausência de estado informado.
+  - name: is_currentsubject_missing
+    description: Flag de ausência de disciplina atual.
+  - name: is_utm_missing
+    description: Flag de ausência de origem UTM.
+  - name: is_total_alunos_missing
+    description: Flag de ausência de total de alunos.
+  - name: is_tipo_total_alunos_missing
+    description: Flag de ausência de tipo do total de alunos.
+- name: modeled_mart_teacher_persona_ready
+  description: Mart por professor pronto para leitura de personas.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_total_alunos
+    description: Total de alunos informado.
+  - name: teacher_tipo_total_alunos
+    description: Tipo do total de alunos informado.
+  - name: teacher_months_since_last_observed_month_dataset_end
+    description: Meses entre a última observação e o fim do dataset.
+  - name: is_estado_missing
+    description: Flag de ausência de estado informado.
+  - name: is_currentsubject_missing
+    description: Flag de ausência de disciplina atual.
+  - name: is_utm_missing
+    description: Flag de ausência de origem UTM.
+  - name: is_total_alunos_missing
+    description: Flag de ausência de total de alunos.
+  - name: is_tipo_total_alunos_missing
+    description: Flag de ausência de tipo do total de alunos.
+  - name: teacher_first_observed_month
+    description: Primeiro mês observado do professor.
+  - name: teacher_last_observed_month
+    description: Último mês observado do professor.
+  - name: teacher_observed_months_total
+    description: Quantidade total de meses observados.
+  - name: teacher_active_months_total
+    description: Quantidade total de meses ativos.
+  - name: teacher_strict_months_total
+    description: Quantidade total de meses ativos na definição estrita.
+  - name: teacher_persona_eligible_months_total
+    description: Teacher persona eligible months total.
+  - name: teacher_active_month_share
+    description: Teacher atividade month share.
+  - name: teacher_strict_month_share
+    description: Teacher estrita month share.
+  - name: teacher_persona_analysis_eligible_flag
+    description: Flag indicando elegibilidade para teacher persona analysis.
+  - name: avg_activity_events_active_month
+    description: Mês de média atividade eventos atividade.
+  - name: std_activity_events_active_month
+    description: Mês de std atividade eventos atividade.
+  - name: avg_active_days_active_month
+    description: Mês de média atividade dias atividade.
+  - name: std_active_days_active_month
+    description: Mês de std atividade dias atividade.
+  - name: avg_strict_downloads_active_month
+    description: Mês de média estrita downloads atividade.
+  - name: std_strict_downloads_active_month
+    description: Mês de std estrita downloads atividade.
+  - name: avg_downloads_active_month
+    description: Mês de média downloads atividade.
+  - name: avg_content_views_active_month
+    description: Mês de média conteúdo visualizações atividade.
+  - name: avg_other_actions_active_month
+    description: Mês de média outras ações atividade.
+  - name: avg_aula_events_active_month
+    description: Mês de média aulas eventos atividade.
+  - name: avg_plano_events_active_month
+    description: Mês de média planos eventos atividade.
+  - name: avg_prova_events_active_month
+    description: Mês de média provas eventos atividade.
+  - name: avg_ia_events_active_month
+    description: Mês de média IA eventos atividade.
+  - name: avg_mapped_lessons_active_month
+    description: Mês de média mapeadas aulas atividade.
+  - name: avg_clean_entry_sessions_active_month
+    description: Mês de média limpas sessão de entrada sessões atividade.
+  - name: avg_clean_entry_minutes_active_month
+    description: Mês de média limpas sessão de entrada minutos atividade.
+  - name: teacher_clean_entry_coverage_share
+    description: Teacher limpas sessão de entrada coverage share.
+  - name: teacher_only_ping_month_share
+    description: Teacher apenas ping month share.
+  - name: teacher_interaction_without_entry_share
+    description: Teacher interação without sessão de entrada share.
+  - name: teacher_mobile_month_share
+    description: Teacher mobile month share.
+  - name: teacher_desktop_month_share
+    description: Teacher desktop month share.
+  - name: teacher_no_download_month_share
+    description: Teacher no download month share.
+  - name: teacher_view_only_no_download_month_share
+    description: Teacher visualização apenas no download month share.
+  - name: teacher_view_plus_action_no_download_month_share
+    description: Teacher visualização mais ação no download month share.
+  - name: teacher_action_only_no_download_month_share
+    description: Teacher ação apenas no download month share.
+  - name: teacher_returned_active_rate_observed
+    description: Teacher retorno atividade rate observado.
+  - name: teacher_returned_download_rate_observed
+    description: Teacher retorno download rate observado.
+  - name: teacher_strict_user_rate_observed
+    description: Teacher estrita user rate observado.
+  - name: teacher_active_streak_max_months
+    description: Maior sequência mensal de atividade.
+  - name: teacher_strict_streak_max_months
+    description: Maior sequência mensal de atividade estrita.

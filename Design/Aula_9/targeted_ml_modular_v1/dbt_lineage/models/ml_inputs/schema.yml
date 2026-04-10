@@ -1,0 +1,271 @@
+version: 2
+models:
+- name: ml_mart_onboarding_population
+  description: População inicial de onboarding reconstruída para o modelo.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: first_month
+    description: Primeiro mês observado do professor.
+  - name: first_session_ts
+    description: Timestamp de primeiro sessão.
+  - name: first_interaction_ts
+    description: Timestamp de primeiro interação.
+  - name: onboarding_anchor_ts
+    description: Timestamp âncora do onboarding.
+  - name: data_entrada_month
+    description: Mês de entrada do professor.
+  - name: months_after_entry
+    description: Meses entre a entrada e o primeiro mês observado.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: first_event_type
+    description: Tipo do 1º evento observado.
+  - name: first_event_family
+    description: Família do 1º evento observado.
+  - name: first_event_action
+    description: Ação do 1º evento observado.
+  - name: first_device
+    description: Dispositivo do 1º evento observado.
+  - name: first_utm_source
+    description: UTM source do 1º evento observado.
+  - name: first3_interaction_downloads
+    description: Downloads nas 3 primeiras interações observadas.
+  - name: first3_interaction_views
+    description: Visualizações nas 3 primeiras interações observadas.
+  - name: first3_interaction_other_actions
+    description: Outras ações nas 3 primeiras interações observadas.
+  - name: first7d_events
+    description: Eventos nos 7 primeiros dias.
+  - name: first7d_active_days
+    description: Dias ativos nos 7 primeiros dias.
+  - name: first_session_minutes
+    description: Minutos da 1ª sessão.
+  - name: first7d_sessions
+    description: Sessões nos 7 primeiros dias.
+  - name: first7d_session_minutes
+    description: Minutos em sessão nos 7 primeiros dias.
+  - name: first_event_missing_flag
+    description: Flag de ausência do 1º evento.
+  - name: first_event_action_missing_flag
+    description: Flag de ausência da ação do 1º evento.
+  - name: first_utm_missing_flag
+    description: Flag de ausência da UTM inicial.
+  - name: first_device_missing_flag
+    description: Flag de ausência do dispositivo inicial.
+- name: ml_mart_first_session_journey
+  description: Resumo da 1ª sessão, do 1º evento e da janela inicial da jornada.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: first_month
+    description: Primeiro mês observado do professor.
+  - name: first_session_ts
+    description: Timestamp de primeiro sessão.
+  - name: first_interaction_ts
+    description: Timestamp de primeiro interação.
+  - name: onboarding_anchor_ts
+    description: Timestamp âncora do onboarding.
+  - name: data_entrada_month
+    description: Mês de entrada do professor.
+  - name: months_after_entry
+    description: Meses entre a entrada e o primeiro mês observado.
+  - name: teacher_population_status
+    description: Status do professor na população observada.
+  - name: utm_group
+    description: Grupo analítico da origem UTM.
+  - name: teacher_estado
+    description: Estado informado.
+  - name: teacher_currentstage
+    description: Etapa atual do professor.
+  - name: teacher_currentsubject_group
+    description: Grupo analítico da disciplina atual.
+  - name: first_event_type
+    description: Tipo do 1º evento observado.
+  - name: first_event_family
+    description: Família do 1º evento observado.
+  - name: first_event_action
+    description: Ação do 1º evento observado.
+  - name: first_device
+    description: Dispositivo do 1º evento observado.
+  - name: first_utm_source
+    description: UTM source do 1º evento observado.
+  - name: first3_interaction_downloads
+    description: Downloads nas 3 primeiras interações observadas.
+  - name: first3_interaction_views
+    description: Visualizações nas 3 primeiras interações observadas.
+  - name: first3_interaction_other_actions
+    description: Outras ações nas 3 primeiras interações observadas.
+  - name: first7d_events
+    description: Eventos nos 7 primeiros dias.
+  - name: first7d_active_days
+    description: Dias ativos nos 7 primeiros dias.
+  - name: first_session_minutes
+    description: Minutos da 1ª sessão.
+  - name: first7d_sessions
+    description: Sessões nos 7 primeiros dias.
+  - name: first7d_session_minutes
+    description: Minutos em sessão nos 7 primeiros dias.
+  - name: first_event_missing_flag
+    description: Flag de ausência do 1º evento.
+  - name: first_event_action_missing_flag
+    description: Flag de ausência da ação do 1º evento.
+  - name: first_utm_missing_flag
+    description: Flag de ausência da UTM inicial.
+  - name: first_device_missing_flag
+    description: Flag de ausência do dispositivo inicial.
+  - name: first_session_row_hash
+    description: Hash técnico da 1ª sessão.
+  - name: first_session_start_ts
+    description: Início da 1ª sessão.
+  - name: first_session_end_ts
+    description: Fim da 1ª sessão.
+  - name: first_session_duration_sec
+    description: Duração da 1ª sessão em segundos.
+  - name: first_session_duration_min
+    description: Duração da 1ª sessão em minutos.
+  - name: first_session_interactions
+    description: Interações dentro da 1ª sessão.
+  - name: first_session_downloads
+    description: Downloads dentro da 1ª sessão.
+  - name: first_session_views
+    description: Visualizações dentro da 1ª sessão.
+  - name: first_session_other_actions
+    description: Outras ações dentro da 1ª sessão.
+  - name: first_session_navigation_events
+    description: Eventos de navegação na 1ª sessão.
+  - name: first_session_meaningful_events
+    description: Eventos relevantes na 1ª sessão.
+  - name: step_1_token
+    description: Passo observado na posição 1.
+  - name: step_2_token
+    description: Passo observado na posição 2.
+  - name: step_3_token
+    description: Passo observado na posição 3.
+  - name: step_4_token
+    description: Passo observado na posição 4.
+  - name: step_5_token
+    description: Passo observado na posição 5.
+  - name: first_session_first_event_ts
+    description: Timestamp do 1º evento da 1ª sessão.
+  - name: first_session_first_event_type
+    description: Tipo do 1º evento da 1ª sessão.
+  - name: first_session_first_event_family
+    description: Família do 1º evento da 1ª sessão.
+  - name: first_session_first_event_action
+    description: Ação do 1º evento da 1ª sessão.
+  - name: first_session_first_event_utm_source
+    description: UTM source do 1º evento da 1ª sessão.
+  - name: first_session_first_event_device
+    description: Dispositivo do 1º evento da 1ª sessão.
+  - name: first_session_first_meaningful_ts
+    description: Timestamp da 1ª ação relevante da 1ª sessão.
+  - name: first_session_first_meaningful_type
+    description: Tipo da 1ª ação relevante da 1ª sessão.
+  - name: first_session_first_meaningful_family
+    description: Família da 1ª ação relevante da 1ª sessão.
+  - name: first_session_first_meaningful_action
+    description: Ação da 1ª ação relevante da 1ª sessão.
+  - name: first_session_last_event_ts
+    description: Timestamp do último evento da 1ª sessão.
+  - name: first_session_last_event_type
+    description: Tipo do último evento da 1ª sessão.
+  - name: first_session_last_event_family
+    description: Família do último evento da 1ª sessão.
+  - name: first_session_last_event_action
+    description: Ação do último evento da 1ª sessão.
+  - name: first_session_missing_flag
+    description: Flag indicando ausência da 1ª sessão.
+  - name: first_session_has_interaction_flag
+    description: Flag indicando interação dentro da 1ª sessão.
+  - name: first_session_has_meaningful_action_flag
+    description: Flag indicando ação relevante na 1ª sessão.
+  - name: session_without_interaction_flag
+    description: Flag de sessão sem interação associada.
+  - name: first_session_entry_surface
+    description: Superfície de entrada da 1ª sessão.
+  - name: first_session_device_raw
+    description: Dispositivo bruto da 1ª sessão.
+  - name: first_session_device_bucket
+    description: Bucket do dispositivo da 1ª sessão.
+  - name: secs_to_first_interaction
+    description: Segundos até a 1ª interação.
+  - name: secs_to_first_meaningful_action
+    description: Segundos até a 1ª ação relevante.
+  - name: first_session_first_meaningful_action_group
+    description: Grupo da 1ª ação relevante da 1ª sessão.
+  - name: first_session_first_event_action_group
+    description: Grupo da ação do 1º evento da 1ª sessão.
+  - name: first_session_exit_state
+    description: Estado de saída da 1ª sessão.
+  - name: observed_step_count_first5
+    description: Quantidade de passos observados entre os 5 primeiros.
+  - name: step_sequence_first5
+    description: Sequência dos 5 primeiros passos.
+  - name: step_sequence_observed_first5
+    description: Sequência observada dos 5 primeiros passos.
+- name: ml_mart_future_metrics
+  description: Métricas futuras nativas usadas para definição de atividade e validadores.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: first_month
+    description: Primeiro mês observado do professor.
+  - name: anchor_ts
+    description: Timestamp âncora da jornada inicial.
+  - name: label_start_ts
+    description: Início da medição futura após a janela inicial.
+  - name: label_end_ts
+    description: Fim da janela principal de label.
+  - name: validator_1_end_ts
+    description: Fim do 1º bloco validador pós-label.
+  - name: validator_2_end_ts
+    description: Fim do 2º bloco validador pós-label.
+  - name: validator_3_end_ts
+    description: Fim do 3º bloco validador pós-label.
+  - name: full_followup_observed_flag
+    description: Flag indicando seguimento futuro completo observado.
+  - name: future_sessions
+    description: Sessões futuras após o início do label.
+  - name: future_session_minutes
+    description: Minutos futuros em sessão após o início do label.
+  - name: future_interactions
+    description: Interações futuras após o início do label.
+  - name: future_activity_events
+    description: Eventos futuros de atividade após o início do label.
+  - name: future_active_days
+    description: Dias ativos futuros após o início do label.
+  - name: future_distinct_actions
+    description: Ações distintas futuras após o início do label.
+  - name: future_downloads
+    description: Downloads futuros após o início do label.
+  - name: future_content_views
+    description: Visualizações futuras de conteúdo após o início do label.
+  - name: future_mapped_lessons
+    description: Aulas futuras mapeadas após o início do label.
+  - name: future_formation_events
+    description: Eventos futuros de formação após o início do label.
+  - name: future_mari_help_events
+    description: Eventos futuros de ajuda da Mari após o início do label.
+  - name: future_mari_conversation_events
+    description: Conversas futuras com a Mari após o início do label.
+  - name: future_business_active_weeks
+    description: Semanas futuras com atividade mínima de negócio.
+  - name: returned_active_post_label_m1
+    description: Flag indicando retorno ativo no 1º bloco pós-label.
+  - name: returned_active_post_label_m2
+    description: Flag indicando retorno ativo no 2º bloco pós-label.
+  - name: returned_active_post_label_m3
+    description: Flag indicando retorno ativo no 3º bloco pós-label.
+  - name: active_days_post_label_3m
+    description: Dias ativos somados nos 3 blocos pós-label.
+  - name: sustained_active_2of3_post_label
+    description: Flag indicando atividade em pelo menos 2 dos 3 blocos pós-label.

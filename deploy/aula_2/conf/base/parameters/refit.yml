@@ -14,7 +14,8 @@ refit_model:
     verbose: 0
 
 calibration:
+  enabled: true
   class_path: sklearn.calibration.CalibratedClassifierCV
   init_args:
     method: sigmoid
-    cv: prefit
+    cv: 5

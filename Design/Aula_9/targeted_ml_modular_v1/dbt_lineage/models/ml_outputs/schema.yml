@@ -1,0 +1,1403 @@
+version: 2
+models:
+- name: ml_core_cv_metric_folds
+  description: Robustez por fold das métricas probabilísticas do modelo.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: metric_value
+    description: Valor medido na auditoria.
+- name: ml_core_cv_metric_summary
+  description: Resumo de robustez por fold das métricas probabilísticas.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: mean_value
+    description: Valor médio entre folds válidos.
+  - name: std_value
+    description: Desvio-padrão entre folds válidos.
+  - name: min_value
+    description: Menor valor observado.
+  - name: max_value
+    description: Maior valor observado.
+  - name: value_range
+    description: Amplitude entre o menor e o maior valor.
+  - name: max_fold_to_fold_jump
+    description: Maior salto entre folds consecutivos.
+  - name: fold_order_slope
+    description: Inclinação da métrica ao longo da ordem dos folds.
+  - name: fold_order_pvalue
+    description: P-valor da inclinação por permutação.
+- name: ml_core_cv_score_folds
+  description: Robustez por fold da distribuição de score e risco.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: mean_score
+    description: Média de score.
+  - name: mean_risk_score
+    description: Média de risco score.
+  - name: realized_risk_rate
+    description: Taxa realizada de risco.
+  - name: score_std
+    description: Desvio-padrão do score.
+  - name: risk_score_std
+    description: Desvio-padrão do risk_score.
+- name: ml_core_cv_score_summary
+  description: Resumo de robustez por fold da distribuição de score e risco.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: mean_value
+    description: Valor médio entre folds válidos.
+  - name: std_value
+    description: Desvio-padrão entre folds válidos.
+  - name: min_value
+    description: Menor valor observado.
+  - name: max_value
+    description: Maior valor observado.
+  - name: value_range
+    description: Amplitude entre o menor e o maior valor.
+  - name: max_fold_to_fold_jump
+    description: Maior salto entre folds consecutivos.
+  - name: fold_order_slope
+    description: Inclinação da métrica ao longo da ordem dos folds.
+  - name: fold_order_pvalue
+    description: P-valor da inclinação por permutação.
+- name: ml_core_definition_b_excessive_separation
+  description: Diagnóstico de separação excessiva na Definição B.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: mean_ap
+    description: Average Precision na predição concatenada.
+  - name: mean_roc_auc
+    description: ROC AUC na predição concatenada.
+  - name: mean_brier
+    description: Brier score na predição concatenada.
+  - name: mean_log_loss
+    description: Log loss na predição concatenada.
+  - name: mean_calibration_slope_error
+    description: Distância da inclinação de calibração até 1 na predição concatenada.
+  - name: mean_calibration_intercept_abs
+    description: Valor absoluto do intercepto de calibração na predição concatenada.
+  - name: std_ap
+    description: Desvio-padrão de AP entre folds válidos.
+  - name: std_brier
+    description: Desvio-padrão de Brier entre folds válidos.
+  - name: std_log_loss
+    description: Desvio-padrão de log loss entre folds válidos.
+  - name: ap_good_percentile
+    description: Percentil favorável de AP dentro da trilha.
+  - name: roc_auc_good_percentile
+    description: Percentil favorável de ROC AUC dentro da trilha.
+  - name: brier_good_percentile
+    description: Percentil favorável de Brier dentro da trilha.
+  - name: log_loss_good_percentile
+    description: Percentil favorável de log loss dentro da trilha.
+  - name: calibration_good_percentile
+    description: Percentil favorável de calibração dentro da trilha.
+  - name: stability_good_percentile
+    description: Percentil favorável de estabilidade dentro da trilha.
+  - name: combined_separation_score
+    description: Score combinado de separação.
+  - name: combined_separation_percentile_within_track
+    description: Percentil do score combinado de separação dentro da trilha.
+  - name: comparator_rows_in_track
+    description: Quantidade de comparadores disponíveis na trilha.
+  - name: red_flag_eligible_flag
+    description: Flag indicando elegibilidade para red flag.
+  - name: excessive_separation_red_flag
+    description: Flag indicando excessive separation red.
+- name: ml_core_definition_b_feature_block_gain_folds
+  description: Ganho incremental por bloco de sinais da Definição B em nível de fold.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: technical_fold_valid_flag
+    description: Flag indicando se o fold era tecnicamente calculável.
+  - name: fold_valid_flag
+    description: Flag indicando se o fold conta no resumo oficial.
+  - name: inner_valid_splits
+    description: Inner valid splits.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: test_positive_rate
+    description: Test positive rate.
+  - name: tuning_applied_flag
+    description: Flag indicando se houve tuning.
+  - name: tuning_status
+    description: Status do tuning.
+  - name: tuning_valid_splits
+    description: Quantidade de splits internos válidos no tuning.
+  - name: tuning_best_score
+    description: Melhor score encontrado no tuning.
+  - name: best_params_json
+    description: Melhores hiperparâmetros em JSON.
+  - name: invalid_reason
+    description: Motivo de invalidação do fold ou da saída.
+  - name: ap
+    description: Average Precision do fold.
+  - name: roc_auc
+    description: ROC AUC do fold.
+  - name: brier
+    description: Brier score do fold.
+  - name: log_loss
+    description: Log loss do fold.
+  - name: calibration_slope
+    description: Inclinação de calibração.
+  - name: calibration_intercept
+    description: Intercepto de calibração.
+  - name: calibration_slope_error
+    description: Distância da inclinação de calibração até 1.
+  - name: calibration_intercept_abs
+    description: Valor absoluto do intercepto de calibração.
+  - name: reference_problem_key
+    description: Problema de referência usado no diagnóstico.
+  - name: block_name
+    description: Nome do bloco de variáveis testado.
+  - name: block_type
+    description: Tipo do bloco de variáveis.
+  - name: selected_feature_count
+    description: Quantidade de variáveis no bloco testado.
+  - name: added_feature_count
+    description: Quantidade de variáveis adicionadas sobre o baseline.
+  - name: selected_feature_names_json
+    description: Lista JSON das variáveis selecionadas no bloco.
+  - name: added_feature_names_json
+    description: Lista JSON das variáveis adicionadas sobre o baseline.
+  - name: diagnostic_problem_key
+    description: Problema diagnóstico derivado do bloco de variáveis.
+- name: ml_core_definition_b_feature_block_gain_summary
+  description: Resumo do ganho incremental por bloco de sinais da Definição B.
+  columns:
+  - name: reference_problem_key
+    description: Problema de referência usado no diagnóstico.
+  - name: diagnostic_problem_key
+    description: Problema diagnóstico derivado do bloco de variáveis.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: block_name
+    description: Nome do bloco de variáveis testado.
+  - name: block_type
+    description: Tipo do bloco de variáveis.
+  - name: selected_feature_count
+    description: Quantidade de variáveis no bloco testado.
+  - name: added_feature_count
+    description: Quantidade de variáveis adicionadas sobre o baseline.
+  - name: selected_feature_names_json
+    description: Lista JSON das variáveis selecionadas no bloco.
+  - name: added_feature_names_json
+    description: Lista JSON das variáveis adicionadas sobre o baseline.
+  - name: pooled_rows
+    description: Quantidade de linhas na predição concatenada.
+  - name: pooled_positives
+    description: Quantidade de positivos na predição concatenada.
+  - name: pooled_negatives
+    description: Quantidade de negativos na predição concatenada.
+  - name: pooled_positive_rate
+    description: Taxa positiva na predição concatenada.
+  - name: mean_ap
+    description: Average Precision na predição concatenada.
+  - name: mean_roc_auc
+    description: ROC AUC na predição concatenada.
+  - name: mean_brier
+    description: Brier score na predição concatenada.
+  - name: mean_log_loss
+    description: Log loss na predição concatenada.
+  - name: mean_calibration_slope
+    description: Inclinação de calibração na predição concatenada.
+  - name: mean_calibration_intercept
+    description: Intercepto de calibração na predição concatenada.
+  - name: mean_calibration_slope_error
+    description: Distância da inclinação de calibração até 1 na predição concatenada.
+  - name: mean_calibration_intercept_abs
+    description: Valor absoluto do intercepto de calibração na predição concatenada.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: fold_mean_ap
+    description: Média de AP entre folds válidos.
+  - name: std_ap
+    description: Desvio-padrão de AP entre folds válidos.
+  - name: fold_mean_roc_auc
+    description: Média de ROC AUC entre folds válidos.
+  - name: std_roc_auc
+    description: Desvio-padrão de ROC AUC entre folds válidos.
+  - name: fold_mean_brier
+    description: Média de Brier entre folds válidos.
+  - name: std_brier
+    description: Desvio-padrão de Brier entre folds válidos.
+  - name: fold_mean_log_loss
+    description: Média de log loss entre folds válidos.
+  - name: std_log_loss
+    description: Desvio-padrão de log loss entre folds válidos.
+  - name: fold_mean_calibration_slope
+    description: Média da inclinação de calibração entre folds válidos.
+  - name: fold_mean_calibration_intercept
+    description: Média do intercepto de calibração entre folds válidos.
+  - name: fold_mean_calibration_slope_error
+    description: Média da distância da inclinação até 1.
+  - name: fold_mean_calibration_intercept_abs
+    description: Média do valor absoluto do intercepto.
+  - name: baseline_mean_ap
+    description: AP do baseline de contexto.
+  - name: baseline_mean_roc_auc
+    description: ROC AUC do baseline de contexto.
+  - name: baseline_mean_brier
+    description: Brier do baseline de contexto.
+  - name: baseline_mean_log_loss
+    description: Log loss do baseline de contexto.
+  - name: delta_ap_vs_context
+    description: Ganho de AP sobre o baseline de contexto.
+  - name: delta_roc_auc_vs_context
+    description: Ganho de ROC AUC sobre o baseline de contexto.
+  - name: brier_improvement_vs_context
+    description: Melhora de Brier sobre o baseline de contexto.
+  - name: log_loss_improvement_vs_context
+    description: Melhora de log loss sobre o baseline de contexto.
+  - name: uplift_metric_positive_count
+    description: Quantidade de métricas de ganho positivas.
+  - name: mean_uplift_percentile
+    description: Percentil médio de ganho do bloco.
+  - name: abnormal_uplift_flag
+    description: Flag de ganho anormal sobre o baseline.
+  - name: delta_ap_vs_context_percentile
+    description: Diferença de ap vs context percentile.
+  - name: delta_roc_auc_vs_context_percentile
+    description: Diferença de roc auc vs context percentile.
+  - name: brier_improvement_vs_context_percentile
+    description: Percentil da melhora de Brier sobre o baseline de contexto.
+  - name: log_loss_improvement_vs_context_percentile
+    description: Percentil da melhora de log loss sobre o baseline de contexto.
+- name: ml_core_definition_candidates_test_frontier
+  description: Diagnóstico em teste dos candidatos de definição futura.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: candidate_type
+    description: Tipo do candidato de definição.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: threshold
+    description: Threshold aplicado na regra.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: rule_text
+    description: Regra em texto para exibição.
+  - name: rule_size
+    description: Quantidade de componentes da regra.
+  - name: rule_operator
+    description: Operador usado na regra.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: split_role
+    description: Split role.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: prevalence
+    description: Prevalence.
+  - name: prevalence_entropy
+    description: Entropia da prevalência do label.
+  - name: monthly_prevalence_mean
+    description: Monthly prevalence mean.
+  - name: monthly_prevalence_std
+    description: Desvio-padrão da prevalência mensal.
+  - name: bootstrap_prevalence_ci_low
+    description: Bootstrap prevalence ci low.
+  - name: bootstrap_prevalence_ci_high
+    description: Bootstrap prevalence ci high.
+  - name: bootstrap_prevalence_ci_width
+    description: Largura do intervalo bootstrap da prevalência.
+  - name: candidate_valid_flag
+    description: Flag indicando candidate valid.
+  - name: gap_returned_active_post_label_m1
+    description: Gap de retorno atividade pós label m1.
+  - name: gap_returned_active_post_label_m2
+    description: Gap de retorno atividade pós label m2.
+  - name: gap_returned_active_post_label_m3
+    description: Gap de retorno atividade pós label m3.
+  - name: gap_active_days_post_label_3m
+    description: Gap de atividade dias pós label 3m.
+  - name: gap_sustained_active_2of3_post_label
+    description: Gap de sustained atividade 2of3 pós label.
+- name: ml_core_definition_candidates_train
+  description: Diagnóstico em treino dos candidatos de definição futura.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: candidate_type
+    description: Tipo do candidato de definição.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: threshold
+    description: Threshold aplicado na regra.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: rule_text
+    description: Regra em texto para exibição.
+  - name: rule_size
+    description: Quantidade de componentes da regra.
+  - name: rule_operator
+    description: Operador usado na regra.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: split_role
+    description: Split role.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: prevalence
+    description: Prevalence.
+  - name: prevalence_entropy
+    description: Entropia da prevalência do label.
+  - name: monthly_prevalence_mean
+    description: Monthly prevalence mean.
+  - name: monthly_prevalence_std
+    description: Desvio-padrão da prevalência mensal.
+  - name: bootstrap_prevalence_ci_low
+    description: Bootstrap prevalence ci low.
+  - name: bootstrap_prevalence_ci_high
+    description: Bootstrap prevalence ci high.
+  - name: bootstrap_prevalence_ci_width
+    description: Largura do intervalo bootstrap da prevalência.
+  - name: candidate_valid_flag
+    description: Flag indicando candidate valid.
+  - name: gap_returned_active_post_label_m1
+    description: Gap de retorno atividade pós label m1.
+  - name: gap_returned_active_post_label_m2
+    description: Gap de retorno atividade pós label m2.
+  - name: gap_returned_active_post_label_m3
+    description: Gap de retorno atividade pós label m3.
+  - name: gap_active_days_post_label_3m
+    description: Gap de atividade dias pós label 3m.
+  - name: gap_sustained_active_2of3_post_label
+    description: Gap de sustained atividade 2of3 pós label.
+- name: ml_core_definition_external_validation
+  description: Validação externa temporal das definições futuras.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: candidate_type
+    description: Tipo do candidato de definição.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: threshold
+    description: Threshold aplicado na regra.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: rule_text
+    description: Regra em texto para exibição.
+  - name: rule_size
+    description: Quantidade de componentes da regra.
+  - name: rule_operator
+    description: Operador usado na regra.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: split_role
+    description: Split role.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: prevalence
+    description: Prevalence.
+  - name: prevalence_entropy
+    description: Entropia da prevalência do label.
+  - name: monthly_prevalence_mean
+    description: Monthly prevalence mean.
+  - name: monthly_prevalence_std
+    description: Desvio-padrão da prevalência mensal.
+  - name: bootstrap_prevalence_ci_low
+    description: Bootstrap prevalence ci low.
+  - name: bootstrap_prevalence_ci_high
+    description: Bootstrap prevalence ci high.
+  - name: bootstrap_prevalence_ci_width
+    description: Largura do intervalo bootstrap da prevalência.
+  - name: candidate_valid_flag
+    description: Flag indicando candidate valid.
+  - name: gap_returned_active_post_label_m1
+    description: Gap de retorno atividade pós label m1.
+  - name: gap_returned_active_post_label_m2
+    description: Gap de retorno atividade pós label m2.
+  - name: gap_returned_active_post_label_m3
+    description: Gap de retorno atividade pós label m3.
+  - name: gap_active_days_post_label_3m
+    description: Gap de atividade dias pós label 3m.
+  - name: gap_sustained_active_2of3_post_label
+    description: Gap de sustained atividade 2of3 pós label.
+- name: ml_core_definition_frontier
+  description: Fronteira admissível das definições futuras.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: candidate_type
+    description: Tipo do candidato de definição.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: threshold
+    description: Threshold aplicado na regra.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: rule_text
+    description: Regra em texto para exibição.
+  - name: rule_size
+    description: Quantidade de componentes da regra.
+  - name: rule_operator
+    description: Operador usado na regra.
+  - name: folds
+    description: Quantidade de folds válidos.
+  - name: test_gap_returned_active_post_label_m1
+    description: Gap em teste de retorno atividade pós label m1.
+  - name: test_gap_returned_active_post_label_m2
+    description: Gap em teste de retorno atividade pós label m2.
+  - name: test_gap_returned_active_post_label_m3
+    description: Gap em teste de retorno atividade pós label m3.
+  - name: test_gap_active_days_post_label_3m
+    description: Gap em teste de atividade dias pós label 3m.
+  - name: test_gap_sustained_active_2of3_post_label
+    description: Gap em teste de sustained atividade 2of3 pós label.
+  - name: test_prevalence_entropy
+    description: Entropia da prevalência do label em teste.
+  - name: test_monthly_prevalence_std
+    description: Desvio-padrão da prevalência mensal em teste.
+  - name: test_bootstrap_prevalence_ci_width
+    description: Largura do intervalo bootstrap da prevalência em teste.
+  - name: test_prevalence_std
+    description: Test prevalence std.
+  - name: label_hash
+    description: Hash do vetor de label.
+  - name: label_positives
+    description: Quantidade de positivos do label.
+  - name: label_share_pct
+    description: Participação percentual dos positivos do label.
+  - name: label_vector_group_size
+    description: Quantidade de candidatos com o mesmo vetor de label.
+  - name: rank__folds
+    description: Rank folds.
+  - name: rank__test_gap_returned_active_post_label_m1
+    description: Rank test gap retorno atividade pós label m1.
+  - name: rank__test_gap_returned_active_post_label_m2
+    description: Rank test gap retorno atividade pós label m2.
+  - name: rank__test_gap_returned_active_post_label_m3
+    description: Rank test gap retorno atividade pós label m3.
+  - name: rank__test_gap_active_days_post_label_3m
+    description: Rank test gap atividade dias pós label 3m.
+  - name: rank__test_gap_sustained_active_2of3_post_label
+    description: Rank test gap sustained atividade 2of3 pós label.
+  - name: rank__test_prevalence_entropy
+    description: Rank test prevalence entropy.
+  - name: rank__test_monthly_prevalence_std
+    description: Rank test monthly prevalence std.
+  - name: rank__test_bootstrap_prevalence_ci_width
+    description: Rank test bootstrap prevalence ci width.
+  - name: worst_objective_rank
+    description: Worst objective rank.
+  - name: mean_objective_rank
+    description: Média de objective rank.
+  - name: label_vector_representative_flag
+    description: Flag indicando label vector representative.
+  - name: pareto_frontier_flag
+    description: Flag indicando presença na fronteira de Pareto.
+- name: ml_core_definition_selection
+  description: Seleção oficial das definições futuras testadas.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: definition_group
+    description: Grupo da definição futura.
+  - name: official_status
+    description: Status oficial do candidato.
+  - name: winner_flag
+    description: Flag indicando vencedor único.
+  - name: candidate_type
+    description: Tipo do candidato de definição.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: threshold
+    description: Threshold aplicado na regra.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: rule_text
+    description: Regra em texto para exibição.
+  - name: rule_size
+    description: Quantidade de componentes da regra.
+  - name: rule_operator
+    description: Operador usado na regra.
+  - name: selection_basis
+    description: Base usada para decidir o status oficial.
+  - name: folds
+    description: Quantidade de folds válidos.
+  - name: label_hash
+    description: Hash do vetor de label.
+  - name: label_positives
+    description: Quantidade de positivos do label.
+  - name: label_share_pct
+    description: Participação percentual dos positivos do label.
+  - name: label_vector_group_size
+    description: Quantidade de candidatos com o mesmo vetor de label.
+  - name: test_gap_returned_active_post_label_m1
+    description: Gap em teste de retorno atividade pós label m1.
+  - name: test_gap_returned_active_post_label_m2
+    description: Gap em teste de retorno atividade pós label m2.
+  - name: test_gap_returned_active_post_label_m3
+    description: Gap em teste de retorno atividade pós label m3.
+  - name: test_gap_active_days_post_label_3m
+    description: Gap em teste de atividade dias pós label 3m.
+  - name: test_gap_sustained_active_2of3_post_label
+    description: Gap em teste de sustained atividade 2of3 pós label.
+  - name: test_prevalence_entropy
+    description: Entropia da prevalência do label em teste.
+  - name: test_monthly_prevalence_std
+    description: Desvio-padrão da prevalência mensal em teste.
+  - name: test_bootstrap_prevalence_ci_width
+    description: Largura do intervalo bootstrap da prevalência em teste.
+- name: ml_core_model_calibration_audit
+  description: Auditoria dos splits internos de tuning e calibração.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: outer_fold_id
+    description: Identificador do fold externo.
+  - name: inner_fold_id
+    description: Identificador do fold interno.
+  - name: split_strategy
+    description: Split strategy.
+  - name: validation_start_month
+    description: Mês de validation start.
+  - name: validation_month_count
+    description: Quantidade de validation month.
+  - name: calibration_start_month
+    description: Mês de calibration start.
+  - name: calibration_month_count
+    description: Quantidade de calibration month.
+  - name: train_rows
+    description: Quantidade de linhas de train.
+  - name: test_rows
+    description: Quantidade de linhas de test.
+  - name: train_positives
+    description: Train positives.
+  - name: test_positives
+    description: Test positives.
+  - name: valid_inner_split_flag
+    description: Flag indicando valid inner split.
+  - name: invalid_reason
+    description: Motivo de invalidação do fold ou da saída.
+- name: ml_core_model_fold_metrics
+  description: Métricas por fold externo dos modelos avaliados.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: technical_fold_valid_flag
+    description: Flag indicando se o fold era tecnicamente calculável.
+  - name: fold_valid_flag
+    description: Flag indicando se o fold conta no resumo oficial.
+  - name: inner_valid_splits
+    description: Inner valid splits.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: test_positive_rate
+    description: Test positive rate.
+  - name: tuning_applied_flag
+    description: Flag indicando se houve tuning.
+  - name: tuning_status
+    description: Status do tuning.
+  - name: tuning_valid_splits
+    description: Quantidade de splits internos válidos no tuning.
+  - name: tuning_best_score
+    description: Melhor score encontrado no tuning.
+  - name: best_params_json
+    description: Melhores hiperparâmetros em JSON.
+  - name: invalid_reason
+    description: Motivo de invalidação do fold ou da saída.
+  - name: ap
+    description: Average Precision do fold.
+  - name: roc_auc
+    description: ROC AUC do fold.
+  - name: brier
+    description: Brier score do fold.
+  - name: log_loss
+    description: Log loss do fold.
+  - name: calibration_slope
+    description: Inclinação de calibração.
+  - name: calibration_intercept
+    description: Intercepto de calibração.
+  - name: calibration_slope_error
+    description: Distância da inclinação de calibração até 1.
+  - name: calibration_intercept_abs
+    description: Valor absoluto do intercepto de calibração.
+- name: ml_core_model_frontier
+  description: Fronteira final de definição, trilha e família de modelo.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: pooled_rows
+    description: Quantidade de linhas na predição concatenada.
+  - name: pooled_positives
+    description: Quantidade de positivos na predição concatenada.
+  - name: pooled_negatives
+    description: Quantidade de negativos na predição concatenada.
+  - name: pooled_positive_rate
+    description: Taxa positiva na predição concatenada.
+  - name: mean_ap
+    description: Average Precision na predição concatenada.
+  - name: mean_roc_auc
+    description: ROC AUC na predição concatenada.
+  - name: mean_brier
+    description: Brier score na predição concatenada.
+  - name: mean_log_loss
+    description: Log loss na predição concatenada.
+  - name: mean_calibration_slope
+    description: Inclinação de calibração na predição concatenada.
+  - name: mean_calibration_intercept
+    description: Intercepto de calibração na predição concatenada.
+  - name: mean_calibration_slope_error
+    description: Distância da inclinação de calibração até 1 na predição concatenada.
+  - name: mean_calibration_intercept_abs
+    description: Valor absoluto do intercepto de calibração na predição concatenada.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: fold_mean_ap
+    description: Média de AP entre folds válidos.
+  - name: std_ap
+    description: Desvio-padrão de AP entre folds válidos.
+  - name: fold_mean_roc_auc
+    description: Média de ROC AUC entre folds válidos.
+  - name: std_roc_auc
+    description: Desvio-padrão de ROC AUC entre folds válidos.
+  - name: fold_mean_brier
+    description: Média de Brier entre folds válidos.
+  - name: std_brier
+    description: Desvio-padrão de Brier entre folds válidos.
+  - name: fold_mean_log_loss
+    description: Média de log loss entre folds válidos.
+  - name: std_log_loss
+    description: Desvio-padrão de log loss entre folds válidos.
+  - name: fold_mean_calibration_slope
+    description: Média da inclinação de calibração entre folds válidos.
+  - name: fold_mean_calibration_intercept
+    description: Média do intercepto de calibração entre folds válidos.
+  - name: fold_mean_calibration_slope_error
+    description: Média da distância da inclinação até 1.
+  - name: fold_mean_calibration_intercept_abs
+    description: Média do valor absoluto do intercepto.
+  - name: pareto_frontier_flag
+    description: Flag indicando presença na fronteira de Pareto.
+- name: ml_core_model_predictions
+  description: Predições externas dos modelos avaliados.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: first_month
+    description: Primeiro mês observado do professor.
+  - name: y_true
+    description: Valor observado do alvo binário.
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: score
+    description: Probabilidade prevista de atividade futura.
+  - name: technical_fold_valid_flag
+    description: Flag indicando se o fold era tecnicamente calculável.
+  - name: fold_valid_flag
+    description: Flag indicando se o fold conta no resumo oficial.
+  - name: invalid_reason
+    description: Motivo de invalidação do fold ou da saída.
+- name: ml_core_navigation_sequences
+  description: Sequências iniciais de navegação observadas na jornada.
+  columns:
+  - name: step_sequence_first5
+    description: Step sequence first5.
+  - name: teachers
+    description: Teachers.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: label_value
+    description: Label valor.
+- name: ml_core_navigation_transitions
+  description: Transições entre passos de navegação na jornada inicial.
+  columns:
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: label_value
+    description: Label valor.
+  - name: from_token
+    description: From token.
+  - name: to_token
+    description: To token.
+  - name: teachers
+    description: Teachers.
+- name: ml_core_prediction_bootstrap
+  description: Intervalos bootstrap das métricas probabilísticas das predições oficiais.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: ci_low
+    description: Limite inferior do intervalo.
+  - name: ci_high
+    description: Limite superior do intervalo.
+  - name: ci_width
+    description: Largura do intervalo.
+- name: ml_core_scoring_scenarios
+  description: Cenários oficiais de score com definição, trilha e conjunto elegível de variáveis.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: label_col
+    description: Coluna binária usada como alvo.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: score_window_end_day
+    description: Último dia disponível para leitura do score.
+  - name: feature_count
+    description: Quantidade de variáveis elegíveis.
+  - name: feature_names_json
+    description: Lista JSON das variáveis elegíveis.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: positives
+    description: Quantidade de casos positivos.
+  - name: negatives
+    description: Quantidade de casos negativos.
+  - name: months
+    description: Quantidade de meses distintos.
+- name: ml_governance_arbitrariness_registry
+  description: Registro das escolhas arbitrárias ou mecânicas expostas no estudo.
+  columns:
+  - name: choice_name
+    description: Nome da escolha registrada.
+  - name: choice_value
+    description: Choice valor.
+  - name: choice_type
+    description: Tipo da escolha registrada.
+  - name: where_used
+    description: Where used.
+  - name: status
+    description: Status do check.
+  - name: why
+    description: Why.
+  - name: in_official_report_flag
+    description: Flag indicando presença no relatório oficial.
+- name: ml_governance_definition_candidate_metric_registry
+  description: Registro das métricas permitidas na busca de candidatos de definição.
+  columns:
+  - name: metric_name
+    description: Nome da métrica.
+  - name: metric_type
+    description: Tipo da métrica.
+  - name: source_columns_json
+    description: Source columns json.
+  - name: definition_role
+    description: Definition role.
+  - name: definition_a_candidate_flag
+    description: Flag indicando definition a candidate.
+  - name: semantic_group
+    description: Semantic group.
+- name: ml_governance_feature_eligibility
+  description: Elegibilidade de cada variável por trilha de score.
+  columns:
+  - name: feature_name
+    description: Nome da variável.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: eligible_flag
+    description: Flag indicando eligible.
+  - name: feature_class
+    description: Feature classe.
+  - name: pit_class
+    description: Pit classe.
+  - name: behavior_family
+    description: Behavior family.
+- name: ml_governance_feature_registry
+  description: Registro das variáveis candidatas e suas classes analíticas.
+  columns:
+  - name: feature_name
+    description: Nome da variável.
+  - name: feature_type
+    description: Tipo da variável.
+  - name: source_table
+    description: Tabela de origem.
+  - name: source_columns_json
+    description: Source columns json.
+  - name: pit_class
+    description: Pit classe.
+  - name: behavior_family
+    description: Behavior family.
+  - name: feature_class
+    description: Feature classe.
+  - name: allowed_in_S1
+    description: Allowed in s1.
+  - name: allowed_in_S7
+    description: Allowed in s7.
+  - name: allowed_in_S1_PLUS_S7
+    description: Allowed in s1 plus s7.
+  - name: allowed_in_STRICT_CONTEXT
+    description: Allowed in strict context.
+- name: ml_governance_label_registry
+  description: Registro das definições futuras materializadas e suas regras.
+  columns:
+  - name: label_name
+    description: Label name.
+  - name: label_group
+    description: Label group.
+  - name: official_flag
+    description: Flag indicando official.
+  - name: source_table
+    description: Tabela de origem.
+  - name: source_columns_json
+    description: Source columns json.
+  - name: rule_json
+    description: Regra estruturada em JSON.
+  - name: window_start_day
+    description: Window start dia.
+  - name: window_end_day
+    description: Window end dia.
+- name: ml_governance_leakage_audit
+  description: Auditoria detalhada de leakage por variável e cenário.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: feature_name
+    description: Nome da variável.
+  - name: feature_source_table
+    description: Feature source table.
+  - name: feature_source_columns_json
+    description: Feature source columns json.
+  - name: feature_class
+    description: Feature classe.
+  - name: feature_pit_class
+    description: Feature pit classe.
+  - name: feature_behavior_family
+    description: Feature behavior family.
+  - name: label_source_table
+    description: Label source table.
+  - name: label_source_columns_json
+    description: Label source columns json.
+  - name: label_window_start_day
+    description: Label window start dia.
+  - name: label_window_end_day
+    description: Label window end dia.
+  - name: score_window_end_day
+    description: Último dia disponível para leitura do score.
+  - name: available_at_score_time_flag
+    description: Flag indicando available at score time.
+  - name: pit_safe_flag
+    description: Flag indicando pit safe.
+  - name: same_source_column_flag
+    description: Flag indicando same source column.
+  - name: source_table_matches_label_table_flag
+    description: Flag indicando source table matches label table.
+  - name: source_column_future_named_flag
+    description: Flag indicando source column future named.
+  - name: source_touches_future_window_flag
+    description: Flag indicando source touches future window.
+  - name: temporal_window_ok_flag
+    description: Flag indicando temporal window ok.
+  - name: high_risk_future_touch_flag
+    description: Flag indicando high risco future touch.
+  - name: definition_b_specific_flag
+    description: Flag indicando definition b specific.
+  - name: leakage_flag
+    description: Flag indicando leakage.
+- name: ml_governance_leakage_summary
+  description: Resumo expandido da auditoria de leakage.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: audited_features
+    description: Audited features.
+  - name: features_with_leakage_flag
+    description: Flag indicando features with leakage.
+  - name: features_with_source_overlap
+    description: Features with source overlap.
+  - name: features_with_future_named_source
+    description: Quantidade de variáveis com source nomeado como futuro.
+  - name: features_touching_label_source_table
+    description: Features touching label source table.
+  - name: features_with_temporal_violation
+    description: Features with temporal violation.
+  - name: features_with_high_risk_future_touch
+    description: Features with high risco future touch.
+  - name: all_features_available_at_score_time_flag
+    description: Flag indicando all features available at score time.
+  - name: all_features_pit_safe_flag
+    description: Flag indicando all features pit safe.
+  - name: any_leakage_flag
+    description: Flag indicando qualquer leakage.
+- name: ml_governance_policy_registry
+  description: Registro das políticas operacionais e analíticas publicadas.
+  columns:
+  - name: policy_group
+    description: Policy group.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: policy_value_json
+    description: Policy valor json.
+  - name: active_in_build_flag
+    description: Flag indicando atividade in build.
+  - name: official_flag
+    description: Flag indicando official.
+  - name: why
+    description: Why.
+- name: ml_governance_post_model_output_status
+  description: Status das saídas pós-modelo por problema, modelo e fold.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: post_model_output_name
+    description: Nome da saída pós-modelo.
+  - name: post_model_output_status
+    description: Status da saída pós-modelo.
+  - name: error_type
+    description: Tipo do erro ocorrido.
+  - name: error_message
+    description: Mensagem resumida do erro.
+  - name: traceback_snippet
+    description: Trecho resumido do traceback.
+- name: ml_governance_track_registry
+  description: Registro das trilhas de score e sua janela de leitura.
+  columns:
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: score_window_end_day
+    description: Último dia disponível para leitura do score.
+  - name: score_moment_text
+    description: Score moment text.
+  - name: allowed_feature_classes_json
+    description: Allowed feature classes json.
+  - name: official_flag
+    description: Flag indicando official.
+- name: ml_post_model_band_summary
+  description: Resumo das faixas de risco por política registrada.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: band_name
+    description: Nome da faixa de risco.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: share
+    description: Participação do grupo na base.
+- name: ml_post_model_cluster_assignment
+  description: Atribuição de cluster descritivo por caso publicado.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: cluster_id
+    description: Cluster id.
+  - name: cluster_name
+    description: Cluster name.
+  - name: cluster_k
+    description: Cluster k.
+  - name: cluster_silhouette
+    description: Cluster silhouette.
+- name: ml_post_model_cluster_profile
+  description: Perfil agregado dos clusters descritivos publicados.
+  columns:
+  - name: cluster_name
+    description: Cluster name.
+  - name: feature_name
+    description: Nome da variável.
+  - name: feature_mean
+    description: Feature mean.
+  - name: cluster_rows
+    description: Quantidade de linhas de cluster.
+- name: ml_post_model_cluster_summary
+  description: Resumo dos clusters descritivos publicados.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: cluster_name
+    description: Cluster name.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: mean_score
+    description: Média de score.
+  - name: mean_risk_score
+    description: Média de risco score.
+  - name: realized_inactivity_rate
+    description: Taxa realizada de inatividade.
+  - name: share
+    description: Participação do grupo na base.
+- name: ml_post_model_cluster_validation
+  description: Métricas de validação dos clusters descritivos publicados.
+  columns:
+  - name: iteration_id
+    description: Iteration id.
+  - name: cluster_k
+    description: Cluster k.
+  - name: silhouette
+    description: Silhouette.
+  - name: stability_ari_vs_full
+    description: Stability ari vs full.
+  - name: selected_cluster_k
+    description: Selected cluster k.
+  - name: selected_cluster_silhouette
+    description: Selected cluster silhouette.
+- name: ml_post_model_confusion_matrix
+  description: Matriz de confusão operacional por política de cutoff.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: actual_group
+    description: Grupo observado na matriz de confusão.
+  - name: predicted_group
+    description: Grupo previsto na matriz de confusão.
+  - name: rows
+    description: Quantidade de linhas.
+- name: ml_post_model_cv_confusion_folds
+  description: Matriz de confusão por fold e política de cutoff.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: actual_group
+    description: Grupo observado na matriz de confusão.
+  - name: predicted_group
+    description: Grupo previsto na matriz de confusão.
+  - name: rows
+    description: Quantidade de linhas.
+- name: ml_post_model_cv_confusion_summary
+  description: Resumo da robustez da matriz de confusão por fold.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: actual_group
+    description: Grupo observado na matriz de confusão.
+  - name: predicted_group
+    description: Grupo previsto na matriz de confusão.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: mean_rows
+    description: Quantidade de linhas de mean.
+  - name: std_rows
+    description: Desvio-padrão da quantidade de linhas entre folds.
+  - name: min_rows
+    description: Quantidade de linhas de min.
+  - name: max_rows
+    description: Quantidade de linhas de máxima.
+  - name: max_fold_to_fold_jump
+    description: Maior salto entre folds consecutivos.
+  - name: fold_order_slope
+    description: Inclinação da métrica ao longo da ordem dos folds.
+  - name: fold_order_pvalue
+    description: P-valor da inclinação por permutação.
+- name: ml_post_model_cv_threshold_folds
+  description: Métricas por fold das políticas de cutoff.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: risk_threshold
+    description: Cutoff de risco usado na política.
+  - name: tp
+    description: Verdadeiros positivos.
+  - name: fp
+    description: Falsos positivos.
+  - name: tn
+    description: Verdadeiros negativos.
+  - name: fn
+    description: Falsos negativos.
+  - name: precision
+    description: Precisão no cutoff.
+  - name: recall
+    description: Recall no cutoff.
+  - name: f1
+    description: F1 no cutoff.
+  - name: accuracy
+    description: Acurácia no cutoff.
+  - name: predicted_positive_rate
+    description: Taxa prevista como positiva no cutoff.
+- name: ml_post_model_cv_threshold_summary
+  description: Resumo da robustez das políticas de cutoff por fold.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: valid_folds
+    description: Quantidade de folds externos válidos.
+  - name: mean_value
+    description: Valor médio entre folds válidos.
+  - name: std_value
+    description: Desvio-padrão entre folds válidos.
+  - name: min_value
+    description: Menor valor observado.
+  - name: max_value
+    description: Maior valor observado.
+  - name: value_range
+    description: Amplitude entre o menor e o maior valor.
+  - name: max_fold_to_fold_jump
+    description: Maior salto entre folds consecutivos.
+  - name: fold_order_slope
+    description: Inclinação da métrica ao longo da ordem dos folds.
+  - name: fold_order_pvalue
+    description: P-valor da inclinação por permutação.
+- name: ml_post_model_feature_importance
+  description: Importância por permutação dos modelos de referência.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: definition_name
+    description: Nome da definição futura.
+  - name: track_name
+    description: Nome da trilha de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: fold_id
+    description: Identificador do fold externo.
+  - name: feature_name
+    description: Nome da variável.
+  - name: importance_mean
+    description: Importância média por permutação.
+  - name: importance_std
+    description: Desvio-padrão da importância por permutação.
+- name: ml_post_model_heavy_user_profile
+  description: Perfil agregado do proxy de heavy user.
+  columns:
+  - name: heavy_user_flag
+    description: Flag indicando heavy user.
+  - name: metric_name
+    description: Nome da métrica.
+  - name: metric_mean
+    description: Metric mean.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: heavy_cutoff
+    description: Heavy cutoff.
+- name: ml_post_model_heavy_user_scores
+  description: Scores do proxy de heavy user por caso.
+  columns:
+  - name: teacher_unique_id
+    description: Identificador único do professor.
+  - name: heavy_intensity_raw
+    description: Heavy intensity brutas.
+  - name: heavy_intensity_score
+    description: Heavy intensity score.
+  - name: heavy_intensity_pc_explained_variance
+    description: Heavy intensity pc explained variance.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: heavy_cutoff
+    description: Heavy cutoff.
+  - name: heavy_user_flag
+    description: Flag indicando heavy user.
+- name: ml_post_model_heavy_user_summary
+  description: Resumo do proxy de heavy user publicado.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: heavy_user_flag
+    description: Flag indicando heavy user.
+  - name: rows
+    description: Quantidade de linhas.
+  - name: mean_score
+    description: Média de score.
+  - name: mean_risk_score
+    description: Média de risco score.
+  - name: realized_inactivity_rate
+    description: Taxa realizada de inatividade.
+  - name: share
+    description: Participação do grupo na base.
+- name: ml_post_model_monthly_fit
+  description: Ajuste mensal entre risco previsto e risco realizado.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: monthly_r2
+    description: R² entre risco previsto e realizado por mês.
+  - name: monthly_mape_positive_months
+    description: MAPE mensal considerando só meses com risco realizado positivo.
+  - name: months_used
+    description: Quantidade de meses usados no ajuste mensal.
+- name: ml_post_model_reference_selection
+  description: Escopo final de referência usado no relatório.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: selection_reason
+    description: Motivo da seleção no escopo de referência.
+- name: ml_post_model_threshold_metrics
+  description: Métricas operacionais por política de cutoff.
+  columns:
+  - name: problem_key
+    description: Chave do problema de score.
+  - name: model_name
+    description: Nome da família de modelo.
+  - name: policy_name
+    description: Nome da política registrada.
+  - name: risk_threshold
+    description: Cutoff de risco usado na política.
+  - name: tp
+    description: Verdadeiros positivos.
+  - name: fp
+    description: Falsos positivos.
+  - name: tn
+    description: Verdadeiros negativos.
+  - name: fn
+    description: Falsos negativos.
+  - name: precision
+    description: Precisão no cutoff.
+  - name: recall
+    description: Recall no cutoff.
+  - name: f1
+    description: F1 no cutoff.
+  - name: accuracy
+    description: Acurácia no cutoff.
+  - name: predicted_positive_rate
+    description: Taxa prevista como positiva no cutoff.

@@ -1,30 +1,22 @@
-"""Camada de serving FastAPI, predição de diabetes"""
+"""Camada de serving FastAPI, com inferência Kedro e jobs assíncronos."""
 
 from __future__ import annotations
 
 import logging
 import os
-import pickle
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
-import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi import Depends, FastAPI, HTTPException, Response, Security, status
 from fastapi.security import APIKeyHeader
+from kedro.io import DatasetError
 from pydantic import BaseModel, ConfigDict, Field
 
-from insper_deploy_kedro.pipelines.data_engineering.nodes import (
-    add_features,
-    clean_data,
-    transform_encoders,
-    transform_scalers,
-)
-from insper_deploy_kedro.pipelines.inference.nodes import predict
+from insper_deploy_kedro import serving_runtime
+from insper_deploy_kedro.logging_utils import configure_project_logging
 
+configure_project_logging()
 logger = logging.getLogger(__name__)
-
-_artifacts: dict[str, Any] = {}
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -39,7 +31,25 @@ def _verify_api_key(
     return api_key
 
 
-#Schema
+class RunResponse(BaseModel):
+    """Response de disparo de job assíncrono."""
+
+    run_id: str
+    status: str
+
+
+class RunStatus(BaseModel):
+    """Status de execução de job assíncrono."""
+
+    run_id: str
+    status: str
+    pipeline: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    result: Any | None = None
+
+
 class DiabetesFeatures(BaseModel):
     """Features de entrada pra um paciente."""
 
@@ -68,6 +78,8 @@ class PredictionResult(BaseModel):
 
     prediction: str
     prediction_proba: float | None = None
+    risk_score: float | None = None
+    risk_band: str | None = None
 
 
 class InferenceResponse(BaseModel):
@@ -84,37 +96,50 @@ class HealthResponse(BaseModel):
     model_version: str | None = None
 
 
-#Artefatos (treinados localmente, inferencia pode ser pelo google cloud run)
+def _sanitize_run_error(error: str | None) -> str | None:
+    if error is None:
+        return None
+    return error.splitlines()[0].strip()
 
-def _load_pickle(path: Path) -> Any:
-    with open(path, "rb") as fh:
-        return pickle.load(fh)
+
+def _public_run_status(run_id: str, entry: dict[str, Any]) -> RunStatus:
+    public_entry = entry.copy()
+    public_entry["error"] = _sanitize_run_error(public_entry.get("error"))
+    return RunStatus(run_id=run_id, **public_entry)
+
+
+def _serialize_predictions(predictions_frame: Any) -> InferenceResponse:
+    records = predictions_frame.to_dict(orient="records")
+    predictions = [
+        PredictionResult(
+            prediction=str(record["prediction"]),
+            prediction_proba=(
+                float(record["prediction_proba"])
+                if record.get("prediction_proba") is not None
+                else None
+            ),
+            risk_score=(
+                float(record["risk_score"])
+                if record.get("risk_score") is not None
+                else None
+            ),
+            risk_band=(
+                str(record["risk_band"])
+                if record.get("risk_band") is not None
+                else None
+            ),
+        )
+        for record in records
+    ]
+    return InferenceResponse(predictions=predictions)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Carrega artefatos de produção uma vez na inicialização."""
-    project_root = Path.cwd()
-    models_dir = project_root / "data" / "06_models"
-
-    try:
-        _artifacts["encoders"] = _load_pickle(models_dir / "production_encoders.pkl")
-        _artifacts["scalers"] = _load_pickle(models_dir / "production_scalers.pkl")
-        _artifacts["model"] = _load_pickle(models_dir / "production_model.pkl")
-        _artifacts["inference_raw_columns"] = {
-            "categorical": [],
-            "numerical": list(DiabetesFeatures.model_fields.keys()),
-        }
-        _artifacts["model_version"] = _artifacts["model"].get("class_path", "unknown")
-        logger.info("Artefatos de produção carregados de %s", models_dir)
-    except FileNotFoundError:
-        logger.warning("Artefatos não encontrados em %s — rode kedro run primeiro", models_dir)
-
+    """Inicializa bootstrap Kedro uma vez no startup."""
+    serving_runtime.ensure_bootstrap()
     yield
-    _artifacts.clear()
 
-
-# Camada de Aplicação
 
 app = FastAPI(
     title="API de Predição de Diabetes",
@@ -123,15 +148,67 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Health check q estava faltando
-@app.get("/health", response_model=HealthResponse)
-def health_check() -> HealthResponse:
-    """Probe de liveness / readiness."""
-    return HealthResponse(
-        status="healthy",
-        model_loaded=bool(_artifacts),
-        model_version=_artifacts.get("model_version"),
+
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    responses={503: {"model": HealthResponse}},
+)
+def health_check(response: Response) -> HealthResponse:
+    """Readiness probe for production inference artifacts."""
+    production_status = serving_runtime.get_production_status()
+    model_loaded = bool(production_status.get("model_loaded"))
+    response.status_code = (
+        status.HTTP_200_OK if model_loaded else status.HTTP_503_SERVICE_UNAVAILABLE
     )
+    return HealthResponse(
+        status="healthy" if model_loaded else "unhealthy",
+        model_loaded=model_loaded,
+        model_version=production_status.get("model_version"),
+    )
+
+
+@app.post("/train", response_model=RunResponse)
+def start_training(
+    _key: str | None = Depends(_verify_api_key),
+) -> RunResponse:
+    """Dispara treino completo (DE + modelling + refit) em background."""
+    run_id = serving_runtime.start_training_run()
+    return RunResponse(run_id=run_id, status="pending")
+
+
+@app.get("/train/{run_id}", response_model=RunStatus)
+def get_training_status(
+    run_id: str,
+    _key: str | None = Depends(_verify_api_key),
+) -> RunStatus:
+    """Consulta o status de um treino em background."""
+    entry = serving_runtime.get_run_status(run_id)
+    if entry is None or entry.get("pipeline") != "train":
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    return _public_run_status(run_id, entry)
+
+
+@app.post("/batch-inference", response_model=RunResponse)
+def start_batch_inference(
+    _key: str | None = Depends(_verify_api_key),
+) -> RunResponse:
+    """Dispara a pipeline Kedro de inferência em background usando o catálogo."""
+    run_id = serving_runtime.start_batch_inference_run()
+    return RunResponse(run_id=run_id, status="pending")
+
+
+@app.get("/batch-inference/{run_id}", response_model=RunStatus)
+def get_batch_inference_status(
+    run_id: str,
+    _key: str | None = Depends(_verify_api_key),
+) -> RunStatus:
+    """Consulta o status de uma inferência batch em background."""
+    entry = serving_runtime.get_run_status(run_id)
+    if entry is None or entry.get("pipeline") != "batch-inference":
+        raise HTTPException(status_code=404, detail="Run not found")
+    return _public_run_status(run_id, entry)
 
 
 @app.post("/inference", response_model=InferenceResponse)
@@ -139,32 +216,24 @@ def run_inference(
     request: InferenceRequest,
     _key: str | None = Depends(_verify_api_key),
 ) -> InferenceResponse:
-    """Roda o pipeline completo de inferência num batch de pacientes"""
-    if not _artifacts:
-        raise HTTPException(status_code=503, detail="Model artifacts not loaded")
+    """Roda a pipeline Kedro real de inferência num batch de pacientes."""
+    instances = [inst.model_dump() for inst in request.instances]
 
     try:
-        raw_df = pd.DataFrame([inst.model_dump() for inst in request.instances])
-
-        cleaned = clean_data(raw_df, _artifacts["inference_raw_columns"])
-        featured = add_features(cleaned)
-        encoded = transform_encoders(featured, _artifacts["encoders"])
-        scaled = transform_scalers(encoded, _artifacts["scalers"])
-        result = predict(scaled, _artifacts["model"])
-
-        predictions = [
-            PredictionResult(
-                prediction=str(row["prediction"]),
-                prediction_proba=(
-                    float(row["prediction_proba"])
-                    if "prediction_proba" in row
-                    else None
-                ),
-            )
-            for _, row in result.iterrows()
-        ]
-        return InferenceResponse(predictions=predictions)
-
-    except Exception as exc:
-        logger.exception("Inferência falhou")
+        predictions_frame = serving_runtime.run_online_inference(instances)
+        return _serialize_predictions(predictions_frame)
+    except (DatasetError, FileNotFoundError, OSError) as exc:
+        logger.exception("Online inference unavailable")
+        raise HTTPException(
+            status_code=503,
+            detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
+    except (KeyError, ValueError) as exc:
+        logger.exception("Online inference rejected the payload")
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Online inference failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"{type(exc).__name__}: {exc}",
+        ) from exc

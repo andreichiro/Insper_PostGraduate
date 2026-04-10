@@ -1,0 +1,3220 @@
+version: 2
+sources:
+- name: raw_conceptual
+  description: Camada documental das tabelas raw que originam a base modelada. Essas fontes existem para explicar a linhagem
+    e o significado dos dados brutos, mesmo quando a transformação raw -> modeled acontece fora deste projeto dbt.
+  schema: main
+  tables:
+  - name: dim_teachers
+    description: Tabela dimensão que armazena informações dos professores cadastrados na plataforma AprendiZAP.
+    columns:
+    - name: unique_id
+      description: Identificador único do professor.
+    - name: utm_origin
+      description: Origem UTM do cadastro.
+    - name: tela_origem
+      description: Tela de origem do cadastro.
+    - name: estado
+      description: Estado ou UF do professor.
+    - name: total_alunos
+      description: Total de alunos do professor.
+    - name: tipo_total_alunos
+      description: Tipo de alunos diretos ou indiretos imputados pelo professor.
+    - name: alunos_diretos
+      description: Quantidade de alunos diretos.
+    - name: alunos_indiretos
+      description: Quantidade de alunos indiretos.
+    - name: login_google
+      description: Indicador se usa login via Google.
+    - name: currentstage
+      description: Etapa ou série atual em que leciona.
+    - name: currentsubject
+      description: Disciplina atual em que leciona.
+    - name: selectedstages
+      description: Etapas selecionadas pelo professor.
+    - name: selectedsubjectsem
+      description: Disciplinas selecionadas para Ensino Médio.
+    - name: selectedsubjectsfundii
+      description: Disciplinas selecionadas para Fundamental II.
+    - name: visualizou_metodologia_ativa
+      description: Flag se visualizou metodologia ativa.
+    - name: data_entrada
+      description: Data de entrada na plataforma.
+  - name: fct_teachers_contents_interactions
+    description: Tabela de fatos que registra as interações dos professores com conteúdos da plataforma.
+    columns:
+    - name: unique_id
+      description: Identificador único do professor.
+    - name: user_type
+      description: Tipo do usuário.
+    - name: user_agent_device_type
+      description: Tipo de dispositivo usado.
+    - name: data_inicio
+      description: Data e hora de início da interação.
+    - name: event_type
+      description: Tipo do evento ou interação.
+    - name: content_type
+      description: Tipo do conteúdo acessado.
+    - name: id_aula
+      description: Identificador da aula.
+    - name: utm_source
+      description: Fonte UTM da sessão.
+  - name: fct_teachers_entries
+    description: Tabela de fatos que registra as entradas dos professores na plataforma.
+    columns:
+    - name: unique_id
+      description: Identificador único do professor.
+    - name: user_type
+      description: Tipo do usuário.
+    - name: data_inicio
+      description: Data e hora de início da sessão.
+    - name: data_fim
+      description: Data e hora de fim da sessão.
+  - name: fct_mari_ia_eventos_isso_ajudou
+    description: Tabela de fatos que registra interações com a Mari IA e avalia as respostas recebidas.
+    columns:
+    - name: user_id
+      description: Identificador do usuário associado ao evento.
+    - name: date
+      description: Data da interação.
+    - name: turno
+      description: Turno da interação.
+    - name: key
+      description: Chave do evento ou atributo reportado.
+    - name: isso_ajudou
+      description: Resposta textual sobre se a interação ajudou.
+    - name: isso_ajudou_num
+      description: Resposta numérica sobre se a interação ajudou.
+  - name: stg_formation
+    description: Tabela de staging que registra interações dos usuários com cursos de formação.
+    columns:
+    - name: unique_id_aprendizap
+      description: Identificador do usuário no AprendiZAP.
+    - name: itemid
+      description: ID do item do curso.
+    - name: createdat
+      description: Data de criação do registro.
+    - name: updatedat
+      description: Data da última atualização.
+    - name: type
+      description: Tipo do item do curso.
+    - name: completionstatus
+      description: Status de conclusão.
+    - name: progress
+      description: Progresso percentual.
+    - name: questionstatus
+      description: Status das questões.
+    - name: coursemodulecount
+      description: Quantidade de módulos do curso.
+    - name: moduleblockcount
+      description: Quantidade de blocos do módulo.
+    - name: quizquestioncount
+      description: Quantidade de questões do quiz.
+  - name: stg_mari_ia_conversation
+    description: Tabela de staging que armazena conversas com a IA Mari em dados anteriores a 21/02/2025.
+    columns:
+    - name: id_mari
+      description: Identificador da conversa ou thread na Mari.
+    - name: createdat
+      description: Data de criação da conversa.
+    - name: updatedat
+      description: Data da última atualização.
+    - name: userlastmessage
+      description: Última mensagem enviada pelo usuário.
+    - name: ailastmessage
+      description: Última mensagem enviada pela IA.
+    - name: originsource
+      description: Fonte de origem da conversa.
+    - name: userreaction
+      description: Reação do usuário à resposta.
+    - name: unique_id_aprendizap
+      description: Identificador reconciliado do usuário no AprendiZAP.
+  - name: stg_mari_ia_reports
+    description: Tabela de staging com relatórios estruturados das interações com a IA Mari em dados posteriores a 20/02/2025.
+    columns:
+    - name: id_mari
+      description: Identificador da conversa ou thread na Mari.
+    - name: updatedat
+      description: Data da última atualização.
+    - name: key
+      description: Chave do atributo reportado.
+    - name: value
+      description: Valor do atributo reportado.
+    - name: metadata
+      description: Metadados em JSON.
+    - name: unique_id_aprendizap
+      description: Identificador reconciliado do usuário no AprendiZAP.
+  - name: stg_lessons
+    description: Tabela de staging que armazena metadados educacionais das aulas disponíveis na plataforma.
+    columns:
+    - name: id_aula
+      description: Identificação da aula.
+    - name: titulo
+      description: Título da aula.
+    - name: nivel
+      description: Nível de ensino.
+    - name: ano
+      description: Ano de ensino.
+    - name: ano_em
+      description: Ano no recorte de Ensino Médio quando aplicável.
+    - name: disciplina
+      description: Disciplina de ensino.
+    - name: unidade
+      description: Unidade de ensino.
+    - name: bncc
+      description: BNCC atrelada à aula.
+    - name: possui_metodologia_ativa
+      description: Flag que identifica se existe metodologia ativa.
+    - name: total_metodologias_ativa
+      description: Contagem de metodologias ativas.
+  - name: hotjar_pesquisa_mobile
+    description: Tabela contendo informações sobre pesquisas quanto ao uso do AprendiZAP em contexto mobile.
+    columns:
+    - name: User
+      description: Identificação do usuário.
+    - name: Date Submitted
+      description: Data de envio da resposta.
+    - name: Country
+      description: País do usuário.
+    - name: Source URL
+      description: Fonte da pesquisa.
+    - name: Device
+      description: Tipo de dispositivo.
+    - name: Browser
+      description: Tipo de navegador.
+    - name: OS
+      description: Sistema operacional.
+    - name: Hotjar User ID
+      description: Identificação do usuário no CRM.
+    - name: Como você avalia a sua experiência?
+      description: Avaliação da experiência.
+    - name: Conte-nos sobre a sua experiência...
+      description: Descrição da experiência.
+    - name: Você topa conversar com a gente para melhorar sua experiência?
+      description: Disponibilidade para conversar com o time.
+    - name: 'Sentiment for: Conte-nos sobre a sua experiência...'
+      description: Sentimento do comentário aberto.
+  - name: hotjar_pesquisa_desktop
+    description: Tabela contendo informações sobre pesquisas quanto ao uso do AprendiZAP em contexto desktop.
+    columns:
+    - name: User
+      description: Identificação do usuário.
+    - name: Date Submitted
+      description: Data de envio da resposta.
+    - name: Country
+      description: País do usuário.
+    - name: Source URL
+      description: Fonte da pesquisa.
+    - name: Device
+      description: Tipo de dispositivo.
+    - name: Browser
+      description: Tipo de navegador.
+    - name: OS
+      description: Sistema operacional.
+    - name: Hotjar User ID
+      description: Identificação do usuário no CRM.
+    - name: Como você avalia a sua experiência?
+      description: Avaliação da experiência.
+    - name: Conte-nos sobre a sua experiência...
+      description: Descrição da experiência.
+    - name: Você topa conversar com a gente para melhorar sua experiência?
+      description: Disponibilidade para conversar com o time.
+    - name: 'Sentiment for: Conte-nos sobre a sua experiência...'
+      description: Sentimento do comentário aberto.
+  - name: hotjar_teste_interesse
+    description: Tabela contendo informações sobre pesquisas quanto ao uso do AprendiZAP voltadas a interesse e engajamento.
+    columns:
+    - name: User
+      description: Identificação do usuário.
+    - name: Date Submitted
+      description: Data de envio da resposta.
+    - name: Country
+      description: País do usuário.
+    - name: Source URL
+      description: Fonte da pesquisa.
+    - name: Device
+      description: Tipo de dispositivo.
+    - name: Browser
+      description: Tipo de navegador.
+    - name: OS
+      description: Sistema operacional.
+    - name: Hotjar User ID
+      description: Identificação do usuário no CRM.
+    - name: Quais estratégias você utiliza para engajar os alunos desinteressados?
+      description: Estratégias usadas para engajar alunos desinteressados.
+    - name: Quão útil seria para você discutir desafios educacionais com outros educadores através da nossa plataforma?
+      description: Utilidade percebida de discutir desafios com outros educadores.
+    - name: 'Sentiment for: Quais estratégias você utiliza para engajar os alunos desinteressados?'
+      description: Sentimento do comentário sobre estratégias.
+  - name: school_calendar
+    description: Calendário escolar raw usado para enriquecer a dimensão de calendário da base modelada.
+    columns:
+    - name: year
+      description: Ano de referência.
+    - name: month
+      description: Mês numérico de referência.
+    - name: month_start
+      description: Início do mês de referência.
+    - name: uf
+      description: UF do calendário.
+    - name: rede
+      description: Rede de ensino.
+    - name: business_days
+      description: Quantidade de dias úteis estimados no mês.
+    - name: official_holiday_weekdays
+      description: Quantidade de feriados oficiais em dias úteis.
+    - name: school_days_estimate
+      description: Estimativa de dias letivos no mês.
+    - name: calendar_source
+      description: Fonte do calendário consolidado.
+- name: modeled_base
+  description: Base modelada oficial usada pelo pipeline de ML. Aqui entram fatos, dimensões e marts limpos, prontos para
+    reconstruir a jornada inicial e medir atividade futura.
+  database: modelled_base
+  schema: main
+  tables:
+  - name: audit_base_modelada_validation
+    description: Auditoria final de validação estrutural da base modelada.
+    columns:
+    - name: check_name
+      description: Nome do check de validação.
+    - name: metric_value
+      description: Valor medido no check.
+    - name: status
+      description: Status do check.
+    - name: note
+      description: Observação complementar do check.
+  - name: audit_persona_feature_readiness
+    description: Auditoria de prontidão das variáveis usadas em personas e clustering.
+    columns:
+    - name: feature_name
+      description: Nome da variável auditada.
+    - name: feature_level
+      description: Nível analítico da variável.
+    - name: feature_role
+      description: Papel analítico da variável.
+    - name: definition
+      description: Definição curta da variável.
+    - name: missing_rate
+      description: Proporção de valores ausentes.
+    - name: zero_share
+      description: Proporção de valores zero.
+    - name: std
+      description: Desvio-padrão da variável.
+    - name: recommended_for_persona_analysis
+      description: Flag indicando recomendação para personas.
+    - name: recommended_for_persona_ranges
+      description: Flag indicando recomendação para faixas.
+    - name: recommended_for_behavior_clustering
+      description: Flag indicando recomendação para clustering.
+    - name: caveat
+      description: Ressalva metodológica da variável.
+  - name: base_modelada_v2
+    description: Painel mensal principal da base modelada com contexto e uso por professor.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: month
+      description: Mês de referência.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: teacher_utm_origin
+      description: Origem UTM do cadastro.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_tela_origem
+      description: Tela de origem do cadastro.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_total_alunos
+      description: Total de alunos informado.
+    - name: teacher_tipo_total_alunos
+      description: Tipo do total de alunos informado.
+    - name: teacher_alunos_diretos
+      description: Quantidade de alunos diretos.
+    - name: teacher_alunos_indiretos
+      description: Quantidade de alunos indiretos.
+    - name: teacher_login_google
+      description: Uso de login via Google.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_currentsubject
+      description: Disciplina atual do professor.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_selectedstages
+      description: Etapas selecionadas no cadastro.
+    - name: teacher_selectedsubjectsem
+      description: Disciplinas selecionadas no Ensino Médio.
+    - name: teacher_selectedsubjectsfundii
+      description: Disciplinas selecionadas no Fundamental II.
+    - name: teacher_visualizou_metodologia_ativa
+      description: Visualização de metodologia ativa.
+    - name: teacher_data_entrada
+      description: Data de entrada do professor.
+    - name: has_registered_entry
+      description: Flag indicando presença de sessão registrada.
+    - name: has_registered_interaction
+      description: Flag indicando presença de interação registrada.
+    - name: has_formation
+      description: Flag indicando presença de formação.
+    - name: is_estado_missing
+      description: Flag de ausência de estado informado.
+    - name: is_utm_missing
+      description: Flag de ausência de origem UTM.
+    - name: is_tela_origem_missing
+      description: Flag de ausência de tela de origem.
+    - name: is_total_alunos_missing
+      description: Flag de ausência de total de alunos.
+    - name: is_tipo_total_alunos_missing
+      description: Flag de ausência de tipo do total de alunos.
+    - name: is_alunos_diretos_missing
+      description: Flag de ausência de quantidade de alunos diretos.
+    - name: is_alunos_indiretos_missing
+      description: Flag de ausência de quantidade de alunos indiretos.
+    - name: is_login_google_missing
+      description: Flag de ausência de login via Google.
+    - name: is_currentstage_missing
+      description: Flag de ausência de etapa atual.
+    - name: is_currentsubject_missing
+      description: Flag de ausência de disciplina atual.
+    - name: is_selectedstages_missing
+      description: Flag de ausência de etapas selecionadas.
+    - name: is_selectedsubjectsem_missing
+      description: Flag de ausência de disciplinas selecionadas do Ensino Médio.
+    - name: is_selectedsubjectsfundii_missing
+      description: Flag de ausência de disciplinas selecionadas do Fundamental II.
+    - name: is_visualizou_metodologia_ativa_missing
+      description: Flag de ausência de visualização de metodologia ativa.
+    - name: is_total_alunos_negative
+      description: Flag de valor negativo em total de alunos.
+    - name: is_alunos_diretos_negative
+      description: Flag de valor negativo em quantidade de alunos diretos.
+    - name: is_alunos_indiretos_negative
+      description: Flag de valor negativo em quantidade de alunos indiretos.
+    - name: is_login_google_invalid
+      description: Flag de valor inválido em login via Google.
+    - name: raw_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada brutas.
+    - name: ping_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada do tipo ping.
+    - name: clean_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada limpas.
+    - name: clean_entry_total_session_minutes_month
+      description: Quantidade mensal de minutos em sessões de entrada limpas.
+    - name: clean_entry_avg_session_minutes_month
+      description: Média mensal de minutos por sessão de entrada limpa.
+    - name: interaction_rows_month
+      description: Quantidade mensal de linhas de interação.
+    - name: activity_events_month
+      description: Quantidade mensal de eventos de atividade.
+    - name: active_days_month
+      description: Quantidade mensal de dias ativos.
+    - name: aula_events_month
+      description: Quantidade mensal de eventos de aula.
+    - name: plano_events_month
+      description: Quantidade mensal de eventos de plano.
+    - name: prova_events_month
+      description: Quantidade mensal de eventos de prova.
+    - name: ia_events_month
+      description: Quantidade mensal de eventos de IA.
+    - name: download_count_month
+      description: Quantidade mensal de downloads.
+    - name: download_aula_count_month
+      description: Quantidade mensal de downloads de aula.
+    - name: download_plano_count_month
+      description: Quantidade mensal de downloads de plano.
+    - name: strict_download_count_month
+      description: Quantidade mensal de downloads estritos.
+    - name: content_views_month
+      description: Quantidade mensal de visualizações de conteúdo.
+    - name: other_activity_non_download_events_month
+      description: Quantidade mensal de eventos de atividade não ligados a download.
+    - name: mapped_lessons_month
+      description: Quantidade mensal de aulas mapeadas.
+    - name: interaction_signal_flag
+      description: Flag indicando presença de sinal de interação.
+    - name: entry_signal_flag
+      description: Flag indicando presença de sinal de sessão de entrada.
+    - name: clean_entry_signal_flag
+      description: Flag indicando presença de sinal de sessão limpa de entrada.
+    - name: only_ping_entry_flag
+      description: Flag indicando presença apenas de ping sessão de entrada.
+    - name: any_signal_flag
+      description: Flag indicando qualquer sinal observado.
+    - name: month_signal_class
+      description: Classe mensal de sinal observado.
+    - name: strict_value_flag
+      description: Flag indicando valor estrito.
+    - name: active_user_flag
+      description: Flag indicando usuário ativo no mês.
+    - name: viewed_aula_flag
+      description: Flag indicando visualização de aula.
+    - name: viewed_plano_flag
+      description: Flag indicando visualização de plano.
+    - name: viewed_prova_flag
+      description: Flag indicando visualização de prova.
+    - name: used_ia_flag
+      description: Flag indicando uso de IA.
+    - name: used_desktop_flag
+      description: Flag indicando uso de desktop.
+    - name: used_mobile_flag
+      description: Flag indicando uso de mobile.
+    - name: no_download_flag
+      description: Flag indicando ausência de download.
+    - name: no_download_view_only_flag
+      description: Flag indicando apenas visualização sem download.
+    - name: no_download_view_plus_action_flag
+      description: Flag indicando visualização e ação sem download.
+    - name: no_download_action_only_flag
+      description: Flag indicando ação sem download.
+    - name: clean_entry_exposed_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem download.
+    - name: clean_entry_exposed_no_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+    - name: clean_entry_exposed_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+    - name: month_num
+      description: Número sequencial do mês observado.
+    - name: next_month
+      description: Mês seguinte observado.
+    - name: next_month_observed_flag
+      description: Flag indicando observação de mês seguinte.
+    - name: returned_active_m1
+      description: Flag indicando retorno de atividade no 1º mês.
+    - name: returned_strict_value_m1
+      description: Flag indicando retorno de valor estrito no 1º mês.
+    - name: returned_any_download_m1
+      description: Flag indicando retorno de qualquer download no 1º mês.
+    - name: strict_user_flag
+      description: Flag indicando usuário estrito.
+    - name: strict_return_value_m1
+      description: Valor estrito realizado no 1º mês seguinte.
+    - name: lifetime_active_months
+      description: Quantidade histórica de meses ativos.
+    - name: lifetime_clean_entry_minutes_total
+      description: Total histórico de minutos em sessões de entrada limpas.
+    - name: active_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade.
+    - name: active_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade.
+    - name: strict_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade estrita.
+    - name: strict_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade estrita.
+  - name: bridge_mari_conversation_teacher
+    description: Bridge de resolução entre identificadores da Mari e teacher_unique_id.
+    columns:
+    - name: id_mari
+      description: Identificador bruto da Mari.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: teacher_resolution_count
+      description: Quantidade de resoluções candidatas encontradas.
+    - name: is_unambiguous
+      description: Flag indicando resolução sem ambiguidade.
+    - name: resolution_source
+      description: Fonte usada na reconciliação.
+    - name: teacher_candidates
+      description: Lista de professores candidatos.
+    - name: report_rows
+      description: Quantidade de linhas de report associadas.
+    - name: conv_rows
+      description: Quantidade de linhas de conversa associadas.
+  - name: bridge_teacher_identity_audit
+    description: Auditoria de reconciliação de identidade entre fontes raw e teacher_unique_id.
+    columns:
+    - name: source_table
+      description: Tabela de origem.
+    - name: source_key_name
+      description: Nome da chave observada na origem.
+    - name: source_key
+      description: Valor bruto da chave observada.
+    - name: source_user_types
+      description: Tipos de usuário observados na origem.
+    - name: resolution_path
+      description: Caminho usado na reconciliação.
+    - name: resolved_teacher_unique_id
+      description: Professor reconciliado.
+    - name: resolved_teacher_count
+      description: Quantidade de professores candidatos.
+    - name: is_unambiguous
+      description: Flag indicando resolução sem ambiguidade.
+    - name: source_key_domain
+      description: Domínio inferido da chave de origem.
+    - name: is_resolved_flag
+      description: Flag indicando se a chave foi resolvida.
+  - name: dim_calendar
+    description: Dimensão de calendário escolar usada como contexto temporal.
+    columns:
+    - name: calendar_year
+      description: Ano do calendário.
+    - name: calendar_month
+      description: Mês do calendário.
+    - name: month_start
+      description: Início do mês de referência.
+    - name: uf
+      description: UF de referência.
+    - name: rede
+      description: Rede de ensino.
+    - name: business_days
+      description: Quantidade de dias úteis no mês.
+    - name: official_holiday_weekdays
+      description: Quantidade de feriados em dias úteis.
+    - name: school_days_estimate
+      description: Estimativa de dias letivos no mês.
+    - name: calendar_source
+      description: Fonte do calendário.
+    - name: school_phase
+      description: Fase do período escolar.
+  - name: dim_device
+    description: Dimensão de dispositivo padronizado.
+    columns:
+    - name: device_group
+      description: Agrupamento padronizado do dispositivo.
+    - name: description
+      description: Descrição textual.
+  - name: dim_event
+    description: Dimensão semântica dos eventos observados nas interações.
+    columns:
+    - name: event_type
+      description: Tipo bruto do evento.
+    - name: event_family
+      description: Família semântica do evento.
+    - name: event_action
+      description: Ação semântica do evento.
+    - name: raw_rows_total
+      description: Quantidade total de linhas raw.
+    - name: core_rows_total
+      description: Quantidade total de linhas mantidas na camada core.
+    - name: core_activity_rows_total
+      description: Quantidade total de linhas de atividade na camada core.
+    - name: core_download_rows_total
+      description: Quantidade total de linhas de download na camada core.
+    - name: is_strict_value_event
+      description: Is estrita valor evento.
+    - name: is_download_event
+      description: Is download evento.
+    - name: is_visualization_event
+      description: Is visualization evento.
+    - name: is_navigation_event
+      description: Is navigation evento.
+    - name: is_activity_event
+      description: Is atividade evento.
+  - name: dim_lesson
+    description: Dimensão de aulas reconciliada com o catálogo educacional.
+    columns:
+    - name: lesson_id
+      description: Identificador reconciliado da aula.
+    - name: interaction_rows_total
+      description: Quantidade total de interações.
+    - name: distinct_teachers_total
+      description: Quantidade total de professores distintos.
+    - name: first_observed_ts
+      description: Primeiro timestamp observado.
+    - name: last_observed_ts
+      description: Último timestamp observado.
+    - name: download_events_total
+      description: Quantidade total de eventos de download.
+    - name: strict_download_events_total
+      description: Quantidade total de downloads estritos.
+    - name: content_view_events_total
+      description: Quantidade total de visualizações de conteúdo.
+    - name: lesson_metadata_matched_flag
+      description: Flag indicando se a aula foi conciliada ao catálogo.
+    - name: lesson_title
+      description: Título da aula.
+    - name: lesson_level
+      description: Nível de ensino da aula.
+    - name: lesson_year
+      description: Ano ou série da aula.
+    - name: lesson_year_em
+      description: Ano ou série conciliado para Ensino Médio.
+    - name: lesson_discipline
+      description: Disciplina da aula.
+    - name: lesson_discipline_group
+      description: Grupo analítico da disciplina da aula.
+    - name: lesson_unit
+      description: Unidade didática da aula.
+    - name: lesson_bncc
+      description: Lista de referências BNCC da aula.
+    - name: lesson_has_active_methodology
+      description: Flag indicando se a aula tem metodologia ativa.
+    - name: lesson_total_active_methodologies
+      description: Quantidade de metodologias ativas da aula.
+    - name: lesson_id_semantic
+      description: Identificador semântico da aula.
+    - name: raw_lesson_id_valid_flag
+      description: Flag indicando se o identificador bruto da aula é válido.
+    - name: is_active_methodology_missing
+      description: Flag de ausência da informação de metodologia ativa.
+    - name: is_metadata_missing
+      description: Flag de ausência de metadados da aula.
+  - name: dim_persona_range_candidates
+    description: Candidatos de faixas para leitura de personas.
+    columns:
+    - name: feature_name
+      description: Nome da variável.
+    - name: feature_level
+      description: Nível analítico da variável.
+    - name: population_used
+      description: Population used.
+    - name: n_rows
+      description: Quantidade de linhas usadas no cálculo.
+    - name: min_value
+      description: Menor valor observado.
+    - name: p10
+      description: Percentil 10.
+    - name: p25
+      description: Percentil 25.
+    - name: p50
+      description: Percentil 50.
+    - name: p75
+      description: Percentil 75.
+    - name: p90
+      description: Percentil 90.
+    - name: p95
+      description: Percentil 95.
+    - name: max_value
+      description: Maior valor observado.
+    - name: zero_share
+      description: Proporção de valores zero.
+    - name: note
+      description: Observação complementar do check.
+  - name: dim_teacher
+    description: Dimensão modelada de professores com cadastro, histórico e flags de qualidade.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: teacher_utm_origin
+      description: Origem UTM do cadastro.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_tela_origem
+      description: Tela de origem do cadastro.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_total_alunos
+      description: Total de alunos informado.
+    - name: teacher_tipo_total_alunos
+      description: Tipo do total de alunos informado.
+    - name: teacher_alunos_diretos
+      description: Quantidade de alunos diretos.
+    - name: teacher_alunos_indiretos
+      description: Quantidade de alunos indiretos.
+    - name: teacher_login_google
+      description: Uso de login via Google.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_currentsubject
+      description: Disciplina atual do professor.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_selectedstages
+      description: Etapas selecionadas no cadastro.
+    - name: teacher_selectedsubjectsem
+      description: Disciplinas selecionadas no Ensino Médio.
+    - name: teacher_selectedsubjectsfundii
+      description: Disciplinas selecionadas no Fundamental II.
+    - name: teacher_visualizou_metodologia_ativa
+      description: Visualização de metodologia ativa.
+    - name: teacher_data_entrada
+      description: Data de entrada do professor.
+    - name: teacher_first_observed_month
+      description: Primeiro mês observado do professor.
+    - name: teacher_last_observed_month
+      description: Último mês observado do professor.
+    - name: teacher_months_since_last_observed_month_dataset_end
+      description: Meses entre a última observação e o fim do dataset.
+    - name: teacher_observed_months_total
+      description: Quantidade total de meses observados.
+    - name: teacher_active_months_total
+      description: Quantidade total de meses ativos.
+    - name: teacher_strict_months_total
+      description: Quantidade total de meses ativos na definição estrita.
+    - name: teacher_total_strict_downloads
+      description: Total histórico de downloads estritos.
+    - name: teacher_total_downloads
+      description: Total histórico de downloads.
+    - name: teacher_total_clean_entry_sessions
+      description: Total histórico de sessões limpas.
+    - name: teacher_total_clean_entry_minutes
+      description: Total histórico de minutos em sessões limpas.
+    - name: teacher_active_streak_max_months
+      description: Maior sequência mensal de atividade.
+    - name: teacher_strict_streak_max_months
+      description: Maior sequência mensal de atividade estrita.
+    - name: has_registered_entry
+      description: Flag indicando presença de sessão registrada.
+    - name: has_registered_interaction
+      description: Flag indicando presença de interação registrada.
+    - name: has_formation
+      description: Flag indicando presença de formação.
+    - name: is_estado_missing
+      description: Flag de ausência de estado informado.
+    - name: is_utm_missing
+      description: Flag de ausência de origem UTM.
+    - name: is_tela_origem_missing
+      description: Flag de ausência de tela de origem.
+    - name: is_total_alunos_missing
+      description: Flag de ausência de total de alunos.
+    - name: is_tipo_total_alunos_missing
+      description: Flag de ausência de tipo do total de alunos.
+    - name: is_alunos_diretos_missing
+      description: Flag de ausência de quantidade de alunos diretos.
+    - name: is_alunos_indiretos_missing
+      description: Flag de ausência de quantidade de alunos indiretos.
+    - name: is_login_google_missing
+      description: Flag de ausência de login via Google.
+    - name: is_currentstage_missing
+      description: Flag de ausência de etapa atual.
+    - name: is_currentsubject_missing
+      description: Flag de ausência de disciplina atual.
+    - name: is_selectedstages_missing
+      description: Flag de ausência de etapas selecionadas.
+    - name: is_selectedsubjectsem_missing
+      description: Flag de ausência de disciplinas selecionadas do Ensino Médio.
+    - name: is_selectedsubjectsfundii_missing
+      description: Flag de ausência de disciplinas selecionadas do Fundamental II.
+    - name: is_visualizou_metodologia_ativa_missing
+      description: Flag de ausência de visualização de metodologia ativa.
+    - name: is_total_alunos_negative
+      description: Flag de valor negativo em total de alunos.
+    - name: is_alunos_diretos_negative
+      description: Flag de valor negativo em quantidade de alunos diretos.
+    - name: is_alunos_indiretos_negative
+      description: Flag de valor negativo em quantidade de alunos indiretos.
+    - name: is_login_google_invalid
+      description: Flag de valor inválido em login via Google.
+  - name: fct_formation_clean
+    description: Fato de formação limpo por evento de curso.
+    columns:
+    - name: formation_row_hash
+      description: Hash técnico do evento de formação.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: formation_ts
+      description: Timestamp de formação.
+    - name: formation_month
+      description: Mês de formação.
+    - name: item_id
+      description: Item id.
+    - name: item_type
+      description: Tipo do item.
+    - name: completion_status
+      description: Completion status.
+    - name: progress
+      description: Progress.
+    - name: question_status
+      description: Question status.
+    - name: course_module_count
+      description: Quantidade de course module.
+    - name: module_block_count
+      description: Quantidade de module block.
+    - name: quiz_question_count
+      description: Quantidade de quiz question.
+    - name: teacher_matched_flag
+      description: Flag indicando teacher matched.
+    - name: is_missing_timestamp
+      description: Is missing timestamp.
+    - name: is_complete_status
+      description: Is complete status.
+  - name: fct_interaction_clean
+    description: Fato de interações limpas com classificação semântica de evento.
+    columns:
+    - name: interaction_row_hash
+      description: Hash técnico da interação.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: interaction_month
+      description: Mês de interação.
+    - name: interaction_ts
+      description: Timestamp de interação.
+    - name: event_type
+      description: Tipo bruto do evento.
+    - name: content_type
+      description: Tipo de conteúdo.
+    - name: utm_source
+      description: Origem UTM da sessão.
+    - name: device_group
+      description: Agrupamento padronizado do dispositivo.
+    - name: event_family
+      description: Família semântica do evento.
+    - name: event_action
+      description: Ação semântica do evento.
+    - name: raw_lesson_id
+      description: Brutas aula id.
+    - name: id_aula_semantic
+      description: Id aulas semantic.
+    - name: lesson_join_allowed
+      description: Aula join allowed.
+    - name: lesson_mapped_flag
+      description: Flag indicando mapeamento de aula.
+    - name: lesson_id
+      description: Identificador reconciliado da aula.
+    - name: is_strict_value_event
+      description: Is estrita valor evento.
+    - name: is_download_event
+      description: Is download evento.
+    - name: is_visualization_event
+      description: Is visualization evento.
+    - name: is_navigation_event
+      description: Is navigation evento.
+    - name: is_activity_event
+      description: Is atividade evento.
+    - name: is_content_view_event
+      description: Is conteúdo visualização evento.
+    - name: is_other_activity_non_download_event
+      description: Is outras atividade não download evento.
+  - name: fct_mari_conversation_resolved
+    description: Fato resolvido das conversas da Mari IA.
+    columns:
+    - name: id_mari
+      description: Identificador bruto da Mari.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: mari_created_ts
+      description: Timestamp de mari created.
+    - name: mari_updated_ts
+      description: Timestamp de mari updated.
+    - name: mari_month
+      description: Mês de mari.
+    - name: origin_source
+      description: Fonte de origem.
+    - name: user_reaction
+      description: User reaction.
+    - name: has_user_message
+      description: Flag indicando presença de user message.
+    - name: has_ai_message
+      description: Flag indicando presença de ai message.
+    - name: is_mari_created_ts_missing
+      description: Flag de ausência de mari created ts.
+    - name: is_mari_updated_ts_missing
+      description: Flag de ausência de mari updated ts.
+  - name: fct_mari_help_resolved
+    description: Fato resolvido dos eventos de ajuda da Mari IA.
+    columns:
+    - name: id_mari
+      description: Identificador bruto da Mari.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: teacher_resolution_count
+      description: Quantidade de resoluções candidatas encontradas.
+    - name: is_unambiguous
+      description: Flag indicando resolução sem ambiguidade.
+    - name: resolution_source
+      description: Fonte usada na reconciliação.
+    - name: help_ts
+      description: Timestamp de ajuda.
+    - name: help_month
+      description: Mês de ajuda.
+    - name: turno
+      description: Turno.
+    - name: help_key
+      description: Ajuda key.
+    - name: isso_ajudou
+      description: Isso ajudou.
+    - name: isso_ajudou_num
+      description: Isso ajudou num.
+  - name: fct_mari_reports_resolved
+    description: Fato resolvido dos reports estruturados da Mari IA.
+    columns:
+    - name: id_mari
+      description: Identificador bruto da Mari.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: report_ts
+      description: Timestamp de report.
+    - name: report_month
+      description: Mês de report.
+    - name: report_key
+      description: Report key.
+    - name: report_value
+      description: Report valor.
+    - name: report_metadata
+      description: Report metadata.
+  - name: fct_session_clean
+    description: Fato de sessões limpas por sessão.
+    columns:
+    - name: session_row_hash
+      description: Hash técnico da sessão.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: user_type
+      description: Tipo de usuário.
+    - name: session_month
+      description: Mês de sessão.
+    - name: session_start_ts
+      description: Timestamp de sessão start.
+    - name: session_end_ts
+      description: Timestamp de sessão end.
+    - name: duration_sec
+      description: Duration em segundos.
+    - name: duration_min
+      description: Duration em minutos.
+  - name: fct_session_raw
+    description: Fato bruto de sessões antes dos filtros de limpeza.
+    columns:
+    - name: session_row_hash
+      description: Hash técnico da sessão.
+    - name: source_unique_id
+      description: Source unique id.
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: user_type
+      description: Tipo de usuário.
+    - name: session_month
+      description: Mês de sessão.
+    - name: session_start_ts
+      description: Timestamp de sessão start.
+    - name: session_end_ts
+      description: Timestamp de sessão end.
+    - name: duration_sec
+      description: Duration em segundos.
+    - name: is_negative_duration
+      description: Is negative duration.
+    - name: is_ping_session_le_5s
+      description: Is ping sessão le 5s.
+    - name: is_core_teacher_session
+      description: Is core teacher sessão.
+    - name: is_session_month_missing
+      description: Flag de ausência de sessão month.
+    - name: is_session_start_missing
+      description: Flag de ausência de sessão start.
+    - name: is_session_end_missing
+      description: Flag de ausência de sessão end.
+  - name: fct_teacher_month
+    description: Fato mensal por professor que sintetiza sessões e interações.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: month
+      description: Mês de referência.
+    - name: raw_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada brutas.
+    - name: ping_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada do tipo ping.
+    - name: clean_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada limpas.
+    - name: clean_entry_total_session_minutes_month
+      description: Quantidade mensal de minutos em sessões de entrada limpas.
+    - name: clean_entry_avg_session_minutes_month
+      description: Média mensal de minutos por sessão de entrada limpa.
+    - name: interaction_rows_month
+      description: Quantidade mensal de linhas de interação.
+    - name: activity_events_month
+      description: Quantidade mensal de eventos de atividade.
+    - name: active_days_month
+      description: Quantidade mensal de dias ativos.
+    - name: aula_events_month
+      description: Quantidade mensal de eventos de aula.
+    - name: plano_events_month
+      description: Quantidade mensal de eventos de plano.
+    - name: prova_events_month
+      description: Quantidade mensal de eventos de prova.
+    - name: ia_events_month
+      description: Quantidade mensal de eventos de IA.
+    - name: download_count_month
+      description: Quantidade mensal de downloads.
+    - name: download_aula_count_month
+      description: Quantidade mensal de downloads de aula.
+    - name: download_plano_count_month
+      description: Quantidade mensal de downloads de plano.
+    - name: strict_download_count_month
+      description: Quantidade mensal de downloads estritos.
+    - name: content_views_month
+      description: Quantidade mensal de visualizações de conteúdo.
+    - name: other_activity_non_download_events_month
+      description: Quantidade mensal de eventos de atividade não ligados a download.
+    - name: mapped_lessons_month
+      description: Quantidade mensal de aulas mapeadas.
+    - name: interaction_signal_flag
+      description: Flag indicando presença de sinal de interação.
+    - name: entry_signal_flag
+      description: Flag indicando presença de sinal de sessão de entrada.
+    - name: clean_entry_signal_flag
+      description: Flag indicando presença de sinal de sessão limpa de entrada.
+    - name: only_ping_entry_flag
+      description: Flag indicando presença apenas de ping sessão de entrada.
+    - name: any_signal_flag
+      description: Flag indicando qualquer sinal observado.
+    - name: month_signal_class
+      description: Classe mensal de sinal observado.
+    - name: strict_value_flag
+      description: Flag indicando valor estrito.
+    - name: active_user_flag
+      description: Flag indicando usuário ativo no mês.
+    - name: viewed_aula_flag
+      description: Flag indicando visualização de aula.
+    - name: viewed_plano_flag
+      description: Flag indicando visualização de plano.
+    - name: viewed_prova_flag
+      description: Flag indicando visualização de prova.
+    - name: used_ia_flag
+      description: Flag indicando uso de IA.
+    - name: used_desktop_flag
+      description: Flag indicando uso de desktop.
+    - name: used_mobile_flag
+      description: Flag indicando uso de mobile.
+    - name: no_download_flag
+      description: Flag indicando ausência de download.
+    - name: no_download_view_only_flag
+      description: Flag indicando apenas visualização sem download.
+    - name: no_download_view_plus_action_flag
+      description: Flag indicando visualização e ação sem download.
+    - name: no_download_action_only_flag
+      description: Flag indicando ação sem download.
+    - name: clean_entry_exposed_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem download.
+    - name: clean_entry_exposed_no_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+    - name: clean_entry_exposed_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+    - name: month_num
+      description: Número sequencial do mês observado.
+    - name: next_month
+      description: Mês seguinte observado.
+    - name: next_month_observed_flag
+      description: Flag indicando observação de mês seguinte.
+    - name: returned_active_m1
+      description: Flag indicando retorno de atividade no 1º mês.
+    - name: returned_strict_value_m1
+      description: Flag indicando retorno de valor estrito no 1º mês.
+    - name: returned_any_download_m1
+      description: Flag indicando retorno de qualquer download no 1º mês.
+    - name: strict_user_flag
+      description: Flag indicando usuário estrito.
+    - name: strict_return_value_m1
+      description: Valor estrito realizado no 1º mês seguinte.
+    - name: lifetime_active_months
+      description: Quantidade histórica de meses ativos.
+    - name: lifetime_clean_entry_minutes_total
+      description: Total histórico de minutos em sessões de entrada limpas.
+    - name: active_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade.
+    - name: active_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade.
+    - name: strict_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade estrita.
+    - name: strict_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade estrita.
+  - name: mart_teacher_cluster_ready
+    description: Mart por professor pronto para segmentação exploratória.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: cluster_analysis_eligible_flag
+      description: Flag indicando elegibilidade para cluster analysis.
+    - name: teacher_active_months_total
+      description: Quantidade total de meses ativos.
+    - name: teacher_strict_months_total
+      description: Quantidade total de meses ativos na definição estrita.
+    - name: teacher_active_month_share
+      description: Teacher atividade month share.
+    - name: teacher_strict_month_share
+      description: Teacher estrita month share.
+    - name: avg_activity_events_active_month
+      description: Mês de média atividade eventos atividade.
+    - name: std_activity_events_active_month
+      description: Mês de std atividade eventos atividade.
+    - name: avg_active_days_active_month
+      description: Mês de média atividade dias atividade.
+    - name: std_active_days_active_month
+      description: Mês de std atividade dias atividade.
+    - name: avg_strict_downloads_active_month
+      description: Mês de média estrita downloads atividade.
+    - name: std_strict_downloads_active_month
+      description: Mês de std estrita downloads atividade.
+    - name: avg_downloads_active_month
+      description: Mês de média downloads atividade.
+    - name: avg_content_views_active_month
+      description: Mês de média conteúdo visualizações atividade.
+    - name: avg_other_actions_active_month
+      description: Mês de média outras ações atividade.
+    - name: avg_aula_events_active_month
+      description: Mês de média aulas eventos atividade.
+    - name: avg_plano_events_active_month
+      description: Mês de média planos eventos atividade.
+    - name: avg_prova_events_active_month
+      description: Mês de média provas eventos atividade.
+    - name: avg_ia_events_active_month
+      description: Mês de média IA eventos atividade.
+    - name: avg_mapped_lessons_active_month
+      description: Mês de média mapeadas aulas atividade.
+    - name: avg_clean_entry_sessions_active_month
+      description: Mês de média limpas sessão de entrada sessões atividade.
+    - name: avg_clean_entry_minutes_active_month
+      description: Mês de média limpas sessão de entrada minutos atividade.
+    - name: teacher_clean_entry_coverage_share
+      description: Teacher limpas sessão de entrada coverage share.
+    - name: teacher_only_ping_month_share
+      description: Teacher apenas ping month share.
+    - name: teacher_interaction_without_entry_share
+      description: Teacher interação without sessão de entrada share.
+    - name: teacher_mobile_month_share
+      description: Teacher mobile month share.
+    - name: teacher_desktop_month_share
+      description: Teacher desktop month share.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+  - name: mart_teacher_month_cluster_ready
+    description: Mart mensal por professor pronto para segmentação exploratória.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: month
+      description: Mês de referência.
+    - name: month_num
+      description: Número sequencial do mês observado.
+    - name: cluster_analysis_eligible_flag
+      description: Flag indicando elegibilidade para cluster analysis.
+    - name: activity_events_month
+      description: Quantidade mensal de eventos de atividade.
+    - name: active_days_month
+      description: Quantidade mensal de dias ativos.
+    - name: strict_download_count_month
+      description: Quantidade mensal de downloads estritos.
+    - name: download_count_month
+      description: Quantidade mensal de downloads.
+    - name: content_views_month
+      description: Quantidade mensal de visualizações de conteúdo.
+    - name: other_activity_non_download_events_month
+      description: Quantidade mensal de eventos de atividade não ligados a download.
+    - name: aula_events_month
+      description: Quantidade mensal de eventos de aula.
+    - name: plano_events_month
+      description: Quantidade mensal de eventos de plano.
+    - name: prova_events_month
+      description: Quantidade mensal de eventos de prova.
+    - name: ia_events_month
+      description: Quantidade mensal de eventos de IA.
+    - name: mapped_lessons_month
+      description: Quantidade mensal de aulas mapeadas.
+    - name: clean_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada limpas.
+    - name: clean_entry_total_session_minutes_month
+      description: Quantidade mensal de minutos em sessões de entrada limpas.
+    - name: clean_entry_avg_session_minutes_month
+      description: Média mensal de minutos por sessão de entrada limpa.
+    - name: clean_entry_signal_flag
+      description: Flag indicando presença de sinal de sessão limpa de entrada.
+    - name: only_ping_entry_flag
+      description: Flag indicando presença apenas de ping sessão de entrada.
+    - name: interaction_signal_flag
+      description: Flag indicando presença de sinal de interação.
+    - name: month_signal_class
+      description: Classe mensal de sinal observado.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+    - name: used_desktop_flag
+      description: Flag indicando uso de desktop.
+    - name: used_mobile_flag
+      description: Flag indicando uso de mobile.
+  - name: mart_teacher_month_panel
+    description: Painel mensal expandido com meses observados e não observados por professor.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: month
+      description: Mês de referência.
+    - name: month_num
+      description: Número sequencial do mês observado.
+    - name: observed_month_flag
+      description: Flag indicando observado month.
+    - name: no_signal_month_flag
+      description: Flag indicando no sinal month.
+    - name: any_signal_flag
+      description: Flag indicando qualquer sinal observado.
+    - name: interaction_signal_flag
+      description: Flag indicando presença de sinal de interação.
+    - name: entry_signal_flag
+      description: Flag indicando presença de sinal de sessão de entrada.
+    - name: clean_entry_signal_flag
+      description: Flag indicando presença de sinal de sessão limpa de entrada.
+    - name: only_ping_entry_flag
+      description: Flag indicando presença apenas de ping sessão de entrada.
+    - name: month_signal_class
+      description: Classe mensal de sinal observado.
+    - name: active_user_flag
+      description: Flag indicando usuário ativo no mês.
+    - name: strict_value_flag
+      description: Flag indicando valor estrito.
+    - name: strict_download_count_month
+      description: Quantidade mensal de downloads estritos.
+    - name: download_count_month
+      description: Quantidade mensal de downloads.
+    - name: activity_events_month
+      description: Quantidade mensal de eventos de atividade.
+    - name: active_days_month
+      description: Quantidade mensal de dias ativos.
+    - name: content_views_month
+      description: Quantidade mensal de visualizações de conteúdo.
+    - name: other_activity_non_download_events_month
+      description: Quantidade mensal de eventos de atividade não ligados a download.
+    - name: aula_events_month
+      description: Quantidade mensal de eventos de aula.
+    - name: plano_events_month
+      description: Quantidade mensal de eventos de plano.
+    - name: prova_events_month
+      description: Quantidade mensal de eventos de prova.
+    - name: ia_events_month
+      description: Quantidade mensal de eventos de IA.
+    - name: mapped_lessons_month
+      description: Quantidade mensal de aulas mapeadas.
+    - name: raw_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada brutas.
+    - name: ping_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada do tipo ping.
+    - name: clean_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada limpas.
+    - name: clean_entry_total_session_minutes_month
+      description: Quantidade mensal de minutos em sessões de entrada limpas.
+    - name: clean_entry_avg_session_minutes_month
+      description: Média mensal de minutos por sessão de entrada limpa.
+    - name: months_since_last_signal
+      description: Months since último sinal.
+    - name: months_since_last_active
+      description: Months since último atividade.
+    - name: months_since_last_strict_value
+      description: Months since último estrita valor.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+  - name: mart_teacher_month_persona_ready
+    description: Mart mensal por professor pronto para leitura de personas.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: month
+      description: Mês de referência.
+    - name: month_num
+      description: Número sequencial do mês observado.
+    - name: observed_month_flag
+      description: Flag indicando observado month.
+    - name: persona_analysis_eligible_flag
+      description: Flag indicando elegibilidade para persona analysis.
+    - name: active_user_flag
+      description: Flag indicando usuário ativo no mês.
+    - name: strict_value_flag
+      description: Flag indicando valor estrito.
+    - name: strict_user_flag
+      description: Flag indicando usuário estrito.
+    - name: returned_active_m1
+      description: Flag indicando retorno de atividade no 1º mês.
+    - name: returned_any_download_m1
+      description: Flag indicando retorno de qualquer download no 1º mês.
+    - name: returned_strict_value_m1
+      description: Flag indicando retorno de valor estrito no 1º mês.
+    - name: strict_return_value_m1
+      description: Valor estrito realizado no 1º mês seguinte.
+    - name: next_month_observed_flag
+      description: Flag indicando observação de mês seguinte.
+    - name: interaction_rows_month
+      description: Quantidade mensal de linhas de interação.
+    - name: activity_events_month
+      description: Quantidade mensal de eventos de atividade.
+    - name: active_days_month
+      description: Quantidade mensal de dias ativos.
+    - name: raw_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada brutas.
+    - name: ping_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada do tipo ping.
+    - name: clean_entry_session_count_month
+      description: Quantidade mensal de sessões de entrada limpas.
+    - name: clean_entry_total_session_minutes_month
+      description: Quantidade mensal de minutos em sessões de entrada limpas.
+    - name: clean_entry_avg_session_minutes_month
+      description: Média mensal de minutos por sessão de entrada limpa.
+    - name: strict_download_count_month
+      description: Quantidade mensal de downloads estritos.
+    - name: download_count_month
+      description: Quantidade mensal de downloads.
+    - name: download_aula_count_month
+      description: Quantidade mensal de downloads de aula.
+    - name: download_plano_count_month
+      description: Quantidade mensal de downloads de plano.
+    - name: content_views_month
+      description: Quantidade mensal de visualizações de conteúdo.
+    - name: other_activity_non_download_events_month
+      description: Quantidade mensal de eventos de atividade não ligados a download.
+    - name: aula_events_month
+      description: Quantidade mensal de eventos de aula.
+    - name: plano_events_month
+      description: Quantidade mensal de eventos de plano.
+    - name: prova_events_month
+      description: Quantidade mensal de eventos de prova.
+    - name: ia_events_month
+      description: Quantidade mensal de eventos de IA.
+    - name: mapped_lessons_month
+      description: Quantidade mensal de aulas mapeadas.
+    - name: interaction_signal_flag
+      description: Flag indicando presença de sinal de interação.
+    - name: entry_signal_flag
+      description: Flag indicando presença de sinal de sessão de entrada.
+    - name: clean_entry_signal_flag
+      description: Flag indicando presença de sinal de sessão limpa de entrada.
+    - name: only_ping_entry_flag
+      description: Flag indicando presença apenas de ping sessão de entrada.
+    - name: any_signal_flag
+      description: Flag indicando qualquer sinal observado.
+    - name: month_signal_class
+      description: Classe mensal de sinal observado.
+    - name: used_desktop_flag
+      description: Flag indicando uso de desktop.
+    - name: used_mobile_flag
+      description: Flag indicando uso de mobile.
+    - name: used_ia_flag
+      description: Flag indicando uso de IA.
+    - name: no_download_flag
+      description: Flag indicando ausência de download.
+    - name: no_download_view_only_flag
+      description: Flag indicando apenas visualização sem download.
+    - name: no_download_view_plus_action_flag
+      description: Flag indicando visualização e ação sem download.
+    - name: no_download_action_only_flag
+      description: Flag indicando ação sem download.
+    - name: clean_entry_exposed_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem download.
+    - name: clean_entry_exposed_no_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada sem atividade e sem download.
+    - name: clean_entry_exposed_activity_no_download_flag
+      description: Flag indicando exposição em sessão limpa de entrada com atividade, mas sem download.
+    - name: lifetime_active_months
+      description: Quantidade histórica de meses ativos.
+    - name: lifetime_clean_entry_minutes_total
+      description: Total histórico de minutos em sessões de entrada limpas.
+    - name: active_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade.
+    - name: active_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade.
+    - name: strict_streak_current_months
+      description: Quantidade de meses na sequência corrente de atividade estrita.
+    - name: strict_streak_max_months
+      description: Quantidade de meses na maior sequência de atividade estrita.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_total_alunos
+      description: Total de alunos informado.
+    - name: teacher_tipo_total_alunos
+      description: Tipo do total de alunos informado.
+    - name: is_estado_missing
+      description: Flag de ausência de estado informado.
+    - name: is_currentsubject_missing
+      description: Flag de ausência de disciplina atual.
+    - name: is_utm_missing
+      description: Flag de ausência de origem UTM.
+    - name: is_total_alunos_missing
+      description: Flag de ausência de total de alunos.
+    - name: is_tipo_total_alunos_missing
+      description: Flag de ausência de tipo do total de alunos.
+  - name: mart_teacher_persona_ready
+    description: Mart por professor pronto para leitura de personas.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_total_alunos
+      description: Total de alunos informado.
+    - name: teacher_tipo_total_alunos
+      description: Tipo do total de alunos informado.
+    - name: teacher_months_since_last_observed_month_dataset_end
+      description: Meses entre a última observação e o fim do dataset.
+    - name: is_estado_missing
+      description: Flag de ausência de estado informado.
+    - name: is_currentsubject_missing
+      description: Flag de ausência de disciplina atual.
+    - name: is_utm_missing
+      description: Flag de ausência de origem UTM.
+    - name: is_total_alunos_missing
+      description: Flag de ausência de total de alunos.
+    - name: is_tipo_total_alunos_missing
+      description: Flag de ausência de tipo do total de alunos.
+    - name: teacher_first_observed_month
+      description: Primeiro mês observado do professor.
+    - name: teacher_last_observed_month
+      description: Último mês observado do professor.
+    - name: teacher_observed_months_total
+      description: Quantidade total de meses observados.
+    - name: teacher_active_months_total
+      description: Quantidade total de meses ativos.
+    - name: teacher_strict_months_total
+      description: Quantidade total de meses ativos na definição estrita.
+    - name: teacher_persona_eligible_months_total
+      description: Teacher persona eligible months total.
+    - name: teacher_active_month_share
+      description: Teacher atividade month share.
+    - name: teacher_strict_month_share
+      description: Teacher estrita month share.
+    - name: teacher_persona_analysis_eligible_flag
+      description: Flag indicando elegibilidade para teacher persona analysis.
+    - name: avg_activity_events_active_month
+      description: Mês de média atividade eventos atividade.
+    - name: std_activity_events_active_month
+      description: Mês de std atividade eventos atividade.
+    - name: avg_active_days_active_month
+      description: Mês de média atividade dias atividade.
+    - name: std_active_days_active_month
+      description: Mês de std atividade dias atividade.
+    - name: avg_strict_downloads_active_month
+      description: Mês de média estrita downloads atividade.
+    - name: std_strict_downloads_active_month
+      description: Mês de std estrita downloads atividade.
+    - name: avg_downloads_active_month
+      description: Mês de média downloads atividade.
+    - name: avg_content_views_active_month
+      description: Mês de média conteúdo visualizações atividade.
+    - name: avg_other_actions_active_month
+      description: Mês de média outras ações atividade.
+    - name: avg_aula_events_active_month
+      description: Mês de média aulas eventos atividade.
+    - name: avg_plano_events_active_month
+      description: Mês de média planos eventos atividade.
+    - name: avg_prova_events_active_month
+      description: Mês de média provas eventos atividade.
+    - name: avg_ia_events_active_month
+      description: Mês de média IA eventos atividade.
+    - name: avg_mapped_lessons_active_month
+      description: Mês de média mapeadas aulas atividade.
+    - name: avg_clean_entry_sessions_active_month
+      description: Mês de média limpas sessão de entrada sessões atividade.
+    - name: avg_clean_entry_minutes_active_month
+      description: Mês de média limpas sessão de entrada minutos atividade.
+    - name: teacher_clean_entry_coverage_share
+      description: Teacher limpas sessão de entrada coverage share.
+    - name: teacher_only_ping_month_share
+      description: Teacher apenas ping month share.
+    - name: teacher_interaction_without_entry_share
+      description: Teacher interação without sessão de entrada share.
+    - name: teacher_mobile_month_share
+      description: Teacher mobile month share.
+    - name: teacher_desktop_month_share
+      description: Teacher desktop month share.
+    - name: teacher_no_download_month_share
+      description: Teacher no download month share.
+    - name: teacher_view_only_no_download_month_share
+      description: Teacher visualização apenas no download month share.
+    - name: teacher_view_plus_action_no_download_month_share
+      description: Teacher visualização mais ação no download month share.
+    - name: teacher_action_only_no_download_month_share
+      description: Teacher ação apenas no download month share.
+    - name: teacher_returned_active_rate_observed
+      description: Teacher retorno atividade rate observado.
+    - name: teacher_returned_download_rate_observed
+      description: Teacher retorno download rate observado.
+    - name: teacher_strict_user_rate_observed
+      description: Teacher estrita user rate observado.
+    - name: teacher_active_streak_max_months
+      description: Maior sequência mensal de atividade.
+    - name: teacher_strict_streak_max_months
+      description: Maior sequência mensal de atividade estrita.
+- name: ml_outputs
+  description: Saídas materializadas do pipeline Python de ML. O dbt documenta, descreve e conecta essas tabelas à base modelada
+    oficial.
+  schema: main
+  tables:
+  - name: core_cv_metric_folds_v1
+    description: Robustez por fold das métricas probabilísticas do modelo.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: metric_value
+      description: Valor medido na auditoria.
+  - name: core_cv_metric_summary_v1
+    description: Resumo de robustez por fold das métricas probabilísticas.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: mean_value
+      description: Valor médio entre folds válidos.
+    - name: std_value
+      description: Desvio-padrão entre folds válidos.
+    - name: min_value
+      description: Menor valor observado.
+    - name: max_value
+      description: Maior valor observado.
+    - name: value_range
+      description: Amplitude entre o menor e o maior valor.
+    - name: max_fold_to_fold_jump
+      description: Maior salto entre folds consecutivos.
+    - name: fold_order_slope
+      description: Inclinação da métrica ao longo da ordem dos folds.
+    - name: fold_order_pvalue
+      description: P-valor da inclinação por permutação.
+  - name: core_cv_score_folds_v1
+    description: Robustez por fold da distribuição de score e risco.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: mean_score
+      description: Média de score.
+    - name: mean_risk_score
+      description: Média de risco score.
+    - name: realized_risk_rate
+      description: Taxa realizada de risco.
+    - name: score_std
+      description: Desvio-padrão do score.
+    - name: risk_score_std
+      description: Desvio-padrão do risk_score.
+  - name: core_cv_score_summary_v1
+    description: Resumo de robustez por fold da distribuição de score e risco.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: mean_value
+      description: Valor médio entre folds válidos.
+    - name: std_value
+      description: Desvio-padrão entre folds válidos.
+    - name: min_value
+      description: Menor valor observado.
+    - name: max_value
+      description: Maior valor observado.
+    - name: value_range
+      description: Amplitude entre o menor e o maior valor.
+    - name: max_fold_to_fold_jump
+      description: Maior salto entre folds consecutivos.
+    - name: fold_order_slope
+      description: Inclinação da métrica ao longo da ordem dos folds.
+    - name: fold_order_pvalue
+      description: P-valor da inclinação por permutação.
+  - name: core_definition_b_excessive_separation_v1
+    description: Diagnóstico de separação excessiva na Definição B.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: mean_ap
+      description: Average Precision na predição concatenada.
+    - name: mean_roc_auc
+      description: ROC AUC na predição concatenada.
+    - name: mean_brier
+      description: Brier score na predição concatenada.
+    - name: mean_log_loss
+      description: Log loss na predição concatenada.
+    - name: mean_calibration_slope_error
+      description: Distância da inclinação de calibração até 1 na predição concatenada.
+    - name: mean_calibration_intercept_abs
+      description: Valor absoluto do intercepto de calibração na predição concatenada.
+    - name: std_ap
+      description: Desvio-padrão de AP entre folds válidos.
+    - name: std_brier
+      description: Desvio-padrão de Brier entre folds válidos.
+    - name: std_log_loss
+      description: Desvio-padrão de log loss entre folds válidos.
+    - name: ap_good_percentile
+      description: Percentil favorável de AP dentro da trilha.
+    - name: roc_auc_good_percentile
+      description: Percentil favorável de ROC AUC dentro da trilha.
+    - name: brier_good_percentile
+      description: Percentil favorável de Brier dentro da trilha.
+    - name: log_loss_good_percentile
+      description: Percentil favorável de log loss dentro da trilha.
+    - name: calibration_good_percentile
+      description: Percentil favorável de calibração dentro da trilha.
+    - name: stability_good_percentile
+      description: Percentil favorável de estabilidade dentro da trilha.
+    - name: combined_separation_score
+      description: Score combinado de separação.
+    - name: combined_separation_percentile_within_track
+      description: Percentil do score combinado de separação dentro da trilha.
+    - name: comparator_rows_in_track
+      description: Quantidade de comparadores disponíveis na trilha.
+    - name: red_flag_eligible_flag
+      description: Flag indicando elegibilidade para red flag.
+    - name: excessive_separation_red_flag
+      description: Flag indicando excessive separation red.
+  - name: core_definition_b_feature_block_gain_folds_v1
+    description: Ganho incremental por bloco de sinais da Definição B em nível de fold.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: technical_fold_valid_flag
+      description: Flag indicando se o fold era tecnicamente calculável.
+    - name: fold_valid_flag
+      description: Flag indicando se o fold conta no resumo oficial.
+    - name: inner_valid_splits
+      description: Inner valid splits.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: test_positive_rate
+      description: Test positive rate.
+    - name: tuning_applied_flag
+      description: Flag indicando se houve tuning.
+    - name: tuning_status
+      description: Status do tuning.
+    - name: tuning_valid_splits
+      description: Quantidade de splits internos válidos no tuning.
+    - name: tuning_best_score
+      description: Melhor score encontrado no tuning.
+    - name: best_params_json
+      description: Melhores hiperparâmetros em JSON.
+    - name: invalid_reason
+      description: Motivo de invalidação do fold ou da saída.
+    - name: ap
+      description: Average Precision do fold.
+    - name: roc_auc
+      description: ROC AUC do fold.
+    - name: brier
+      description: Brier score do fold.
+    - name: log_loss
+      description: Log loss do fold.
+    - name: calibration_slope
+      description: Inclinação de calibração.
+    - name: calibration_intercept
+      description: Intercepto de calibração.
+    - name: calibration_slope_error
+      description: Distância da inclinação de calibração até 1.
+    - name: calibration_intercept_abs
+      description: Valor absoluto do intercepto de calibração.
+    - name: reference_problem_key
+      description: Problema de referência usado no diagnóstico.
+    - name: block_name
+      description: Nome do bloco de variáveis testado.
+    - name: block_type
+      description: Tipo do bloco de variáveis.
+    - name: selected_feature_count
+      description: Quantidade de variáveis no bloco testado.
+    - name: added_feature_count
+      description: Quantidade de variáveis adicionadas sobre o baseline.
+    - name: selected_feature_names_json
+      description: Lista JSON das variáveis selecionadas no bloco.
+    - name: added_feature_names_json
+      description: Lista JSON das variáveis adicionadas sobre o baseline.
+    - name: diagnostic_problem_key
+      description: Problema diagnóstico derivado do bloco de variáveis.
+  - name: core_definition_b_feature_block_gain_summary_v1
+    description: Resumo do ganho incremental por bloco de sinais da Definição B.
+    columns:
+    - name: reference_problem_key
+      description: Problema de referência usado no diagnóstico.
+    - name: diagnostic_problem_key
+      description: Problema diagnóstico derivado do bloco de variáveis.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: block_name
+      description: Nome do bloco de variáveis testado.
+    - name: block_type
+      description: Tipo do bloco de variáveis.
+    - name: selected_feature_count
+      description: Quantidade de variáveis no bloco testado.
+    - name: added_feature_count
+      description: Quantidade de variáveis adicionadas sobre o baseline.
+    - name: selected_feature_names_json
+      description: Lista JSON das variáveis selecionadas no bloco.
+    - name: added_feature_names_json
+      description: Lista JSON das variáveis adicionadas sobre o baseline.
+    - name: pooled_rows
+      description: Quantidade de linhas na predição concatenada.
+    - name: pooled_positives
+      description: Quantidade de positivos na predição concatenada.
+    - name: pooled_negatives
+      description: Quantidade de negativos na predição concatenada.
+    - name: pooled_positive_rate
+      description: Taxa positiva na predição concatenada.
+    - name: mean_ap
+      description: Average Precision na predição concatenada.
+    - name: mean_roc_auc
+      description: ROC AUC na predição concatenada.
+    - name: mean_brier
+      description: Brier score na predição concatenada.
+    - name: mean_log_loss
+      description: Log loss na predição concatenada.
+    - name: mean_calibration_slope
+      description: Inclinação de calibração na predição concatenada.
+    - name: mean_calibration_intercept
+      description: Intercepto de calibração na predição concatenada.
+    - name: mean_calibration_slope_error
+      description: Distância da inclinação de calibração até 1 na predição concatenada.
+    - name: mean_calibration_intercept_abs
+      description: Valor absoluto do intercepto de calibração na predição concatenada.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: fold_mean_ap
+      description: Média de AP entre folds válidos.
+    - name: std_ap
+      description: Desvio-padrão de AP entre folds válidos.
+    - name: fold_mean_roc_auc
+      description: Média de ROC AUC entre folds válidos.
+    - name: std_roc_auc
+      description: Desvio-padrão de ROC AUC entre folds válidos.
+    - name: fold_mean_brier
+      description: Média de Brier entre folds válidos.
+    - name: std_brier
+      description: Desvio-padrão de Brier entre folds válidos.
+    - name: fold_mean_log_loss
+      description: Média de log loss entre folds válidos.
+    - name: std_log_loss
+      description: Desvio-padrão de log loss entre folds válidos.
+    - name: fold_mean_calibration_slope
+      description: Média da inclinação de calibração entre folds válidos.
+    - name: fold_mean_calibration_intercept
+      description: Média do intercepto de calibração entre folds válidos.
+    - name: fold_mean_calibration_slope_error
+      description: Média da distância da inclinação até 1.
+    - name: fold_mean_calibration_intercept_abs
+      description: Média do valor absoluto do intercepto.
+    - name: baseline_mean_ap
+      description: AP do baseline de contexto.
+    - name: baseline_mean_roc_auc
+      description: ROC AUC do baseline de contexto.
+    - name: baseline_mean_brier
+      description: Brier do baseline de contexto.
+    - name: baseline_mean_log_loss
+      description: Log loss do baseline de contexto.
+    - name: delta_ap_vs_context
+      description: Ganho de AP sobre o baseline de contexto.
+    - name: delta_roc_auc_vs_context
+      description: Ganho de ROC AUC sobre o baseline de contexto.
+    - name: brier_improvement_vs_context
+      description: Melhora de Brier sobre o baseline de contexto.
+    - name: log_loss_improvement_vs_context
+      description: Melhora de log loss sobre o baseline de contexto.
+    - name: uplift_metric_positive_count
+      description: Quantidade de métricas de ganho positivas.
+    - name: mean_uplift_percentile
+      description: Percentil médio de ganho do bloco.
+    - name: abnormal_uplift_flag
+      description: Flag de ganho anormal sobre o baseline.
+    - name: delta_ap_vs_context_percentile
+      description: Diferença de ap vs context percentile.
+    - name: delta_roc_auc_vs_context_percentile
+      description: Diferença de roc auc vs context percentile.
+    - name: brier_improvement_vs_context_percentile
+      description: Percentil da melhora de Brier sobre o baseline de contexto.
+    - name: log_loss_improvement_vs_context_percentile
+      description: Percentil da melhora de log loss sobre o baseline de contexto.
+  - name: core_definition_candidates_test_frontier_v1
+    description: Diagnóstico em teste dos candidatos de definição futura.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: candidate_type
+      description: Tipo do candidato de definição.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: threshold
+      description: Threshold aplicado na regra.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: rule_text
+      description: Regra em texto para exibição.
+    - name: rule_size
+      description: Quantidade de componentes da regra.
+    - name: rule_operator
+      description: Operador usado na regra.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: split_role
+      description: Split role.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: prevalence
+      description: Prevalence.
+    - name: prevalence_entropy
+      description: Entropia da prevalência do label.
+    - name: monthly_prevalence_mean
+      description: Monthly prevalence mean.
+    - name: monthly_prevalence_std
+      description: Desvio-padrão da prevalência mensal.
+    - name: bootstrap_prevalence_ci_low
+      description: Bootstrap prevalence ci low.
+    - name: bootstrap_prevalence_ci_high
+      description: Bootstrap prevalence ci high.
+    - name: bootstrap_prevalence_ci_width
+      description: Largura do intervalo bootstrap da prevalência.
+    - name: candidate_valid_flag
+      description: Flag indicando candidate valid.
+    - name: gap_returned_active_post_label_m1
+      description: Gap de retorno atividade pós label m1.
+    - name: gap_returned_active_post_label_m2
+      description: Gap de retorno atividade pós label m2.
+    - name: gap_returned_active_post_label_m3
+      description: Gap de retorno atividade pós label m3.
+    - name: gap_active_days_post_label_3m
+      description: Gap de atividade dias pós label 3m.
+    - name: gap_sustained_active_2of3_post_label
+      description: Gap de sustained atividade 2of3 pós label.
+  - name: core_definition_candidates_train_v1
+    description: Diagnóstico em treino dos candidatos de definição futura.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: candidate_type
+      description: Tipo do candidato de definição.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: threshold
+      description: Threshold aplicado na regra.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: rule_text
+      description: Regra em texto para exibição.
+    - name: rule_size
+      description: Quantidade de componentes da regra.
+    - name: rule_operator
+      description: Operador usado na regra.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: split_role
+      description: Split role.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: prevalence
+      description: Prevalence.
+    - name: prevalence_entropy
+      description: Entropia da prevalência do label.
+    - name: monthly_prevalence_mean
+      description: Monthly prevalence mean.
+    - name: monthly_prevalence_std
+      description: Desvio-padrão da prevalência mensal.
+    - name: bootstrap_prevalence_ci_low
+      description: Bootstrap prevalence ci low.
+    - name: bootstrap_prevalence_ci_high
+      description: Bootstrap prevalence ci high.
+    - name: bootstrap_prevalence_ci_width
+      description: Largura do intervalo bootstrap da prevalência.
+    - name: candidate_valid_flag
+      description: Flag indicando candidate valid.
+    - name: gap_returned_active_post_label_m1
+      description: Gap de retorno atividade pós label m1.
+    - name: gap_returned_active_post_label_m2
+      description: Gap de retorno atividade pós label m2.
+    - name: gap_returned_active_post_label_m3
+      description: Gap de retorno atividade pós label m3.
+    - name: gap_active_days_post_label_3m
+      description: Gap de atividade dias pós label 3m.
+    - name: gap_sustained_active_2of3_post_label
+      description: Gap de sustained atividade 2of3 pós label.
+  - name: core_definition_external_validation_v1
+    description: Validação externa temporal das definições futuras.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: candidate_type
+      description: Tipo do candidato de definição.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: threshold
+      description: Threshold aplicado na regra.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: rule_text
+      description: Regra em texto para exibição.
+    - name: rule_size
+      description: Quantidade de componentes da regra.
+    - name: rule_operator
+      description: Operador usado na regra.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: split_role
+      description: Split role.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: prevalence
+      description: Prevalence.
+    - name: prevalence_entropy
+      description: Entropia da prevalência do label.
+    - name: monthly_prevalence_mean
+      description: Monthly prevalence mean.
+    - name: monthly_prevalence_std
+      description: Desvio-padrão da prevalência mensal.
+    - name: bootstrap_prevalence_ci_low
+      description: Bootstrap prevalence ci low.
+    - name: bootstrap_prevalence_ci_high
+      description: Bootstrap prevalence ci high.
+    - name: bootstrap_prevalence_ci_width
+      description: Largura do intervalo bootstrap da prevalência.
+    - name: candidate_valid_flag
+      description: Flag indicando candidate valid.
+    - name: gap_returned_active_post_label_m1
+      description: Gap de retorno atividade pós label m1.
+    - name: gap_returned_active_post_label_m2
+      description: Gap de retorno atividade pós label m2.
+    - name: gap_returned_active_post_label_m3
+      description: Gap de retorno atividade pós label m3.
+    - name: gap_active_days_post_label_3m
+      description: Gap de atividade dias pós label 3m.
+    - name: gap_sustained_active_2of3_post_label
+      description: Gap de sustained atividade 2of3 pós label.
+  - name: core_definition_frontier_v1
+    description: Fronteira admissível das definições futuras.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: candidate_type
+      description: Tipo do candidato de definição.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: threshold
+      description: Threshold aplicado na regra.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: rule_text
+      description: Regra em texto para exibição.
+    - name: rule_size
+      description: Quantidade de componentes da regra.
+    - name: rule_operator
+      description: Operador usado na regra.
+    - name: folds
+      description: Quantidade de folds válidos.
+    - name: test_gap_returned_active_post_label_m1
+      description: Gap em teste de retorno atividade pós label m1.
+    - name: test_gap_returned_active_post_label_m2
+      description: Gap em teste de retorno atividade pós label m2.
+    - name: test_gap_returned_active_post_label_m3
+      description: Gap em teste de retorno atividade pós label m3.
+    - name: test_gap_active_days_post_label_3m
+      description: Gap em teste de atividade dias pós label 3m.
+    - name: test_gap_sustained_active_2of3_post_label
+      description: Gap em teste de sustained atividade 2of3 pós label.
+    - name: test_prevalence_entropy
+      description: Entropia da prevalência do label em teste.
+    - name: test_monthly_prevalence_std
+      description: Desvio-padrão da prevalência mensal em teste.
+    - name: test_bootstrap_prevalence_ci_width
+      description: Largura do intervalo bootstrap da prevalência em teste.
+    - name: test_prevalence_std
+      description: Test prevalence std.
+    - name: label_hash
+      description: Hash do vetor de label.
+    - name: label_positives
+      description: Quantidade de positivos do label.
+    - name: label_share_pct
+      description: Participação percentual dos positivos do label.
+    - name: label_vector_group_size
+      description: Quantidade de candidatos com o mesmo vetor de label.
+    - name: rank__folds
+      description: Rank folds.
+    - name: rank__test_gap_returned_active_post_label_m1
+      description: Rank test gap retorno atividade pós label m1.
+    - name: rank__test_gap_returned_active_post_label_m2
+      description: Rank test gap retorno atividade pós label m2.
+    - name: rank__test_gap_returned_active_post_label_m3
+      description: Rank test gap retorno atividade pós label m3.
+    - name: rank__test_gap_active_days_post_label_3m
+      description: Rank test gap atividade dias pós label 3m.
+    - name: rank__test_gap_sustained_active_2of3_post_label
+      description: Rank test gap sustained atividade 2of3 pós label.
+    - name: rank__test_prevalence_entropy
+      description: Rank test prevalence entropy.
+    - name: rank__test_monthly_prevalence_std
+      description: Rank test monthly prevalence std.
+    - name: rank__test_bootstrap_prevalence_ci_width
+      description: Rank test bootstrap prevalence ci width.
+    - name: worst_objective_rank
+      description: Worst objective rank.
+    - name: mean_objective_rank
+      description: Média de objective rank.
+    - name: label_vector_representative_flag
+      description: Flag indicando label vector representative.
+    - name: pareto_frontier_flag
+      description: Flag indicando presença na fronteira de Pareto.
+  - name: core_definition_selection_v1
+    description: Seleção oficial das definições futuras testadas.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: definition_group
+      description: Grupo da definição futura.
+    - name: official_status
+      description: Status oficial do candidato.
+    - name: winner_flag
+      description: Flag indicando vencedor único.
+    - name: candidate_type
+      description: Tipo do candidato de definição.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: threshold
+      description: Threshold aplicado na regra.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: rule_text
+      description: Regra em texto para exibição.
+    - name: rule_size
+      description: Quantidade de componentes da regra.
+    - name: rule_operator
+      description: Operador usado na regra.
+    - name: selection_basis
+      description: Base usada para decidir o status oficial.
+    - name: folds
+      description: Quantidade de folds válidos.
+    - name: label_hash
+      description: Hash do vetor de label.
+    - name: label_positives
+      description: Quantidade de positivos do label.
+    - name: label_share_pct
+      description: Participação percentual dos positivos do label.
+    - name: label_vector_group_size
+      description: Quantidade de candidatos com o mesmo vetor de label.
+    - name: test_gap_returned_active_post_label_m1
+      description: Gap em teste de retorno atividade pós label m1.
+    - name: test_gap_returned_active_post_label_m2
+      description: Gap em teste de retorno atividade pós label m2.
+    - name: test_gap_returned_active_post_label_m3
+      description: Gap em teste de retorno atividade pós label m3.
+    - name: test_gap_active_days_post_label_3m
+      description: Gap em teste de atividade dias pós label 3m.
+    - name: test_gap_sustained_active_2of3_post_label
+      description: Gap em teste de sustained atividade 2of3 pós label.
+    - name: test_prevalence_entropy
+      description: Entropia da prevalência do label em teste.
+    - name: test_monthly_prevalence_std
+      description: Desvio-padrão da prevalência mensal em teste.
+    - name: test_bootstrap_prevalence_ci_width
+      description: Largura do intervalo bootstrap da prevalência em teste.
+  - name: core_model_calibration_audit_v1
+    description: Auditoria dos splits internos de tuning e calibração.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: outer_fold_id
+      description: Identificador do fold externo.
+    - name: inner_fold_id
+      description: Identificador do fold interno.
+    - name: split_strategy
+      description: Split strategy.
+    - name: validation_start_month
+      description: Mês de validation start.
+    - name: validation_month_count
+      description: Quantidade de validation month.
+    - name: calibration_start_month
+      description: Mês de calibration start.
+    - name: calibration_month_count
+      description: Quantidade de calibration month.
+    - name: train_rows
+      description: Quantidade de linhas de train.
+    - name: test_rows
+      description: Quantidade de linhas de test.
+    - name: train_positives
+      description: Train positives.
+    - name: test_positives
+      description: Test positives.
+    - name: valid_inner_split_flag
+      description: Flag indicando valid inner split.
+    - name: invalid_reason
+      description: Motivo de invalidação do fold ou da saída.
+  - name: core_model_fold_metrics_v1
+    description: Métricas por fold externo dos modelos avaliados.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: technical_fold_valid_flag
+      description: Flag indicando se o fold era tecnicamente calculável.
+    - name: fold_valid_flag
+      description: Flag indicando se o fold conta no resumo oficial.
+    - name: inner_valid_splits
+      description: Inner valid splits.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: test_positive_rate
+      description: Test positive rate.
+    - name: tuning_applied_flag
+      description: Flag indicando se houve tuning.
+    - name: tuning_status
+      description: Status do tuning.
+    - name: tuning_valid_splits
+      description: Quantidade de splits internos válidos no tuning.
+    - name: tuning_best_score
+      description: Melhor score encontrado no tuning.
+    - name: best_params_json
+      description: Melhores hiperparâmetros em JSON.
+    - name: invalid_reason
+      description: Motivo de invalidação do fold ou da saída.
+    - name: ap
+      description: Average Precision do fold.
+    - name: roc_auc
+      description: ROC AUC do fold.
+    - name: brier
+      description: Brier score do fold.
+    - name: log_loss
+      description: Log loss do fold.
+    - name: calibration_slope
+      description: Inclinação de calibração.
+    - name: calibration_intercept
+      description: Intercepto de calibração.
+    - name: calibration_slope_error
+      description: Distância da inclinação de calibração até 1.
+    - name: calibration_intercept_abs
+      description: Valor absoluto do intercepto de calibração.
+  - name: core_model_frontier_v1
+    description: Fronteira final de definição, trilha e família de modelo.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: pooled_rows
+      description: Quantidade de linhas na predição concatenada.
+    - name: pooled_positives
+      description: Quantidade de positivos na predição concatenada.
+    - name: pooled_negatives
+      description: Quantidade de negativos na predição concatenada.
+    - name: pooled_positive_rate
+      description: Taxa positiva na predição concatenada.
+    - name: mean_ap
+      description: Average Precision na predição concatenada.
+    - name: mean_roc_auc
+      description: ROC AUC na predição concatenada.
+    - name: mean_brier
+      description: Brier score na predição concatenada.
+    - name: mean_log_loss
+      description: Log loss na predição concatenada.
+    - name: mean_calibration_slope
+      description: Inclinação de calibração na predição concatenada.
+    - name: mean_calibration_intercept
+      description: Intercepto de calibração na predição concatenada.
+    - name: mean_calibration_slope_error
+      description: Distância da inclinação de calibração até 1 na predição concatenada.
+    - name: mean_calibration_intercept_abs
+      description: Valor absoluto do intercepto de calibração na predição concatenada.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: fold_mean_ap
+      description: Média de AP entre folds válidos.
+    - name: std_ap
+      description: Desvio-padrão de AP entre folds válidos.
+    - name: fold_mean_roc_auc
+      description: Média de ROC AUC entre folds válidos.
+    - name: std_roc_auc
+      description: Desvio-padrão de ROC AUC entre folds válidos.
+    - name: fold_mean_brier
+      description: Média de Brier entre folds válidos.
+    - name: std_brier
+      description: Desvio-padrão de Brier entre folds válidos.
+    - name: fold_mean_log_loss
+      description: Média de log loss entre folds válidos.
+    - name: std_log_loss
+      description: Desvio-padrão de log loss entre folds válidos.
+    - name: fold_mean_calibration_slope
+      description: Média da inclinação de calibração entre folds válidos.
+    - name: fold_mean_calibration_intercept
+      description: Média do intercepto de calibração entre folds válidos.
+    - name: fold_mean_calibration_slope_error
+      description: Média da distância da inclinação até 1.
+    - name: fold_mean_calibration_intercept_abs
+      description: Média do valor absoluto do intercepto.
+    - name: pareto_frontier_flag
+      description: Flag indicando presença na fronteira de Pareto.
+  - name: core_model_predictions_v1
+    description: Predições externas dos modelos avaliados.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: first_month
+      description: Primeiro mês observado do professor.
+    - name: y_true
+      description: Valor observado do alvo binário.
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: score
+      description: Probabilidade prevista de atividade futura.
+    - name: technical_fold_valid_flag
+      description: Flag indicando se o fold era tecnicamente calculável.
+    - name: fold_valid_flag
+      description: Flag indicando se o fold conta no resumo oficial.
+    - name: invalid_reason
+      description: Motivo de invalidação do fold ou da saída.
+  - name: core_navigation_sequences_v1
+    description: Sequências iniciais de navegação observadas na jornada.
+    columns:
+    - name: step_sequence_first5
+      description: Step sequence first5.
+    - name: teachers
+      description: Teachers.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: label_value
+      description: Label valor.
+  - name: core_navigation_transitions_v1
+    description: Transições entre passos de navegação na jornada inicial.
+    columns:
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: label_value
+      description: Label valor.
+    - name: from_token
+      description: From token.
+    - name: to_token
+      description: To token.
+    - name: teachers
+      description: Teachers.
+  - name: core_prediction_bootstrap_v1
+    description: Intervalos bootstrap das métricas probabilísticas das predições oficiais.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: ci_low
+      description: Limite inferior do intervalo.
+    - name: ci_high
+      description: Limite superior do intervalo.
+    - name: ci_width
+      description: Largura do intervalo.
+  - name: core_scoring_scenarios_v1
+    description: Cenários oficiais de score com definição, trilha e conjunto elegível de variáveis.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: label_col
+      description: Coluna binária usada como alvo.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: score_window_end_day
+      description: Último dia disponível para leitura do score.
+    - name: feature_count
+      description: Quantidade de variáveis elegíveis.
+    - name: feature_names_json
+      description: Lista JSON das variáveis elegíveis.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: positives
+      description: Quantidade de casos positivos.
+    - name: negatives
+      description: Quantidade de casos negativos.
+    - name: months
+      description: Quantidade de meses distintos.
+  - name: governance_arbitrariness_registry_v1
+    description: Registro das escolhas arbitrárias ou mecânicas expostas no estudo.
+    columns:
+    - name: choice_name
+      description: Nome da escolha registrada.
+    - name: choice_value
+      description: Choice valor.
+    - name: choice_type
+      description: Tipo da escolha registrada.
+    - name: where_used
+      description: Where used.
+    - name: status
+      description: Status do check.
+    - name: why
+      description: Why.
+    - name: in_official_report_flag
+      description: Flag indicando presença no relatório oficial.
+  - name: governance_definition_candidate_metric_registry_v1
+    description: Registro das métricas permitidas na busca de candidatos de definição.
+    columns:
+    - name: metric_name
+      description: Nome da métrica.
+    - name: metric_type
+      description: Tipo da métrica.
+    - name: source_columns_json
+      description: Source columns json.
+    - name: definition_role
+      description: Definition role.
+    - name: definition_a_candidate_flag
+      description: Flag indicando definition a candidate.
+    - name: semantic_group
+      description: Semantic group.
+  - name: governance_feature_eligibility_v1
+    description: Elegibilidade de cada variável por trilha de score.
+    columns:
+    - name: feature_name
+      description: Nome da variável.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: eligible_flag
+      description: Flag indicando eligible.
+    - name: feature_class
+      description: Feature classe.
+    - name: pit_class
+      description: Pit classe.
+    - name: behavior_family
+      description: Behavior family.
+  - name: governance_feature_registry_v1
+    description: Registro das variáveis candidatas e suas classes analíticas.
+    columns:
+    - name: feature_name
+      description: Nome da variável.
+    - name: feature_type
+      description: Tipo da variável.
+    - name: source_table
+      description: Tabela de origem.
+    - name: source_columns_json
+      description: Source columns json.
+    - name: pit_class
+      description: Pit classe.
+    - name: behavior_family
+      description: Behavior family.
+    - name: feature_class
+      description: Feature classe.
+    - name: allowed_in_S1
+      description: Allowed in s1.
+    - name: allowed_in_S7
+      description: Allowed in s7.
+    - name: allowed_in_S1_PLUS_S7
+      description: Allowed in s1 plus s7.
+    - name: allowed_in_STRICT_CONTEXT
+      description: Allowed in strict context.
+  - name: governance_label_registry_v1
+    description: Registro das definições futuras materializadas e suas regras.
+    columns:
+    - name: label_name
+      description: Label name.
+    - name: label_group
+      description: Label group.
+    - name: official_flag
+      description: Flag indicando official.
+    - name: source_table
+      description: Tabela de origem.
+    - name: source_columns_json
+      description: Source columns json.
+    - name: rule_json
+      description: Regra estruturada em JSON.
+    - name: window_start_day
+      description: Window start dia.
+    - name: window_end_day
+      description: Window end dia.
+  - name: governance_leakage_audit_v1
+    description: Auditoria detalhada de leakage por variável e cenário.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: feature_name
+      description: Nome da variável.
+    - name: feature_source_table
+      description: Feature source table.
+    - name: feature_source_columns_json
+      description: Feature source columns json.
+    - name: feature_class
+      description: Feature classe.
+    - name: feature_pit_class
+      description: Feature pit classe.
+    - name: feature_behavior_family
+      description: Feature behavior family.
+    - name: label_source_table
+      description: Label source table.
+    - name: label_source_columns_json
+      description: Label source columns json.
+    - name: label_window_start_day
+      description: Label window start dia.
+    - name: label_window_end_day
+      description: Label window end dia.
+    - name: score_window_end_day
+      description: Último dia disponível para leitura do score.
+    - name: available_at_score_time_flag
+      description: Flag indicando available at score time.
+    - name: pit_safe_flag
+      description: Flag indicando pit safe.
+    - name: same_source_column_flag
+      description: Flag indicando same source column.
+    - name: source_table_matches_label_table_flag
+      description: Flag indicando source table matches label table.
+    - name: source_column_future_named_flag
+      description: Flag indicando source column future named.
+    - name: source_touches_future_window_flag
+      description: Flag indicando source touches future window.
+    - name: temporal_window_ok_flag
+      description: Flag indicando temporal window ok.
+    - name: high_risk_future_touch_flag
+      description: Flag indicando high risco future touch.
+    - name: definition_b_specific_flag
+      description: Flag indicando definition b specific.
+    - name: leakage_flag
+      description: Flag indicando leakage.
+  - name: governance_leakage_summary_v1
+    description: Resumo expandido da auditoria de leakage.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: audited_features
+      description: Audited features.
+    - name: features_with_leakage_flag
+      description: Flag indicando features with leakage.
+    - name: features_with_source_overlap
+      description: Features with source overlap.
+    - name: features_with_future_named_source
+      description: Quantidade de variáveis com source nomeado como futuro.
+    - name: features_touching_label_source_table
+      description: Features touching label source table.
+    - name: features_with_temporal_violation
+      description: Features with temporal violation.
+    - name: features_with_high_risk_future_touch
+      description: Features with high risco future touch.
+    - name: all_features_available_at_score_time_flag
+      description: Flag indicando all features available at score time.
+    - name: all_features_pit_safe_flag
+      description: Flag indicando all features pit safe.
+    - name: any_leakage_flag
+      description: Flag indicando qualquer leakage.
+  - name: governance_policy_registry_v1
+    description: Registro das políticas operacionais e analíticas publicadas.
+    columns:
+    - name: policy_group
+      description: Policy group.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: policy_value_json
+      description: Policy valor json.
+    - name: active_in_build_flag
+      description: Flag indicando atividade in build.
+    - name: official_flag
+      description: Flag indicando official.
+    - name: why
+      description: Why.
+  - name: governance_post_model_output_status_v1
+    description: Status das saídas pós-modelo por problema, modelo e fold.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: post_model_output_name
+      description: Nome da saída pós-modelo.
+    - name: post_model_output_status
+      description: Status da saída pós-modelo.
+    - name: error_type
+      description: Tipo do erro ocorrido.
+    - name: error_message
+      description: Mensagem resumida do erro.
+    - name: traceback_snippet
+      description: Trecho resumido do traceback.
+  - name: governance_track_registry_v1
+    description: Registro das trilhas de score e sua janela de leitura.
+    columns:
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: score_window_end_day
+      description: Último dia disponível para leitura do score.
+    - name: score_moment_text
+      description: Score moment text.
+    - name: allowed_feature_classes_json
+      description: Allowed feature classes json.
+    - name: official_flag
+      description: Flag indicando official.
+  - name: mart_first_session_journey_v1
+    description: Resumo da 1ª sessão, do 1º evento e da janela inicial da jornada.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: first_month
+      description: Primeiro mês observado do professor.
+    - name: first_session_ts
+      description: Timestamp de primeiro sessão.
+    - name: first_interaction_ts
+      description: Timestamp de primeiro interação.
+    - name: onboarding_anchor_ts
+      description: Timestamp âncora do onboarding.
+    - name: data_entrada_month
+      description: Mês de entrada do professor.
+    - name: months_after_entry
+      description: Meses entre a entrada e o primeiro mês observado.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: first_event_type
+      description: Tipo do 1º evento observado.
+    - name: first_event_family
+      description: Família do 1º evento observado.
+    - name: first_event_action
+      description: Ação do 1º evento observado.
+    - name: first_device
+      description: Dispositivo do 1º evento observado.
+    - name: first_utm_source
+      description: UTM source do 1º evento observado.
+    - name: first3_interaction_downloads
+      description: Downloads nas 3 primeiras interações observadas.
+    - name: first3_interaction_views
+      description: Visualizações nas 3 primeiras interações observadas.
+    - name: first3_interaction_other_actions
+      description: Outras ações nas 3 primeiras interações observadas.
+    - name: first7d_events
+      description: Eventos nos 7 primeiros dias.
+    - name: first7d_active_days
+      description: Dias ativos nos 7 primeiros dias.
+    - name: first_session_minutes
+      description: Minutos da 1ª sessão.
+    - name: first7d_sessions
+      description: Sessões nos 7 primeiros dias.
+    - name: first7d_session_minutes
+      description: Minutos em sessão nos 7 primeiros dias.
+    - name: first_event_missing_flag
+      description: Flag de ausência do 1º evento.
+    - name: first_event_action_missing_flag
+      description: Flag de ausência da ação do 1º evento.
+    - name: first_utm_missing_flag
+      description: Flag de ausência da UTM inicial.
+    - name: first_device_missing_flag
+      description: Flag de ausência do dispositivo inicial.
+    - name: first_session_row_hash
+      description: Hash técnico da 1ª sessão.
+    - name: first_session_start_ts
+      description: Início da 1ª sessão.
+    - name: first_session_end_ts
+      description: Fim da 1ª sessão.
+    - name: first_session_duration_sec
+      description: Duração da 1ª sessão em segundos.
+    - name: first_session_duration_min
+      description: Duração da 1ª sessão em minutos.
+    - name: first_session_interactions
+      description: Interações dentro da 1ª sessão.
+    - name: first_session_downloads
+      description: Downloads dentro da 1ª sessão.
+    - name: first_session_views
+      description: Visualizações dentro da 1ª sessão.
+    - name: first_session_other_actions
+      description: Outras ações dentro da 1ª sessão.
+    - name: first_session_navigation_events
+      description: Eventos de navegação na 1ª sessão.
+    - name: first_session_meaningful_events
+      description: Eventos relevantes na 1ª sessão.
+    - name: step_1_token
+      description: Passo observado na posição 1.
+    - name: step_2_token
+      description: Passo observado na posição 2.
+    - name: step_3_token
+      description: Passo observado na posição 3.
+    - name: step_4_token
+      description: Passo observado na posição 4.
+    - name: step_5_token
+      description: Passo observado na posição 5.
+    - name: first_session_first_event_ts
+      description: Timestamp do 1º evento da 1ª sessão.
+    - name: first_session_first_event_type
+      description: Tipo do 1º evento da 1ª sessão.
+    - name: first_session_first_event_family
+      description: Família do 1º evento da 1ª sessão.
+    - name: first_session_first_event_action
+      description: Ação do 1º evento da 1ª sessão.
+    - name: first_session_first_event_utm_source
+      description: UTM source do 1º evento da 1ª sessão.
+    - name: first_session_first_event_device
+      description: Dispositivo do 1º evento da 1ª sessão.
+    - name: first_session_first_meaningful_ts
+      description: Timestamp da 1ª ação relevante da 1ª sessão.
+    - name: first_session_first_meaningful_type
+      description: Tipo da 1ª ação relevante da 1ª sessão.
+    - name: first_session_first_meaningful_family
+      description: Família da 1ª ação relevante da 1ª sessão.
+    - name: first_session_first_meaningful_action
+      description: Ação da 1ª ação relevante da 1ª sessão.
+    - name: first_session_last_event_ts
+      description: Timestamp do último evento da 1ª sessão.
+    - name: first_session_last_event_type
+      description: Tipo do último evento da 1ª sessão.
+    - name: first_session_last_event_family
+      description: Família do último evento da 1ª sessão.
+    - name: first_session_last_event_action
+      description: Ação do último evento da 1ª sessão.
+    - name: first_session_missing_flag
+      description: Flag indicando ausência da 1ª sessão.
+    - name: first_session_has_interaction_flag
+      description: Flag indicando interação dentro da 1ª sessão.
+    - name: first_session_has_meaningful_action_flag
+      description: Flag indicando ação relevante na 1ª sessão.
+    - name: session_without_interaction_flag
+      description: Flag de sessão sem interação associada.
+    - name: first_session_entry_surface
+      description: Superfície de entrada da 1ª sessão.
+    - name: first_session_device_raw
+      description: Dispositivo bruto da 1ª sessão.
+    - name: first_session_device_bucket
+      description: Bucket do dispositivo da 1ª sessão.
+    - name: secs_to_first_interaction
+      description: Segundos até a 1ª interação.
+    - name: secs_to_first_meaningful_action
+      description: Segundos até a 1ª ação relevante.
+    - name: first_session_first_meaningful_action_group
+      description: Grupo da 1ª ação relevante da 1ª sessão.
+    - name: first_session_first_event_action_group
+      description: Grupo da ação do 1º evento da 1ª sessão.
+    - name: first_session_exit_state
+      description: Estado de saída da 1ª sessão.
+    - name: observed_step_count_first5
+      description: Quantidade de passos observados entre os 5 primeiros.
+    - name: step_sequence_first5
+      description: Sequência dos 5 primeiros passos.
+    - name: step_sequence_observed_first5
+      description: Sequência observada dos 5 primeiros passos.
+  - name: mart_future_metrics_v1
+    description: Métricas futuras nativas usadas para definição de atividade e validadores.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: first_month
+      description: Primeiro mês observado do professor.
+    - name: anchor_ts
+      description: Timestamp âncora da jornada inicial.
+    - name: label_start_ts
+      description: Início da medição futura após a janela inicial.
+    - name: label_end_ts
+      description: Fim da janela principal de label.
+    - name: validator_1_end_ts
+      description: Fim do 1º bloco validador pós-label.
+    - name: validator_2_end_ts
+      description: Fim do 2º bloco validador pós-label.
+    - name: validator_3_end_ts
+      description: Fim do 3º bloco validador pós-label.
+    - name: full_followup_observed_flag
+      description: Flag indicando seguimento futuro completo observado.
+    - name: future_sessions
+      description: Sessões futuras após o início do label.
+    - name: future_session_minutes
+      description: Minutos futuros em sessão após o início do label.
+    - name: future_interactions
+      description: Interações futuras após o início do label.
+    - name: future_activity_events
+      description: Eventos futuros de atividade após o início do label.
+    - name: future_active_days
+      description: Dias ativos futuros após o início do label.
+    - name: future_distinct_actions
+      description: Ações distintas futuras após o início do label.
+    - name: future_downloads
+      description: Downloads futuros após o início do label.
+    - name: future_content_views
+      description: Visualizações futuras de conteúdo após o início do label.
+    - name: future_mapped_lessons
+      description: Aulas futuras mapeadas após o início do label.
+    - name: future_formation_events
+      description: Eventos futuros de formação após o início do label.
+    - name: future_mari_help_events
+      description: Eventos futuros de ajuda da Mari após o início do label.
+    - name: future_mari_conversation_events
+      description: Conversas futuras com a Mari após o início do label.
+    - name: future_business_active_weeks
+      description: Semanas futuras com atividade mínima de negócio.
+    - name: returned_active_post_label_m1
+      description: Flag indicando retorno ativo no 1º bloco pós-label.
+    - name: returned_active_post_label_m2
+      description: Flag indicando retorno ativo no 2º bloco pós-label.
+    - name: returned_active_post_label_m3
+      description: Flag indicando retorno ativo no 3º bloco pós-label.
+    - name: active_days_post_label_3m
+      description: Dias ativos somados nos 3 blocos pós-label.
+    - name: sustained_active_2of3_post_label
+      description: Flag indicando atividade em pelo menos 2 dos 3 blocos pós-label.
+  - name: mart_onboarding_population_v1
+    description: População inicial de onboarding reconstruída para o modelo.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: first_month
+      description: Primeiro mês observado do professor.
+    - name: first_session_ts
+      description: Timestamp de primeiro sessão.
+    - name: first_interaction_ts
+      description: Timestamp de primeiro interação.
+    - name: onboarding_anchor_ts
+      description: Timestamp âncora do onboarding.
+    - name: data_entrada_month
+      description: Mês de entrada do professor.
+    - name: months_after_entry
+      description: Meses entre a entrada e o primeiro mês observado.
+    - name: teacher_population_status
+      description: Status do professor na população observada.
+    - name: utm_group
+      description: Grupo analítico da origem UTM.
+    - name: teacher_estado
+      description: Estado informado.
+    - name: teacher_currentstage
+      description: Etapa atual do professor.
+    - name: teacher_currentsubject_group
+      description: Grupo analítico da disciplina atual.
+    - name: first_event_type
+      description: Tipo do 1º evento observado.
+    - name: first_event_family
+      description: Família do 1º evento observado.
+    - name: first_event_action
+      description: Ação do 1º evento observado.
+    - name: first_device
+      description: Dispositivo do 1º evento observado.
+    - name: first_utm_source
+      description: UTM source do 1º evento observado.
+    - name: first3_interaction_downloads
+      description: Downloads nas 3 primeiras interações observadas.
+    - name: first3_interaction_views
+      description: Visualizações nas 3 primeiras interações observadas.
+    - name: first3_interaction_other_actions
+      description: Outras ações nas 3 primeiras interações observadas.
+    - name: first7d_events
+      description: Eventos nos 7 primeiros dias.
+    - name: first7d_active_days
+      description: Dias ativos nos 7 primeiros dias.
+    - name: first_session_minutes
+      description: Minutos da 1ª sessão.
+    - name: first7d_sessions
+      description: Sessões nos 7 primeiros dias.
+    - name: first7d_session_minutes
+      description: Minutos em sessão nos 7 primeiros dias.
+    - name: first_event_missing_flag
+      description: Flag de ausência do 1º evento.
+    - name: first_event_action_missing_flag
+      description: Flag de ausência da ação do 1º evento.
+    - name: first_utm_missing_flag
+      description: Flag de ausência da UTM inicial.
+    - name: first_device_missing_flag
+      description: Flag de ausência do dispositivo inicial.
+  - name: post_model_band_summary_v1
+    description: Resumo das faixas de risco por política registrada.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: band_name
+      description: Nome da faixa de risco.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: share
+      description: Participação do grupo na base.
+  - name: post_model_cluster_assignment_v1
+    description: Atribuição de cluster descritivo por caso publicado.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: cluster_id
+      description: Cluster id.
+    - name: cluster_name
+      description: Cluster name.
+    - name: cluster_k
+      description: Cluster k.
+    - name: cluster_silhouette
+      description: Cluster silhouette.
+  - name: post_model_cluster_profile_v1
+    description: Perfil agregado dos clusters descritivos publicados.
+    columns:
+    - name: cluster_name
+      description: Cluster name.
+    - name: feature_name
+      description: Nome da variável.
+    - name: feature_mean
+      description: Feature mean.
+    - name: cluster_rows
+      description: Quantidade de linhas de cluster.
+  - name: post_model_cluster_summary_v1
+    description: Resumo dos clusters descritivos publicados.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: cluster_name
+      description: Cluster name.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: mean_score
+      description: Média de score.
+    - name: mean_risk_score
+      description: Média de risco score.
+    - name: realized_inactivity_rate
+      description: Taxa realizada de inatividade.
+    - name: share
+      description: Participação do grupo na base.
+  - name: post_model_cluster_validation_v1
+    description: Métricas de validação dos clusters descritivos publicados.
+    columns:
+    - name: iteration_id
+      description: Iteration id.
+    - name: cluster_k
+      description: Cluster k.
+    - name: silhouette
+      description: Silhouette.
+    - name: stability_ari_vs_full
+      description: Stability ari vs full.
+    - name: selected_cluster_k
+      description: Selected cluster k.
+    - name: selected_cluster_silhouette
+      description: Selected cluster silhouette.
+  - name: post_model_confusion_matrix_v1
+    description: Matriz de confusão operacional por política de cutoff.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: actual_group
+      description: Grupo observado na matriz de confusão.
+    - name: predicted_group
+      description: Grupo previsto na matriz de confusão.
+    - name: rows
+      description: Quantidade de linhas.
+  - name: post_model_cv_confusion_folds_v1
+    description: Matriz de confusão por fold e política de cutoff.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: actual_group
+      description: Grupo observado na matriz de confusão.
+    - name: predicted_group
+      description: Grupo previsto na matriz de confusão.
+    - name: rows
+      description: Quantidade de linhas.
+  - name: post_model_cv_confusion_summary_v1
+    description: Resumo da robustez da matriz de confusão por fold.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: actual_group
+      description: Grupo observado na matriz de confusão.
+    - name: predicted_group
+      description: Grupo previsto na matriz de confusão.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: mean_rows
+      description: Quantidade de linhas de mean.
+    - name: std_rows
+      description: Desvio-padrão da quantidade de linhas entre folds.
+    - name: min_rows
+      description: Quantidade de linhas de min.
+    - name: max_rows
+      description: Quantidade de linhas de máxima.
+    - name: max_fold_to_fold_jump
+      description: Maior salto entre folds consecutivos.
+    - name: fold_order_slope
+      description: Inclinação da métrica ao longo da ordem dos folds.
+    - name: fold_order_pvalue
+      description: P-valor da inclinação por permutação.
+  - name: post_model_cv_threshold_folds_v1
+    description: Métricas por fold das políticas de cutoff.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: risk_threshold
+      description: Cutoff de risco usado na política.
+    - name: tp
+      description: Verdadeiros positivos.
+    - name: fp
+      description: Falsos positivos.
+    - name: tn
+      description: Verdadeiros negativos.
+    - name: fn
+      description: Falsos negativos.
+    - name: precision
+      description: Precisão no cutoff.
+    - name: recall
+      description: Recall no cutoff.
+    - name: f1
+      description: F1 no cutoff.
+    - name: accuracy
+      description: Acurácia no cutoff.
+    - name: predicted_positive_rate
+      description: Taxa prevista como positiva no cutoff.
+  - name: post_model_cv_threshold_summary_v1
+    description: Resumo da robustez das políticas de cutoff por fold.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: valid_folds
+      description: Quantidade de folds externos válidos.
+    - name: mean_value
+      description: Valor médio entre folds válidos.
+    - name: std_value
+      description: Desvio-padrão entre folds válidos.
+    - name: min_value
+      description: Menor valor observado.
+    - name: max_value
+      description: Maior valor observado.
+    - name: value_range
+      description: Amplitude entre o menor e o maior valor.
+    - name: max_fold_to_fold_jump
+      description: Maior salto entre folds consecutivos.
+    - name: fold_order_slope
+      description: Inclinação da métrica ao longo da ordem dos folds.
+    - name: fold_order_pvalue
+      description: P-valor da inclinação por permutação.
+  - name: post_model_feature_importance_v1
+    description: Importância por permutação dos modelos de referência.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: definition_name
+      description: Nome da definição futura.
+    - name: track_name
+      description: Nome da trilha de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: fold_id
+      description: Identificador do fold externo.
+    - name: feature_name
+      description: Nome da variável.
+    - name: importance_mean
+      description: Importância média por permutação.
+    - name: importance_std
+      description: Desvio-padrão da importância por permutação.
+  - name: post_model_heavy_user_profile_v1
+    description: Perfil agregado do proxy de heavy user.
+    columns:
+    - name: heavy_user_flag
+      description: Flag indicando heavy user.
+    - name: metric_name
+      description: Nome da métrica.
+    - name: metric_mean
+      description: Metric mean.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: heavy_cutoff
+      description: Heavy cutoff.
+  - name: post_model_heavy_user_scores_v1
+    description: Scores do proxy de heavy user por caso.
+    columns:
+    - name: teacher_unique_id
+      description: Identificador único do professor.
+    - name: heavy_intensity_raw
+      description: Heavy intensity brutas.
+    - name: heavy_intensity_score
+      description: Heavy intensity score.
+    - name: heavy_intensity_pc_explained_variance
+      description: Heavy intensity pc explained variance.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: heavy_cutoff
+      description: Heavy cutoff.
+    - name: heavy_user_flag
+      description: Flag indicando heavy user.
+  - name: post_model_heavy_user_summary_v1
+    description: Resumo do proxy de heavy user publicado.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: heavy_user_flag
+      description: Flag indicando heavy user.
+    - name: rows
+      description: Quantidade de linhas.
+    - name: mean_score
+      description: Média de score.
+    - name: mean_risk_score
+      description: Média de risco score.
+    - name: realized_inactivity_rate
+      description: Taxa realizada de inatividade.
+    - name: share
+      description: Participação do grupo na base.
+  - name: post_model_monthly_fit_v1
+    description: Ajuste mensal entre risco previsto e risco realizado.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: monthly_r2
+      description: R² entre risco previsto e realizado por mês.
+    - name: monthly_mape_positive_months
+      description: MAPE mensal considerando só meses com risco realizado positivo.
+    - name: months_used
+      description: Quantidade de meses usados no ajuste mensal.
+  - name: post_model_reference_selection_v1
+    description: Escopo final de referência usado no relatório.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: selection_reason
+      description: Motivo da seleção no escopo de referência.
+  - name: post_model_threshold_metrics_v1
+    description: Métricas operacionais por política de cutoff.
+    columns:
+    - name: problem_key
+      description: Chave do problema de score.
+    - name: model_name
+      description: Nome da família de modelo.
+    - name: policy_name
+      description: Nome da política registrada.
+    - name: risk_threshold
+      description: Cutoff de risco usado na política.
+    - name: tp
+      description: Verdadeiros positivos.
+    - name: fp
+      description: Falsos positivos.
+    - name: tn
+      description: Verdadeiros negativos.
+    - name: fn
+      description: Falsos negativos.
+    - name: precision
+      description: Precisão no cutoff.
+    - name: recall
+      description: Recall no cutoff.
+    - name: f1
+      description: F1 no cutoff.
+    - name: accuracy
+      description: Acurácia no cutoff.
+    - name: predicted_positive_rate
+      description: Taxa prevista como positiva no cutoff.

@@ -15,6 +15,11 @@ from insper_deploy_kedro.pipelines.data_engineering.nodes import (
     transform_scalers,
 )
 from insper_deploy_kedro.pipelines.modelling.nodes import calibrate_model, train_model
+from insper_deploy_kedro.registry import (
+    build_inference_contract,
+    build_serving_manifest,
+    record_model_registry_entry,
+)
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
@@ -63,7 +68,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 func=train_model,
                 inputs=[
                     "production_master_table",
-                    "params:columns",
+                    "selected_feature_columns",
                     "best_model_config",
                     "params:ml_runtime",
                 ],
@@ -82,6 +87,34 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 outputs="production_model",
                 name="calibrate_model_node",
                 tags=["refit", "calibration"],
+            ),
+            node(
+                func=record_model_registry_entry,
+                inputs=["production_model"],
+                outputs="latest_model_registry_entry",
+                name="record_model_registry_entry_node",
+                tags=["refit", "registry"],
+            ),
+            node(
+                func=build_serving_manifest,
+                inputs=[
+                    "production_model",
+                    "latest_model_registry_entry",
+                ],
+                outputs="latest_serving_manifest",
+                name="build_serving_manifest_node",
+                tags=["refit", "registry", "governance"],
+            ),
+            node(
+                func=build_inference_contract,
+                inputs=[
+                    "production_model",
+                    "params:raw_columns",
+                    "selected_feature_columns",
+                ],
+                outputs="latest_inference_contract",
+                name="build_inference_contract_node",
+                tags=["refit", "registry", "governance"],
             ),
         ]
     )

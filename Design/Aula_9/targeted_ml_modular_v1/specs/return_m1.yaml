@@ -1,0 +1,13 @@
+defaults:
+  - base
+
+analysis_name: targeted_ml_return_m1
+analysis_kind: return
+
+label:
+  definition_b:
+    definition_name: definition_b
+    metric_name: returned_active_post_label_m1
+    operator: ">="
+    threshold: 1.0
+    rule_text: returned_active_post_label_m1 >= 1

@@ -1,0 +1,6 @@
+{
+  "dataset_root": "/Users/akatsurada/Documents/INSPER/Design/Aula_2",
+  "raw_relative_path": "raw/base_aprendizap",
+  "staging_output_root": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/_raw_modelled_staging/final_raw_smoke",
+  "staging_modelled_duckdb": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/_raw_modelled_staging/final_raw_smoke/modelled/duckdb/base_modelada_v2.duckdb"
+}

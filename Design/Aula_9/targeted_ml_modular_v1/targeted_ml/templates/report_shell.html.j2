@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+{% if head_html %}
+  {{ head_html | safe }}
+{% else %}
+  <meta charset="utf-8" />
+  <title>{{ title }}</title>
+{% endif %}
+</head>
+<body>
+  {{ body_html | safe }}
+</body>
+</html>

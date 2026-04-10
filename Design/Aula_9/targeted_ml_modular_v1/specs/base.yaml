@@ -1,0 +1,116 @@
+analysis_name: targeted_ml_activity
+analysis_kind: activity
+
+data:
+  dataset_root: data
+  modeled_source: auto
+  rebuild_modelled_if_missing: false
+  modeled_duckdb_relative_path: data/modelled/duckdb/base_modelada_v2.duckdb
+
+population:
+  official_population: same_month_entry_only
+
+label:
+  window_days: 30
+  post_label_block_days: 30
+  post_label_block_count: 3
+  external_validators:
+    - returned_active_post_label_m1
+    - returned_active_post_label_m2
+    - returned_active_post_label_m3
+    - active_days_post_label_3m
+    - sustained_active_2of3_post_label
+  definition_a:
+    enabled: true
+    strategy: screened_pairwise_compound_weighted
+    promoted_candidate_limit: 3
+    candidate_metrics:
+      - future_business_active_weeks
+      - future_sessions
+      - future_session_minutes
+      - future_interactions
+      - future_activity_events
+      - future_active_days
+      - future_distinct_actions
+      - future_downloads
+      - future_content_views
+      - future_mapped_lessons
+      - future_formation_events
+  definition_b:
+    definition_name: definition_b
+    metric_name: future_business_active_weeks
+    operator: ">="
+    threshold: 1.0
+    rule_text: future_business_active_weeks >= 1
+
+tracks:
+  enabled:
+    - S1
+    - S7
+    - S1_PLUS_S7
+    - STRICT_CONTEXT
+
+modeling:
+  # Split temporal oficial:
+  # development = meses mais antigos usados para busca da Definition A
+  # definition lock = meses seguintes usados para congelar a Definition A
+  # final model evaluation = meses mais recentes reservados para a avaliacao final do modelo
+  max_outer_test_months: 6
+  definition_selection_holdout_months: 6
+  definition_lock_months: 6
+  min_official_valid_outer_folds: 2
+  # Gate minimo de suporte por fold oficial.
+  min_official_test_rows: 50
+  min_official_test_positives: 5
+  min_official_test_negatives: 20
+  # Regra dura do lock da Definition A sobre o bootstrap do gap principal.
+  # Padrao atual: ci_low > 0.
+  # Pode ser trocado, por exemplo, para ci_width < 0.20 alterando:
+  # column_name / operator / threshold.
+  definition_lock_bootstrap_gate:
+    column_name: lock_gap_sustained_active_2of3_post_label_ci_low
+    operator: ">"
+    threshold: 0.0
+  tuning_enabled: true
+  tuning_n_iter: 8
+  tuning_max_inner_splits: 3
+  tuning_scoring: neg_brier_score
+  model_families:
+    - logistic_regression
+    - random_forest
+    - catboost
+  workers: 6
+  calibration_method: sigmoid
+  skip_post_model_refit: false
+
+post_model_outputs:
+  feature_importance_permutation_repeats: 5
+  cluster_k_candidates: [2, 3, 4, 5, 6]
+  cluster_bootstrap_iterations: 20
+  cluster_sample_size: 10000
+  band_policies:
+    - policy_name: top_10_percent
+      policy_type: quantile_risk_cutoff
+      parameter_json: '{"top_share": 0.1}'
+      description: Marca como alto risco os 10% maiores valores de risk_score.
+    - policy_name: tercis
+      policy_type: tertile_risk_band
+      parameter_json: '{"q_high": 0.6666666666666666, "q_low": 0.3333333333333333}'
+      description: Separa risk_score em baixo, medio e alto pelos tercis empiricos.
+    - policy_name: score_ge_0_70
+      policy_type: fixed_risk_cutoff
+      parameter_json: '{"risk_threshold": 0.7}'
+      description: Marca como alto risco os casos com risk_score maior ou igual a 0.70.
+  heavy_user_policies:
+    - policy_name: heavy_top_10_percent
+      policy_type: percentile_cutoff
+      parameter_json: '{"top_share": 0.10}'
+      description: Marca como heavy user os 10% maiores valores do heavy_intensity_score.
+    - policy_name: heavy_top_20_percent
+      policy_type: percentile_cutoff
+      parameter_json: '{"top_share": 0.20}'
+      description: Marca como heavy user os 20% maiores valores do heavy_intensity_score.
+
+report:
+  output_html_name: targeted_ml_report_v1.html
+  render_single_report: true

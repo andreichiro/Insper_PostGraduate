@@ -44,6 +44,12 @@ fit_transform:
 preprocessing:
   train_test_split_function: sklearn.model_selection.train_test_split
   min_rows_for_stratify: 20
+  split_strategy:
+    kind: stratified_random
+    label: stratified_random_baseline
+    description: >
+      O projeto usa split estratificado aleatorio pela coluna target para manter
+      a distribuicao da classe entre treino, validacao e teste.
   categorical_encoder:
     class_path: sklearn.preprocessing.OrdinalEncoder
     init_args:

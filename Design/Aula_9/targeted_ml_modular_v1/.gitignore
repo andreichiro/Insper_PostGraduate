@@ -1,0 +1,43 @@
+# Local caches
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Raw and heavy local data
+data/raw/
+data/modelled/
+data/source_v2
+build/modelled/
+build/duckdb/
+
+# Local execution byproducts
+.runtime/
+build/logs/
+build/staging/
+build/local_runtime_duckdb/
+build/local_runtime_staging/
+build/app_specs/
+build/app_uploads/
+
+# Keep only curated inference examples
+build/inference_runs/*
+!build/inference_runs/example_modelled_inference/
+!build/inference_runs/example_modelled_inference/**
+!build/inference_runs/example_raw_inference/
+!build/inference_runs/example_raw_inference/**
+!build/inference_runs/latest.json
+
+# Keep canonical serving artifacts only
+build/serving/exports/
+
+# dbt local/private/generated noise
+dbt_lineage/.user.yml
+dbt_lineage/logs/
+dbt_lineage/target/compiled/
+dbt_lineage/target/graph.gpickle
+dbt_lineage/target/graph_summary.json
+dbt_lineage/target/partial_parse.msgpack
+dbt_lineage/target/perf_info.json
+dbt_lineage/target/run_results.json

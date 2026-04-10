@@ -20,6 +20,10 @@ from insper_deploy_kedro.pipelines.modelling.nodes import train_model
 PREPROCESSING_FIXTURE: dict = {
     "train_test_split_function": "sklearn.model_selection.train_test_split",
     "min_rows_for_stratify": 20,
+    "split_strategy": {
+        "kind": "stratified_random",
+        "label": "stratified_random_baseline",
+    },
     "categorical_encoder": {
         "class_path": "sklearn.preprocessing.OrdinalEncoder",
         "init_args": {
@@ -47,6 +51,58 @@ ML_RUNTIME_FIXTURE: dict = {
     "optuna_sampler": {
         "class_path": "optuna.samplers.TPESampler",
         "init_args": {"seed": 42},
+    },
+}
+
+DECISION_POLICIES_FIXTURE: dict = {
+    "development_splits": ["train", "validation"],
+    "policy_selection_split": "validation",
+    "cv_folds": 2,
+    "candidate_thresholds": {"start": 0.2, "stop": 0.8, "step": 0.2},
+    "deployment_policy": "prioritize_recall",
+    "risk_bands": [
+        {
+            "name": "low",
+            "label": "Baixo risco",
+            "min_probability": 0.0,
+            "max_probability": 0.3,
+        },
+        {
+            "name": "moderate",
+            "label": "Risco moderado",
+            "min_probability": 0.3,
+            "max_probability": 0.6,
+        },
+        {
+            "name": "high",
+            "label": "Alto risco",
+            "min_probability": 0.6,
+            "max_probability": 1.01,
+        },
+    ],
+    "policies": {
+        "default_050": {
+            "strategy": "fixed_threshold",
+            "threshold": 0.5,
+            "label": "Threshold 0.50",
+            "description": "Cutoff padrão",
+        },
+        "prioritize_recall": {
+            "strategy": "min_expected_cost",
+            "false_negative_cost": 8.0,
+            "false_positive_cost": 1.0,
+            "min_recall": 0.5,
+            "label": "Priorizar recall",
+            "description": "Reduz falsos negativos",
+        },
+        "prioritize_precision": {
+            "strategy": "min_expected_cost",
+            "false_negative_cost": 1.0,
+            "false_positive_cost": 6.0,
+            "min_precision": 0.3,
+            "label": "Priorizar precision",
+            "description": "Reduz falsos positivos",
+        },
     },
 }
 
@@ -86,6 +142,18 @@ EVALUATION_FIXTURE: dict = {
             "prediction_input": "y_proba",
             "kwargs": {},
         },
+        {
+            "key": "brier",
+            "function_path": "sklearn.metrics.brier_score_loss",
+            "prediction_input": "y_proba",
+            "kwargs": {},
+        },
+        {
+            "key": "log_loss",
+            "function_path": "sklearn.metrics.log_loss",
+            "prediction_input": "y_proba",
+            "kwargs": {"labels": [0, 1]},
+        },
     ],
     "derived": {
         "r2": {
@@ -94,6 +162,41 @@ EVALUATION_FIXTURE: dict = {
             "kwargs": {},
         },
         "mape": {"type": "mae_as_percent_of_mean_label"},
+        "calibration": {"enabled": True},
+    },
+}
+
+FEATURE_SELECTION_FIXTURE: dict = {
+    "enabled": True,
+    "selection_splits": ["train"],
+    "selector_model": {
+        "class_path": "sklearn.linear_model.LogisticRegression",
+        "init_args": {
+            "max_iter": 1000,
+            "class_weight": "balanced",
+            "solver": "liblinear",
+        },
+    },
+    "cv": {"n_splits": 2},
+    "primary_metric": "brier",
+    "secondary_metrics": [
+        "roc_auc",
+        "log_loss",
+        "calibration_slope_error",
+        "calibration_intercept_abs",
+    ],
+    "prefer_fewer_features": True,
+    "min_blocks": 1,
+    "max_blocks": 3,
+    "max_candidates": 32,
+    "feature_blocks": {
+        "glucose_axis": ["Glucose"],
+        "bmi_axis": ["BMI"],
+        "age_axis": ["Age"],
+        "interaction_axis": ["glucose_bmi_interaction"],
+    },
+    "required_blocks": {
+        "interaction_axis": ["glucose_axis", "bmi_axis"],
     },
 }
 
@@ -111,6 +214,16 @@ def ml_runtime_config() -> dict:
 @pytest.fixture()
 def evaluation_config() -> dict:
     return EVALUATION_FIXTURE
+
+
+@pytest.fixture()
+def decision_policy_config() -> dict:
+    return DECISION_POLICIES_FIXTURE
+
+
+@pytest.fixture()
+def feature_selection_config() -> dict:
+    return FEATURE_SELECTION_FIXTURE
 
 
 @pytest.fixture()
@@ -215,7 +328,7 @@ def master_table(
         random_state=42,
         stratify_column="Outcome",
         preprocessing=preprocessing_config,
-    )
+    )[0]
     encoders = fit_encoders(
         split, columns_config, fit_transform_config, preprocessing_config
     )

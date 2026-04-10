@@ -1,0 +1,15 @@
+{
+  "run_id": "20260401_180331",
+  "run_name": "final_raw_smoke",
+  "modelled_duckdb": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/_raw_modelled_staging/final_raw_smoke/modelled/duckdb/base_modelada_v2.duckdb",
+  "latest_observed_ts": "2026-02-09 13:17:08.717000",
+  "serving_status": "unique_primary_model",
+  "scored_model_count": 1,
+  "scored_rows": 65258,
+  "eligible_rows": 65254,
+  "artifacts": {
+    "scores_all_models": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/final_raw_smoke/scores_all_models.parquet",
+    "high_risk_users": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/final_raw_smoke/high_risk_users.parquet",
+    "validation_report": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build/inference_runs/final_raw_smoke/validation_report.parquet"
+  }
+}

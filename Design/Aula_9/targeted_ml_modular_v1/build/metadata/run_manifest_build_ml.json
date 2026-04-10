@@ -1,0 +1,178 @@
+{
+  "analysis_name": "targeted_ml_activity",
+  "analysis_kind": "activity",
+  "dataset_root": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/data",
+  "spec_hash": "f24622052f470e706527347186450a75f2ec030a5d4bdb4095297454702b2299",
+  "git_revision": "7a70b211c09a3b30ad046f9ff2cc2f9c32776e6c",
+  "stage_name": "build_ml",
+  "runtime_overrides": {
+    "label_window_days": 30,
+    "post_label_block_days": 30,
+    "post_label_block_count": 3,
+    "external_validators": [
+      "returned_active_post_label_m1",
+      "returned_active_post_label_m2",
+      "returned_active_post_label_m3",
+      "active_days_post_label_3m",
+      "sustained_active_2of3_post_label"
+    ],
+    "enabled_tracks": [
+      "S1",
+      "S7",
+      "S1_PLUS_S7",
+      "STRICT_CONTEXT"
+    ],
+    "analysis_kind": "activity",
+    "definition_b": {
+      "definition_name": "definition_b",
+      "metric_name": "future_business_active_weeks",
+      "operator": ">=",
+      "threshold": 1.0,
+      "rule_text": "future_business_active_weeks >= 1",
+      "sql_file": null,
+      "python_strategy": null
+    },
+    "definition_a_enabled": true,
+    "definition_a_strategy": "combinatorial_beam",
+    "definition_a_candidate_metrics": [
+      "future_business_active_weeks",
+      "future_sessions",
+      "future_session_minutes",
+      "future_interactions",
+      "future_activity_events",
+      "future_active_days",
+      "future_distinct_actions",
+      "future_downloads",
+      "future_content_views",
+      "future_mapped_lessons",
+      "future_formation_events"
+    ],
+    "definition_a_preferred_rule_text": "((future_business_active_weeks >= 3 OR future_distinct_actions >= 4) AND future_session_minutes >= 8.3138)",
+    "definition_a_max_rule_size": 4,
+    "definition_a_operators": [
+      "AND",
+      "OR"
+    ],
+    "definition_a_dedup_similarity_threshold": 0.95,
+    "definition_a_beam_width": 12,
+    "definition_a_min_incremental_gain": 0.0,
+    "definition_a_min_prevalence": 0.03,
+    "definition_a_sql_file": "",
+    "definition_a_python_strategy": "",
+    "definition_b_sql_file": "",
+    "definition_b_python_strategy": "",
+    "max_outer_test_months": 5,
+    "min_official_valid_outer_folds": 2,
+    "min_official_test_rows": 50,
+    "min_official_test_positives": 5,
+    "min_official_test_negatives": 20,
+    "tuning_enabled": true,
+    "tuning_n_iter": 4,
+    "tuning_max_inner_splits": 3,
+    "tuning_scoring": "neg_brier_score",
+    "model_family_scope": [
+      "logistic_regression",
+      "random_forest",
+      "catboost"
+    ],
+    "model_comparison_workers": 5,
+    "calibration_method": "sigmoid",
+    "feature_importance_permutation_repeats": 5,
+    "cluster_k_candidates": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "cluster_bootstrap_iterations": 20,
+    "cluster_sample_size": 10000,
+    "registered_band_policies": [
+      {
+        "policy_name": "top_10_percent",
+        "policy_type": "quantile_risk_cutoff",
+        "parameter_json": "{\"top_share\": 0.1}",
+        "description": "Marca como alto risco os 10% maiores valores de risk_score."
+      },
+      {
+        "policy_name": "tercis",
+        "policy_type": "tertile_risk_band",
+        "parameter_json": "{\"q_high\": 0.6666666666666666, \"q_low\": 0.3333333333333333}",
+        "description": "Separa risk_score em baixo, medio e alto pelos tercis empiricos."
+      },
+      {
+        "policy_name": "score_ge_0_70",
+        "policy_type": "fixed_risk_cutoff",
+        "parameter_json": "{\"risk_threshold\": 0.7}",
+        "description": "Marca como alto risco os casos com risk_score maior ou igual a 0.70."
+      }
+    ],
+    "heavy_user_percentile_policies": [
+      {
+        "policy_name": "heavy_top_10_percent",
+        "policy_type": "percentile_cutoff",
+        "parameter_json": "{\"top_share\": 0.10}",
+        "description": "Marca como heavy user os 10% maiores valores do heavy_intensity_score."
+      },
+      {
+        "policy_name": "heavy_top_20_percent",
+        "policy_type": "percentile_cutoff",
+        "parameter_json": "{\"top_share\": 0.20}",
+        "description": "Marca como heavy user os 20% maiores valores do heavy_intensity_score."
+      }
+    ]
+  },
+  "build_dir": "/Users/akatsurada/Documents/INSPER/Design/Aula_9/targeted_ml_modular_v1/build",
+  "output_tables": [
+    "core_cv_metric_folds_v1.parquet",
+    "core_cv_metric_summary_v1.parquet",
+    "core_cv_score_folds_v1.parquet",
+    "core_cv_score_summary_v1.parquet",
+    "core_definition_b_excessive_separation_v1.parquet",
+    "core_definition_b_feature_block_gain_folds_v1.parquet",
+    "core_definition_b_feature_block_gain_summary_v1.parquet",
+    "core_definition_candidates_test_frontier_v1.parquet",
+    "core_definition_candidates_train_v1.parquet",
+    "core_definition_external_validation_v1.parquet",
+    "core_definition_frontier_v1.parquet",
+    "core_definition_selection_v1.parquet",
+    "core_model_calibration_audit_v1.parquet",
+    "core_model_fold_metrics_v1.parquet",
+    "core_model_frontier_v1.parquet",
+    "core_model_predictions_v1.parquet",
+    "core_navigation_sequences_v1.parquet",
+    "core_navigation_transitions_v1.parquet",
+    "core_prediction_bootstrap_v1.parquet",
+    "core_scoring_scenarios_v1.parquet",
+    "governance_arbitrariness_registry_v1.parquet",
+    "governance_definition_candidate_metric_registry_v1.parquet",
+    "governance_feature_eligibility_v1.parquet",
+    "governance_feature_registry_v1.parquet",
+    "governance_label_registry_v1.parquet",
+    "governance_leakage_audit_v1.parquet",
+    "governance_leakage_summary_v1.parquet",
+    "governance_policy_registry_v1.parquet",
+    "governance_post_model_output_status_v1.parquet",
+    "governance_track_registry_v1.parquet",
+    "mart_first_session_journey_v1.parquet",
+    "mart_future_metrics_v1.parquet",
+    "mart_onboarding_population_v1.parquet",
+    "post_model_band_summary_v1.parquet",
+    "post_model_cluster_assignment_v1.parquet",
+    "post_model_cluster_profile_v1.parquet",
+    "post_model_cluster_summary_v1.parquet",
+    "post_model_cluster_validation_v1.parquet",
+    "post_model_confusion_matrix_v1.parquet",
+    "post_model_cv_confusion_folds_v1.parquet",
+    "post_model_cv_confusion_summary_v1.parquet",
+    "post_model_cv_threshold_folds_v1.parquet",
+    "post_model_cv_threshold_summary_v1.parquet",
+    "post_model_feature_importance_v1.parquet",
+    "post_model_heavy_user_profile_v1.parquet",
+    "post_model_heavy_user_scores_v1.parquet",
+    "post_model_heavy_user_summary_v1.parquet",
+    "post_model_monthly_fit_v1.parquet",
+    "post_model_reference_selection_v1.parquet",
+    "post_model_threshold_metrics_v1.parquet"
+  ]
+}
