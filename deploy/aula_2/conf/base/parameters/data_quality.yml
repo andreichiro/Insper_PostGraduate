@@ -10,7 +10,7 @@ data_quality:
       column_to_exist: ExpectColumnToExist
       column_not_null: ExpectColumnValuesToNotBeNull
       column_between: ExpectColumnValuesToBeBetween
-      table_min_rows: ExpectTableRowCountToBeGreaterThan
+      table_min_rows: ExpectTableRowCountToBeBetween
       target_distinct_in_set: ExpectColumnDistinctValuesToBeInSet
 
     not_null_severity: critical
@@ -34,5 +34,26 @@ data_quality:
     extra_expectations: []
 
   split:
+    classes:
+      column_to_exist: ExpectColumnToExist
+      column_values_in_set: ExpectColumnValuesToBeInSet
+      table_min_rows: ExpectTableRowCountToBeBetween
+    split_column_severity: critical
+    split_values_severity: critical
+    table_min_rows_critical_severity: critical
+    table_min_rows_warning_severity: warning
+    min_rows_per_split: 1
     min_minority_ratio: 0.05
     warn_when_split_rows_below: 5
+
+  freshness:
+    source_path: data/01_raw/diabetes-dataset-modelling.csv
+    warning_age_hours: 168
+    max_age_hours: 720
+
+  drift:
+    reference_split: train
+    compare_splits: [validation, test]
+    psi_bins: 10
+    stable_max: 0.10
+    moderate_max: 0.25

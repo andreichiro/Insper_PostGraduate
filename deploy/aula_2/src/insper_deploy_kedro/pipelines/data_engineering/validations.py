@@ -13,6 +13,10 @@ from insper_deploy_kedro.constants import SPLIT_COLUMN
 logger = logging.getLogger(__name__)
 
 
+def _normalize_severity(value: Any) -> str:
+    return str(value).split(".")[-1].lower()
+
+
 def _ge_expectation_class(class_name: str) -> type:
     """Resolve nome de classe em gx.expectations (mesmo espírito do class_path da modelagem)."""
     try:
@@ -33,10 +37,8 @@ def _make_batch(df: pd.DataFrame, asset_name: str) -> Any:
     """Cria um batch GX efêmero a partir de um DataFrame."""
     context = gx.get_context()
     ds_name = f"pandas_{asset_name}"
-    data_source = context.data_sources.add_pandas(ds_name)
-    data_asset = data_source.add_dataframe_asset(name=asset_name)
-    batch_def = data_asset.add_batch_definition_whole_dataframe(f"{asset_name}_batch")
-    return batch_def.get_batch(batch_parameters={"dataframe": df})
+    data_source = context.data_sources.add_or_update_pandas(ds_name)
+    return data_source.read_dataframe(df, asset_name=asset_name)
 
 
 def _run_expectations(batch: Any, expectations: list[Any]) -> dict[str, Any]:
@@ -49,13 +51,17 @@ def _run_expectations(batch: Any, expectations: list[Any]) -> dict[str, Any]:
         passed = result["success"]
         if not passed:
             all_passed = False
+        kwargs = {
+            k: v
+            for k, v in result["expectation_config"]["kwargs"].items()
+            if k != "batch_id"
+        }
+        severity = getattr(exp, "severity", None)
+        if severity is not None and "severity" not in kwargs:
+            kwargs["severity"] = _normalize_severity(severity)
         results.append({
             "expectation": type(exp).__name__,
-            "kwargs": {
-                k: v
-                for k, v in result["expectation_config"]["kwargs"].items()
-                if k != "batch_id"
-            },
+            "kwargs": kwargs,
             "success": passed,
             "result_detail": result.get("result", {}),
         })
@@ -126,10 +132,15 @@ def validate_clean_data(
     min_rows = int(cfg["min_rows"])
     table_cls = classes["table_min_rows"]
     table_sev = cfg.get("table_min_rows_severity", "critical")
+    table_kwargs: dict[str, Any] = {"severity": table_sev}
+    if table_cls == "ExpectTableRowCountToBeBetween":
+        table_kwargs["min_value"] = min_rows
+    else:
+        table_kwargs["value"] = min_rows
     expectations.append(
         _instantiate_expectation(
             table_cls,
-            {"value": min_rows, "severity": table_sev},
+            table_kwargs,
         ),
     )
 
@@ -154,7 +165,8 @@ def validate_clean_data(
     critical_failures = [
         r
         for r in report["results"]
-        if not r["success"] and r.get("kwargs", {}).get("severity") == "critical"
+        if not r["success"]
+        and _normalize_severity(r.get("kwargs", {}).get("severity")) == "critical"
     ]
     warning_failures = [
         r for r in report["results"] if not r["success"] and r not in critical_failures
@@ -182,16 +194,20 @@ def validate_clean_data(
     return cleaned_data
 
 
-def validate_split_data(
+def validate_split_data(  # noqa: PLR0912
     split_data: pd.DataFrame,
+    split_strategy_report: pd.DataFrame | None,
     split_ratio: dict[str, float],
     stratify_column: str | None,
     data_quality: dict[str, Any],
 ) -> pd.DataFrame:
-    """Checagens pós-split — thresholds só no YAML."""
+    """Checagens pós-split — GX declarativo mais warnings estatísticos leves."""
     cfg = data_quality["split"]
+    classes = cfg.get("classes", {})
     min_minority = float(cfg["min_minority_ratio"])
+    min_rows = int(cfg.get("min_rows_per_split", 1))
     warn_below = int(cfg["warn_when_split_rows_below"])
+    split_names = list(split_ratio.keys())
 
     logger.info(
         "validate_split_data: %d linhas, %d splits",
@@ -199,39 +215,123 @@ def validate_split_data(
         len(split_ratio),
     )
 
-    issues: list[str] = []
+    expectation_results: list[dict[str, Any]] = []
 
-    for split_name in split_ratio:
+    full_batch = _make_batch(split_data, "split_data")
+    full_expectations = [
+        _instantiate_expectation(
+            classes.get("column_to_exist", "ExpectColumnToExist"),
+            {
+                "column": SPLIT_COLUMN,
+                "severity": cfg.get("split_column_severity", "critical"),
+            },
+        ),
+        _instantiate_expectation(
+            classes.get("column_values_in_set", "ExpectColumnValuesToBeInSet"),
+            {
+                "column": SPLIT_COLUMN,
+                "value_set": split_names,
+                "severity": cfg.get("split_values_severity", "critical"),
+            },
+        ),
+    ]
+    full_report = _run_expectations(full_batch, full_expectations)
+    for result in full_report["results"]:
+        result["scope"] = "all_splits"
+    expectation_results.extend(full_report["results"])
+
+    if SPLIT_COLUMN not in split_data.columns:
+        critical_failures = [
+            result
+            for result in expectation_results
+            if not result["success"]
+            and _normalize_severity(result.get("kwargs", {}).get("severity"))
+            == "critical"
+        ]
+        msgs = [
+            f"{failure['scope']}: {failure['expectation']} {failure['kwargs']}"
+            for failure in critical_failures
+        ]
+        raise ValueError(
+            "validate_split_data: validação(ões) crítica(s) falharam: "
+            + "; ".join(msgs)
+        )
+
+    for split_name in split_names:
         split_df = split_data[split_data[SPLIT_COLUMN] == split_name]
-        n = len(split_df)
-
-        if n == 0:
-            issues.append(f"split '{split_name}' está vazio")
-            continue
-
-        if n < warn_below:
-            logger.warning(
-                "validate_split_data: split '%s' tem só %d linhas (< %d)",
-                split_name,
-                n,
-                warn_below,
-            )
+        split_batch = _make_batch(split_df, f"split_{split_name}")
+        split_expectations = [
+            _instantiate_expectation(
+                classes.get("table_min_rows", "ExpectTableRowCountToBeBetween"),
+                {
+                    "min_value": min_rows,
+                    "severity": cfg.get("table_min_rows_critical_severity", "critical"),
+                },
+            ),
+            _instantiate_expectation(
+                classes.get("table_min_rows", "ExpectTableRowCountToBeBetween"),
+                {
+                    "min_value": warn_below,
+                    "severity": cfg.get("table_min_rows_warning_severity", "warning"),
+                },
+            ),
+            _instantiate_expectation(
+                classes.get("column_values_in_set", "ExpectColumnValuesToBeInSet"),
+                {
+                    "column": SPLIT_COLUMN,
+                    "value_set": [split_name],
+                    "severity": cfg.get("split_values_severity", "critical"),
+                },
+            ),
+        ]
+        split_report = _run_expectations(split_batch, split_expectations)
+        for result in split_report["results"]:
+            result["scope"] = split_name
+        expectation_results.extend(split_report["results"])
 
         if stratify_column and stratify_column in split_df.columns:
             value_counts = split_df[stratify_column].value_counts(normalize=True)
-            minority = float(value_counts.min())
-            if minority < min_minority:
+            if not value_counts.empty and float(value_counts.min()) < min_minority:
                 logger.warning(
                     "validate_split_data: split '%s' classe minoritária %.1f%% (< %.0f%%)",
                     split_name,
-                    minority * 100,
+                    float(value_counts.min()) * 100,
                     min_minority * 100,
                 )
 
-    if issues:
-        raise ValueError(
-            "validate_split_data: " + "; ".join(issues),
+    critical_failures = [
+        result
+        for result in expectation_results
+        if not result["success"]
+        and _normalize_severity(result.get("kwargs", {}).get("severity")) == "critical"
+    ]
+    warning_failures = [
+        result
+        for result in expectation_results
+        if not result["success"] and result not in critical_failures
+    ]
+
+    for warning in warning_failures:
+        logger.warning(
+            "validate_split_data WARNING [%s]: %s %s",
+            warning.get("scope", "?"),
+            warning["expectation"],
+            warning["kwargs"],
         )
 
-    logger.info("validate_split_data: splits OK")
+    if critical_failures:
+        msgs = [
+            f"{failure['scope']}: {failure['expectation']} {failure['kwargs']}"
+            for failure in critical_failures
+        ]
+        raise ValueError(
+            "validate_split_data: validação(ões) crítica(s) falharam: "
+            + "; ".join(msgs),
+        )
+
+    logger.info(
+        "validate_split_data: %d criticals, %d warnings, splits OK",
+        len(critical_failures),
+        len(warning_failures),
+    )
     return split_data

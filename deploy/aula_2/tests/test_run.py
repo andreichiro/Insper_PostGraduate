@@ -10,5 +10,5 @@ class TestKedroRun:
     def test_kedro_run(self):
         bootstrap_project(Path.cwd())
 
-        with KedroSession.create(project_path=Path.cwd()) as session:
+        with KedroSession.create(project_path=Path.cwd(), env="ci") as session:
             assert session.run() is not None

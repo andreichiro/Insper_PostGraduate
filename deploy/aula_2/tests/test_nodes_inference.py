@@ -1,10 +1,14 @@
-"""Testes dos nodes de inferência — to_dataframe e predict."""
+"""Testes dos nodes de inferência — to_dataframe, predict e risk report."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from insper_deploy_kedro.pipelines.inference.nodes import predict, to_dataframe
+from insper_deploy_kedro.pipelines.inference.nodes import (
+    build_risk_report,
+    predict,
+    to_dataframe,
+)
 
 
 class TestToDataframe:
@@ -46,3 +50,77 @@ class TestPredict:
         original_cols = set(master_table.columns)
         result = predict(master_table, trained_model)
         assert original_cols.issubset(set(result.columns))
+
+    def test_uses_decision_threshold_when_present(self, master_table, trained_model):
+        baseline = predict(master_table, trained_model)
+        thresholded_artifact = {
+            **trained_model,
+            "decision_threshold": 0.99,
+        }
+        thresholded = predict(master_table, thresholded_artifact)
+
+        assert "prediction_proba" in thresholded.columns
+        assert thresholded["prediction"].sum() <= baseline["prediction"].sum()
+
+    def test_adds_risk_score_and_risk_band_when_configured(
+        self, master_table, trained_model
+    ):
+        artifact = {
+            **trained_model,
+            "risk_bands": [
+                {
+                    "name": "low",
+                    "label": "Baixo risco",
+                    "min_probability": 0.0,
+                    "max_probability": 0.5,
+                },
+                {
+                    "name": "high",
+                    "label": "Alto risco",
+                    "min_probability": 0.5,
+                    "max_probability": 1.01,
+                },
+            ],
+        }
+        result = predict(master_table, artifact)
+
+        assert "risk_score" in result.columns
+        assert "risk_band" in result.columns
+
+
+class TestBuildRiskReport:
+    def test_builds_readable_ranked_report(self):
+        source = pd.DataFrame(
+            [
+                {"Glucose": 148, "BMI": 33.6, "Age": 50},
+                {"Glucose": 95, "BMI": 24.2, "Age": 31},
+            ]
+        )
+        predictions = pd.DataFrame(
+            [
+                {
+                    "prediction": 1,
+                    "prediction_proba": 0.91,
+                    "risk_score": 91.0,
+                    "risk_band": "Alto risco",
+                },
+                {
+                    "prediction": 0,
+                    "prediction_proba": 0.20,
+                    "risk_score": 20.0,
+                    "risk_band": "Baixo risco",
+                },
+            ]
+        )
+        model_artifact = {
+            "decision_policy_name": "prioritize_recall",
+            "decision_threshold": 0.3,
+        }
+
+        report = build_risk_report(source, predictions, model_artifact)
+
+        assert list(report["risk_priority_rank"]) == [1, 2]
+        assert list(report["case_id"]) == [1, 2]
+        assert list(report["prediction_label"]) == ["Positivo", "Negativo"]
+        assert list(report["decision_policy_name"].unique()) == ["prioritize_recall"]
+        assert "recommended_action" in report.columns

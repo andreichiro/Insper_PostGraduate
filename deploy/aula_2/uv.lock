@@ -1278,6 +1278,7 @@ dependencies = [
     { name = "kedro", extra = ["jupyter"] },
     { name = "kedro-datasets", extra = ["matplotlib-matplotlibdataset", "pandas-csvdataset", "pandas-exceldataset", "pandas-parquetdataset", "pickle-pickledataset", "plotly-jsondataset", "plotly-plotlydataset"] },
     { name = "kedro-viz" },
+    { name = "marshmallow" },
     { name = "matplotlib" },
     { name = "optuna" },
     { name = "pyyaml" },
@@ -1327,6 +1328,7 @@ requires-dist = [
     { name = "kedro", extras = ["jupyter"], specifier = "~=1.2.0" },
     { name = "kedro-datasets", extras = ["matplotlib-matplotlibdataset", "pandas-csvdataset", "pandas-exceldataset", "pandas-parquetdataset", "pickle-pickledataset", "plotly-jsondataset", "plotly-plotlydataset"], specifier = ">=9.1" },
     { name = "kedro-viz", specifier = ">=6.7.0" },
+    { name = "marshmallow", specifier = ">=3.7.1,<3.24" },
     { name = "matplotlib", specifier = ">=3.7" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=1.0,<2.1" },
     { name = "nbsphinx", marker = "extra == 'docs'", specifier = "==0.8.1" },
@@ -2001,14 +2003,14 @@ wheels = [
 
 [[package]]
 name = "marshmallow"
-version = "3.26.2"
+version = "3.23.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57", size = 222095, upload-time = "2025-12-22T06:53:53.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/c0/d674c9de69227beafa41e1601b0c48b8b51060212abc231d4332e4b1e794/marshmallow-3.23.3.tar.gz", hash = "sha256:d586c8685ebdb80bf754e1f96e3f305aaf30951f1fc69175b977453633467e76", size = 175606, upload-time = "2025-01-03T20:18:41.52Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73", size = 50964, upload-time = "2025-12-22T06:53:51.801Z" },
+    { url = "https://files.pythonhosted.org/packages/af/82/d8c37cc92948ce11e5d8d71602bbac7ac4257f9e1f918fd91b1ddac4ec97/marshmallow-3.23.3-py3-none-any.whl", hash = "sha256:20c0f8c613f68bcb45b2a0d3282e2f172575560170bf220d67aafb42717910e4", size = 48911, upload-time = "2025-01-03T20:18:39.62Z" },
 ]
 
 [[package]]

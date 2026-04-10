@@ -15,7 +15,7 @@ from insper_deploy_kedro.pipelines.data_engineering.nodes import (
     transform_scalers,
 )
 
-from .nodes import predict
+from .nodes import build_risk_report, predict
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
@@ -56,6 +56,13 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 outputs="predictions",
                 name="predict_node",
                 tags=["inference", "prediction"],
+            ),
+            node(
+                func=build_risk_report,
+                inputs=["featured_inference", "predictions", "production_model"],
+                outputs="risk_report",
+                name="build_risk_report_node",
+                tags=["inference", "reporting"],
             ),
         ]
     )
