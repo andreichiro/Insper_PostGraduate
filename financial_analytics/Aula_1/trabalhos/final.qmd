@@ -1,0 +1,132 @@
+---
+title: "Trabalho Final"
+subtitle: "Análise de Portfólio com Gestão de Risco"
+---
+
+## Objetivo
+
+Aplicar os conceitos da **Parte 2** (volatilidade, VaR, CAPM, otimização) para construir e avaliar um portfólio de investimentos com **gestão de risco integrada**.
+
+::: {.callout-important}
+## Formato da Entrega
+- **Notebook Jupyter** (.ipynb) com código reprodutível
+- **Apresentação** de 10 minutos (slides ou notebook)
+- **Prazo**: semana de 15 de junho (domingo 22/jun, 23h59)
+- **Dupla ou trio** (indicar no notebook)
+:::
+
+## Especificação
+
+Monte um **relatório de análise financeira** que simule uma apresentação ao comitê de investimentos.
+
+### 1. Seleção de Ativos (20%)
+
+- Escolha **6 ativos** (ações, ETFs ou FIIs) do mercado brasileiro ou externo
+  — podem ser do mesmo setor (tecnologia, varejo, bancos etc.) ou de setores distintos,
+  desde que tenham histórico compatível
+- **Justificativa de negócios** para cada ativo: entender fundamentalmente o negócio
+  da empresa e correlacioná-lo com os achados quantitativos (*storytelling*)
+- Análise descritiva individual: gráficos de preços e retornos, com **comentários
+  explícitos sobre possível heterocedasticidade condicional**
+- Download de dados via `yfinance` (mínimo 3 anos de dados diários)
+
+### 2. Modelagem de Volatilidade (25%)
+
+- Ajuste modelos **GARCH univariados** para cada ativo e escolha o mais adequado via
+  critérios de informação e/ou validação cruzada
+- Compare ao menos duas variantes (ex: GARCH vs. EGARCH vs. GJR-GARCH)
+- Use distribuição **$t$ de Student** (justifique)
+- Interprete os parâmetros: persistência, efeito alavancagem, half-life
+- **Previsão um passo à frente** da volatilidade de cada ativo
+- **Comparação entre ativos**: quais volatilidades são maiores/menores?
+  Relacione com o *storytelling* de cada negócio
+- **Volatilidade do portfólio**: calcule os retornos do portfólio usando pesos
+  iniciais, ajuste um modelo de volatilidade para a série agregada e faça a previsão
+  um passo à frente da volatilidade da carteira
+
+### 3. Gestão de Risco (25%)
+
+- Calcule **VaR** e **Expected Shortfall** do portfólio
+- Use pelo menos 2 abordagens (paramétrico + histórico, ou + Monte Carlo)
+- **Backtesting** do VaR com teste de Kupiec
+- Classifique o modelo pelo semáforo de Basileia
+- Análise de cenários de stress (ex: queda de 5% do Ibovespa)
+
+### 4. CAPM e Otimização de Portfólio (20%)
+
+- **Betas individuais** de cada ativo estimados via regressão simples contra um índice
+  de mercado adequado (Ibovespa / S&P 500), com comentários sobre magnitude e sinal
+- **Beta do portfólio** inicial (pesos definidos por vocês) assumindo as hipóteses do CAPM
+- Construa a **fronteira eficiente** com seus ativos
+- Identifique o portfólio de **máximo Sharpe** e o de **mínima variância**
+- Aplique **restrições realistas** (ex: $w_i \leq 30\%$, long-only)
+- **Repita o cálculo de volatilidade e beta do portfólio otimizado** e compare com
+  o portfólio inicial: o risco diminuiu? O beta mudou? O retorno esperado melhorou?
+- Compare com uma alocação equal-weight (1/N)
+- Backtest de 6 meses (walk-forward)
+
+### 5. Apresentação e Conclusão (10%)
+
+- Resumo executivo para não-técnicos
+- Qual portfólio você recomendaria ao comitê? Por quê?
+- Quais os riscos que o comitê deveria monitorar?
+- Limitações da análise e próximos passos
+
+**Perguntas que o relatório deve responder explicitamente**
+
+- O portfólio escolhido tem beta acima ou abaixo de 1? Como interpretar isso?
+- Como se comparam os **betas individuais** dos ativos selecionados?
+- Qual a volatilidade histórica da carteira vs. a volatilidade prevista?
+- Como foram os **retornos dos últimos 12 meses** vis-à-vis a volatilidade observada?
+- A otimização entregou uma carteira dominante no sentido de Markowitz?
+
+## Critérios de Avaliação
+
+| Critério | Peso | Excelente | Adequado | Insuficiente |
+|----------|------|-----------|----------|-------------|
+| Seleção | 20% | Diversificada, justificada | Razoável | Sem justificativa |
+| GARCH | 25% | Múltiplos modelos, interpretação | 1 modelo correto | Sem GARCH |
+| Risco | 25% | VaR + ES + backtest + stress | VaR básico | Incompleto |
+| Portfólio | 20% | Fronteira + Sharpe + backtest | Otimização básica | Sem otimização |
+| Apresentação | 10% | Clara, executiva, crítica | Funcional | Confusa |
+
+::: {.callout-tip}
+## Dicas
+1. **Comece pela qualidade dos dados**: dados limpos são a base de tudo
+2. **Use `arch`** para GARCH e `scipy.optimize` para portfólios
+3. **Interprete, não apenas calcule**: o comitê quer entender, não ver código
+4. **Teste de robustez**: seus resultados mudam se usar janela diferente?
+5. **Conecte as peças**: o GARCH alimenta o VaR, que alimenta a otimização
+:::
+
+## Apresentação Final
+
+Na sessão presencial de **13 de junho**, cada grupo apresentará em **10 minutos**:
+
+1. Quais ativos e por quê (2 min)
+2. O que a volatilidade revela (3 min)
+3. Gestão de risco: VaR e cenários (3 min)
+4. Recomendação final ao comitê (2 min)
+
+Seguido de **5 minutos de perguntas** no formato *Tribunal Estatístico*.
+
+## Critérios narrativos
+
+Além dos critérios quantitativos acima, a avaliação leva em conta:
+
+- **Storytelling** — a apresentação conta uma história coerente?
+- **Visual e coerência** do texto/slides
+- **Incorporação dos ensinamentos das aulas** (conexão explícita com VaR, GARCH, CAPM)
+- **Seleção correta dos modelos** com justificativa técnica
+- **Qualidade dos códigos** (reprodutibilidade, organização, legibilidade)
+- **Profundidade das conclusões**
+
+## Referências e materiais de apoio
+
+Notebooks de referência da Profa. Paloma disponíveis em
+[Materiais Complementares](../complementar/index.qmd):
+
+- `aula04-volatilidade-arch-python.ipynb` — pipeline `arch` em Python
+- `aula04-volatilidade-garch-r.qmd` — GARCH, rugarch e SV em R
+- `aula05-capm-var-yfinance.ipynb` — CAPM, VaR e rolling betas
+- `aula06-otimizacao-markowitz.ipynb` — fronteira eficiente via `scipy.optimize`

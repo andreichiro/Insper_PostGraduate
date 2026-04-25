@@ -1,0 +1,131 @@
+---
+title: "Trabalho Intermediário"
+subtitle: "Previsão de Série Temporal com Dados Reais"
+---
+
+## Objetivo
+
+Aplicar os conceitos da **Parte 1** (séries temporais, ARIMA, previsão e validação) a um problema real de previsão. Você receberá uma série temporal mensal real e deverá produzir as **melhores previsões possíveis** para os 12 meses seguintes.
+
+::: {.callout-important}
+## Formato da Entrega
+- **Notebook Jupyter** (.ipynb) com código reprodutível
+- **Prazo**: semana de 18 de maio (domingo 24/mai, 23h59)
+- **Individual ou dupla** (indicar no notebook)
+:::
+
+## O Desafio
+
+Você receberá uma série temporal mensal com dados até um certo ponto. Os **últimos 12 meses foram ocultados** — eles serão usados para avaliar suas previsões. Você não sabe qual é a série (e não deve tentar descobrir durante o desafio).
+
+### Dados
+
+O dataset será disponibilizado no repositório do curso em formato CSV. A série:
+
+- Tem frequência **mensal**
+- Possui **sazonalidade** clara
+- Tem pelo menos 5 anos de histórico
+- É uma série real de negócios/economia
+
+### O que entregar
+
+Seu notebook deve conter **obrigatoriamente**:
+
+### 1. Análise Exploratória (20%)
+
+- Gráfico da série temporal
+- Decomposição (clássica ou STL) — explique os componentes considerando o aspecto da série
+- ACF e PACF da série original e diferenciada
+- Testes de estacionariedade (ADF e KPSS) com **conclusão explícita sobre tendência estocástica**
+- Identificação de sazonalidade (e sua periodicidade), tendência e outliers
+- Discussão: o que os dados "dizem"?
+
+### 2. Modelagem (30%)
+
+- Pelo menos **3 modelos candidatos** (ex: ARIMA, SARIMA, ETS, Prophet)
+- Justificativa para a escolha de cada modelo — critérios de informação e/ou etapa de
+  identificação da abordagem Box-Jenkins
+- Uso de `statsforecast.AutoARIMA` ou identificação manual via Box-Jenkins
+- Parâmetros estimados e sua interpretação
+- **Diagnóstico residual**: verificar se os resíduos do modelo ARIMA/SARIMA escolhido
+  se comportam como ruído branco (ACF dos resíduos, teste de Ljung-Box)
+
+### 3. Validação Cruzada Temporal (25%)
+
+- Implementação de **time series cross-validation** (expanding ou sliding window)
+- Cálculo de **MAE, RMSE e MASE** para cada modelo
+- Comparação dos modelos em tabela e/ou gráfico
+- Discussão: qual modelo é melhor e por quê?
+
+### 4. Previsão Final (15%)
+
+- Previsão de **12 meses** à frente com o melhor modelo
+- Intervalos de confiança de 80% e 95%
+- Gráfico com a série histórica + previsão + intervalos
+- Arquivo `previsao.csv` com colunas: `data`, `previsao`, `ic_80_inf`, `ic_80_sup`, `ic_95_inf`, `ic_95_sup`
+
+### 5. Discussão (10%)
+
+- Limitações do modelo escolhido
+- O que poderia melhorar com mais dados ou técnicas avançadas?
+- Se esta fosse uma previsão para decisão de negócio, quais cuidados adicionais você teria?
+
+## Critérios de Avaliação
+
+| Critério | Peso | Excelente | Adequado | Insuficiente |
+|----------|------|-----------|----------|-------------|
+| Exploratória | 20% | Completa, com insights | Básica mas correta | Incompleta |
+| Modelagem | 30% | Múltiplos modelos justificados | 2-3 modelos sem justificativa profunda | Apenas 1 modelo |
+| Validação | 25% | CV temporal correto, métricas comparadas | CV feito mas com falhas | Sem CV ou com leakage |
+| Previsão | 15% | Acurácia alta, intervalos calibrados | Acurácia razoável | Previsão pobre |
+| Discussão | 10% | Reflexão crítica e profunda | Superficial | Ausente |
+
+::: {.callout-tip}
+## Dicas
+1. **Não complique demais**: um SARIMA bem ajustado geralmente supera modelos complexos mal calibrados
+2. **Valide antes de prever**: use cross-validation temporal, não apenas um split treino/teste
+3. **Interprete seus resultados**: não basta gerar números — explique o que eles significam
+4. **Código limpo**: use funções, comentários e organize seu notebook em seções claras
+5. **statsforecast** é seu amigo: `AutoARIMA`, `AutoETS` e `AutoCES` facilitam a comparação
+:::
+
+## Competição (Bônus)
+
+As previsões serão avaliadas contra os dados reais ocultos usando **MASE**. Os 3 melhores resultados receberão bônus na nota:
+
+| Posição | Bônus |
+|---------|-------|
+| 1º lugar | +1.0 ponto |
+| 2º lugar | +0.7 ponto |
+| 3º lugar | +0.5 ponto |
+
+A métrica de ranking é o **MASE** (Mean Absolute Scaled Error) — ela permite comparação justa independente da escala da série.
+
+## Desafio adicional: série de periodicidade desconhecida (2 pontos extras)
+
+::: {.callout-important}
+## Base `dados_amostra.csv`
+Será disponibilizada no repositório do curso uma base contendo uma segunda série temporal
+cuja **periodicidade não é informada** (pode ser diária, horária, semanal etc.).
+As **18 observações mais recentes foram ocultadas** propositalmente para avaliar a
+qualidade da sua previsão.
+:::
+
+Seu objetivo:
+
+a. Ajustar modelos de séries temporais apropriados (pode escolher modelos vistos em sala
+   e outros não vistos — DARTS, NBEATS, XGBoost, o que preferir).
+b. Escolher o melhor modelo via **backtest** e métricas de validação apropriadas.
+c. Usar o modelo para prever as próximas **18 observações**.
+d. Exportar as previsões em `previsao_amostra.csv` e submeter junto com a entrega principal.
+
+Essa questão será avaliada pelo **RMSE** sobre as 18 observações ocultadas; os grupos
+com melhores predições recebem bônus adicional na nota do trabalho.
+
+## Referências e materiais de apoio
+
+- Notebooks originais da Profa. Paloma disponíveis em
+  [Materiais Complementares](../complementar/index.qmd), em especial
+  `aula03-darts-forecasting.ipynb` para alternativas ao SARIMA/Prophet.
+- Livro-base: Hyndman & Athanasopoulos, *Forecasting: Principles and Practice* (3ª ed.,
+  FPP3).

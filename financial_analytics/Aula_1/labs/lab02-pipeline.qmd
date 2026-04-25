@@ -1,0 +1,301 @@
+---
+title: "Lab 2: Pipeline de Previsão End-to-End"
+subtitle: "Do dado bruto ao forecast validado"
+---
+
+::: {.objetivos}
+#### Objetivos do Lab
+
+- [Aplicar]{.bloom-badge .bloom-aplicar} o procedimento Box-Jenkins completo em Python
+- [Analisar]{.bloom-badge .bloom-analisar} resultados de diagnóstico e critérios de informação
+- [Avaliar]{.bloom-badge .bloom-avaliar} modelos via cross-validation temporal
+- [Criar]{.bloom-badge .bloom-criar} um pipeline reprodutível de previsão
+:::
+
+## Setup
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from statsmodels.tsa.seasonal import STL
+
+from statsforecast import StatsForecast
+from statsforecast.models import AutoARIMA, SeasonalNaive, Naive
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+import warnings
+warnings.filterwarnings('ignore')
+
+INSPER_RED = '#E50505'
+INSPER_TURQUESA = '#3ACC9F'
+INSPER_AMARELO = '#FFCC00'
+INSPER_GRAY = '#5B5B5B'
+```
+
+## Caso Prático: Transferências do Tesouro Nacional
+
+Vamos prever as transferências federais a estados e municípios — um dado relevante para planejamento fiscal.
+
+```{python}
+# Baixar dados do BCB (série 7478 - Transferências da União)
+url = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.7478/dados?formato=csv"
+df = pd.read_csv(url, sep=";", decimal=",")
+df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y')
+df = df.set_index('data').sort_index()
+df.columns = ['valor']
+df = df.loc['2005':]
+
+# Formato para statsforecast
+sf_df = df.reset_index()
+sf_df.columns = ['ds', 'y']
+sf_df['unique_id'] = 'transferencias'
+sf_df = sf_df[['unique_id', 'ds', 'y']]
+
+print(f"Série: {len(sf_df)} observações, de {sf_df.ds.min().date()} a {sf_df.ds.max().date()}")
+```
+
+## Etapa 1: Análise Exploratória
+
+```{python}
+fig = px.line(df, y='valor',
+              title='Transferências Federais (R$ milhões)',
+              template='plotly_white')
+fig.update_traces(line_color=INSPER_RED)
+fig.update_layout(font_family='Inter', hovermode='x unified')
+fig.show()
+```
+
+```{python}
+# Diagnóstico visual completo
+fig, axes = plt.subplots(4, 1, figsize=(12, 14))
+
+# Série original
+axes[0].plot(df.index, df['valor'], color=INSPER_RED, linewidth=0.8)
+axes[0].set_title('Série Original', fontweight='bold')
+
+# Decomposição STL
+serie_mensal = df['valor'].asfreq('MS').interpolate()
+stl = STL(serie_mensal, period=12, robust=True)
+res = stl.fit()
+axes[1].plot(res.trend, color=INSPER_TURQUESA, label='Tendência')
+axes[1].legend()
+axes[1].set_title('Tendência (STL)', fontweight='bold')
+
+# ACF
+plot_acf(df['valor'].dropna(), ax=axes[2], lags=36, zero=False)
+axes[2].set_title('ACF')
+
+# PACF
+plot_pacf(df['valor'].dropna(), ax=axes[3], lags=36, zero=False)
+axes[3].set_title('PACF')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Etapa 2: Testes e Diferenciação
+
+```{python}
+from statsforecast.arima import ndiffs, nsdiffs
+
+# Número de diferenciações necessárias
+d = ndiffs(df['valor'].values)
+D = nsdiffs(df['valor'].values, period=12)
+
+print(f"Diferenciações regulares necessárias (d): {d}")
+print(f"Diferenciações sazonais necessárias (D): {D}")
+```
+
+```{python}
+# Aplicar diferenciações e visualizar
+serie = df['valor'].copy()
+
+if D > 0:
+    serie = serie.diff(12).dropna()
+if d > 0:
+    serie = serie.diff().dropna()
+
+fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+
+axes[0].plot(serie, color=INSPER_RED, linewidth=0.8)
+axes[0].set_title(f'Série Diferenciada (d={d}, D={D})', fontweight='bold')
+axes[0].axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+
+plot_acf(serie.dropna(), ax=axes[1], lags=36, zero=False)
+axes[1].set_title('ACF — Série Diferenciada')
+
+plot_pacf(serie.dropna(), ax=axes[2], lags=36, zero=False)
+axes[2].set_title('PACF — Série Diferenciada')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Etapa 3: Modelagem com statsforecast
+
+```{python}
+# Modelos candidatos
+modelos = [
+    AutoARIMA(season_length=12, alias='auto_arima'),
+    AutoARIMA(season_length=12, stepwise=False, alias='auto_arima_full'),
+    SeasonalNaive(season_length=12, alias='snaive'),
+    Naive(alias='naive'),
+]
+
+sf = StatsForecast(models=modelos, freq='MS', n_jobs=-1)
+sf.fit(df=sf_df)
+
+# Resumo dos modelos ajustados
+for i, model in enumerate(sf.fitted_):
+    print(f"Modelo {i}: {model}")
+```
+
+## Etapa 4: Cross-Validation Temporal
+
+```{python}
+# Cross-validation com janela expandida
+# Prever 12 meses à frente, testando em 5 janelas
+cv_results = sf.cross_validation(
+    df=sf_df,
+    h=12,           # horizonte de previsão
+    step_size=12,   # mover janela 12 meses por vez
+    n_windows=5     # 5 janelas de teste
+)
+
+cv_results.head(20)
+```
+
+```{python}
+# Calcular métricas por modelo
+from functools import reduce
+
+def calcular_metricas(cv_df, model_col):
+    """Calcula MAE, RMSE e MAPE para um modelo"""
+    mask = cv_df[model_col].notna()
+    y_true = cv_df.loc[mask, 'y']
+    y_pred = cv_df.loc[mask, model_col]
+
+    return {
+        'MAE': mean_absolute_error(y_true, y_pred),
+        'RMSE': np.sqrt(mean_squared_error(y_true, y_pred)),
+        'MAPE': np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    }
+
+model_cols = ['auto_arima', 'auto_arima_full', 'snaive', 'naive']
+metricas = {col: calcular_metricas(cv_results, col) for col in model_cols}
+metricas_df = pd.DataFrame(metricas).T
+metricas_df.sort_values('RMSE')
+```
+
+## Etapa 5: Diagnóstico do Melhor Modelo
+
+```{python}
+# Reajustar o melhor modelo com statsmodels para diagnóstico detalhado
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+# Ajustar SARIMA (use a ordem encontrada pelo AutoARIMA)
+# Exemplo: SARIMA(1,1,1)(0,1,1)[12]
+modelo = SARIMAX(df['valor'], order=(1,1,1), seasonal_order=(0,1,1,12))
+resultado = modelo.fit(disp=False)
+print(resultado.summary())
+```
+
+```{python}
+# Diagnóstico residual
+residuos = resultado.resid
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+
+# Resíduos ao longo do tempo
+axes[0,0].plot(residuos, color=INSPER_GRAY, linewidth=0.5)
+axes[0,0].axhline(y=0, color=INSPER_RED, linewidth=1)
+axes[0,0].set_title('Resíduos', fontweight='bold')
+
+# Histograma
+axes[0,1].hist(residuos.dropna(), bins=40, color=INSPER_RED, alpha=0.7, density=True)
+axes[0,1].set_title('Distribuição dos Resíduos', fontweight='bold')
+
+# ACF dos resíduos
+plot_acf(residuos.dropna(), ax=axes[1,0], lags=36, zero=False)
+axes[1,0].set_title('ACF — Resíduos')
+
+# QQ-Plot
+from scipy import stats
+stats.probplot(residuos.dropna(), plot=axes[1,1])
+axes[1,1].set_title('QQ-Plot', fontweight='bold')
+
+plt.tight_layout()
+plt.show()
+
+# Teste de Ljung-Box
+lb = acorr_ljungbox(residuos.dropna(), lags=24, return_df=True)
+print("\nTeste de Ljung-Box (lags selecionados):")
+print(lb.iloc[[5, 11, 17, 23]])
+```
+
+## Etapa 6: Previsão Final
+
+```{python}
+# Forecast 12 meses à frente
+forecast = sf.forecast(df=sf_df, h=12, level=[80, 95])
+
+fig = go.Figure()
+
+# Dados históricos
+fig.add_trace(go.Scatter(x=sf_df['ds'], y=sf_df['y'],
+                          mode='lines', name='Observado',
+                          line=dict(color=INSPER_GRAY)))
+
+# Previsão
+fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['auto_arima'],
+                          mode='lines+markers', name='Previsão ARIMA',
+                          line=dict(color=INSPER_RED, width=2)))
+
+fig.update_layout(
+    title='Previsão 12 Meses — Transferências Federais',
+    template='plotly_white', font_family='Inter',
+    hovermode='x unified'
+)
+fig.show()
+```
+
+## Dinâmica: Code Review em Pares
+
+::: {.callout-important}
+## Instruções
+
+1. **Troque** seu notebook com um colega
+2. Analise as **decisões** do colega:
+   - A diferenciação faz sentido?
+   - O modelo escolhido é justificado?
+   - O diagnóstico foi feito corretamente?
+3. Escreva **3 pontos positivos** e **2 sugestões de melhoria**
+4. Apresente ao colega em 5 minutos
+:::
+
+## Exercício para Entrega Intermediária
+
+::: {.callout-important}
+## Entrega Intermediária: Orientações
+
+Escolha uma série temporal mensal com pelo menos 5 anos de dados. Faça:
+
+1. **Análise exploratória** completa (gráficos, ACF/PACF, decomposição)
+2. **Testes** de estacionariedade e decisão sobre diferenciação
+3. **Modelagem** com pelo menos 3 modelos candidatos
+4. **Cross-validation** temporal com métricas de erro
+5. **Diagnóstico** residual do melhor modelo
+6. **Previsão** com intervalos de confiança
+7. **Interpretação** de negócios: o que a previsão significa para a tomada de decisão?
+
+**Formato**: notebook Python (.ipynb ou .qmd) com texto explicativo.
+:::

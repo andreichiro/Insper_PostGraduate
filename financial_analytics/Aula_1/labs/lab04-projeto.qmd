@@ -1,0 +1,192 @@
+---
+title: "Lab 4: Projeto Final — Office Hours"
+subtitle: "Notebook de referência e orientações para entrega"
+---
+
+::: {.objetivos}
+#### Objetivos do Lab
+
+- [Criar]{.bloom-badge .bloom-criar} uma análise completa de portfólio com gestão de risco
+- [Avaliar]{.bloom-badge .bloom-avaliar} decisões de investimento com fundamentação estatística
+:::
+
+## Orientações para o Projeto Final
+
+::: {.callout-important}
+## Entrega Final: Especificação
+
+Monte um **relatório de análise financeira** que simule uma apresentação ao comitê de investimentos da sua empresa. O relatório deve conter:
+
+### 1. Seleção de Ativos (20%)
+- Escolha 5–10 ativos com justificativa de negócios
+- Análise descritiva individual (retornos, volatilidade, fatos estilizados)
+
+### 2. Modelagem de Volatilidade (25%)
+- Ajuste GARCH (ou variante) para pelo menos 3 ativos
+- Diagnóstico e interpretação dos parâmetros
+- Previsão de volatilidade
+
+### 3. Gestão de Risco (25%)
+- Cálculo de VaR (pelo menos 2 métodos)
+- Expected Shortfall
+- Backtesting do VaR
+
+### 4. Otimização de Portfólio (20%)
+- Fronteira eficiente com restrições realistas
+- Comparação com benchmark
+- Backtest da carteira otimizada
+
+### 5. Recomendação (10%)
+- Conclusão orientada a negócios
+- Limitações da análise
+- Próximos passos sugeridos
+
+**Formato**: notebook Python (.ipynb ou .qmd) com texto explicativo claro.
+**Prazo**: semana de 15 de junho de 2026.
+:::
+
+## Notebook de Referência: VaR com GARCH
+
+Este notebook serve como **template** para a parte de gestão de risco do projeto.
+
+```{python}
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from arch import arch_model
+from scipy import stats
+
+INSPER_RED = '#E50505'
+INSPER_TURQUESA = '#3ACC9F'
+```
+
+### VaR Paramétrico com GARCH
+
+```{python}
+# Baixar dados
+ativo = 'PETR4.SA'
+precos = yf.download(ativo, start='2018-01-01', auto_adjust=False, progress=False)['Adj Close'].squeeze()
+retornos = np.log(precos / precos.shift(1)).dropna()
+
+# Ajustar GARCH(1,1) com t-Student
+modelo = arch_model(retornos * 100, vol='Garch', p=1, q=1, dist='t')
+resultado = modelo.fit(disp='off')
+
+# Volatilidade condicional (diária)
+vol_cond = resultado.conditional_volatility / 100
+graus_liberdade = resultado.params['nu']
+
+# VaR 95% paramétrico (usando t-Student)
+alpha = 0.05
+quantil_t = stats.t.ppf(alpha, df=graus_liberdade)
+var_95_parametrico = resultado.params['mu']/100 + quantil_t * vol_cond
+
+print(f"VaR 95% paramétrico (último dia): {var_95_parametrico.iloc[-1]:.4f}")
+print(f"  = perda máxima esperada de {abs(var_95_parametrico.iloc[-1])*100:.2f}%")
+```
+
+### VaR Histórico
+
+```{python}
+# VaR histórico com janela móvel de 252 dias
+janela = 252
+var_95_historico = retornos.rolling(janela).quantile(alpha)
+
+print(f"VaR 95% histórico (último dia): {var_95_historico.iloc[-1]:.4f}")
+```
+
+### Backtesting
+
+```{python}
+# Comparar violações
+periodo_teste = retornos.loc['2023':]
+var_param_teste = var_95_parametrico.loc['2023':]
+var_hist_teste = var_95_historico.loc['2023':]
+
+# Alinhar índices
+idx = periodo_teste.index.intersection(var_param_teste.index).intersection(var_hist_teste.index)
+ret_teste = periodo_teste.loc[idx]
+vp = var_param_teste.loc[idx]
+vh = var_hist_teste.loc[idx]
+
+violacoes_param = (ret_teste < vp).sum()
+violacoes_hist = (ret_teste < vh).sum()
+n_dias = len(ret_teste)
+esperado = n_dias * alpha
+
+print(f"Período de teste: {n_dias} dias")
+print(f"Violações esperadas (5%): {esperado:.0f}")
+print(f"Violações VaR Paramétrico: {violacoes_param}")
+print(f"Violações VaR Histórico: {violacoes_hist}")
+
+# Visualização
+fig, ax = plt.subplots(figsize=(14, 5))
+ax.plot(ret_teste.index, ret_teste, color='#5B5B5B', linewidth=0.5, alpha=0.7, label='Retornos')
+ax.plot(vp.index, vp, color=INSPER_RED, linewidth=1, label='VaR Param.')
+ax.fill_between(ret_teste.index,
+                ret_teste.min(),
+                ret_teste.where(ret_teste < vp),
+                alpha=0.3, color=INSPER_RED, label='Violações')
+ax.set_title('Backtesting VaR 95%', fontweight='bold')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Tópicos Avançados (Referência)
+
+### Pair Trading com Cointegração
+
+```{python}
+from statsmodels.tsa.stattools import coint
+
+# Testar cointegração entre dois bancos
+ativos_pair = ['ITUB4.SA', 'BBDC4.SA']
+precos_pair = yf.download(ativos_pair, start='2018-01-01', auto_adjust=False, progress=False)['Adj Close'].dropna()
+
+# Teste de Engle-Granger
+score, pvalue, _ = coint(precos_pair.iloc[:, 0], precos_pair.iloc[:, 1])
+print(f"Teste de Cointegração Engle-Granger:")
+print(f"  Estatística: {score:.4f}")
+print(f"  p-valor: {pvalue:.4f}")
+print(f"  {'Cointegrados!' if pvalue < 0.05 else 'Não cointegrados.'}")
+```
+
+```{python}
+# Se cointegrados, calcular spread e z-score
+from statsmodels.regression.linear_model import OLS
+
+# Regressão para encontrar hedge ratio
+modelo_ols = OLS(precos_pair.iloc[:, 0], precos_pair.iloc[:, 1]).fit()
+hedge_ratio = modelo_ols.params.iloc[0]
+spread = precos_pair.iloc[:, 0] - hedge_ratio * precos_pair.iloc[:, 1]
+
+# Z-score do spread
+zscore = (spread - spread.rolling(60).mean()) / spread.rolling(60).std()
+
+fig, axes = plt.subplots(2, 1, figsize=(14, 8))
+
+axes[0].plot(spread, color='#5B5B5B')
+axes[0].axhline(y=spread.mean(), color=INSPER_RED, linestyle='--')
+axes[0].set_title('Spread entre ITUB4 e BBDC4', fontweight='bold')
+
+axes[1].plot(zscore, color=INSPER_TURQUESA)
+axes[1].axhline(y=2, color=INSPER_RED, linestyle='--', alpha=0.5)
+axes[1].axhline(y=-2, color=INSPER_RED, linestyle='--', alpha=0.5)
+axes[1].axhline(y=0, color='gray', linestyle='-', alpha=0.3)
+axes[1].fill_between(zscore.index, 2, zscore.where(zscore > 2), alpha=0.3, color=INSPER_RED)
+axes[1].fill_between(zscore.index, -2, zscore.where(zscore < -2), alpha=0.3, color=INSPER_TURQUESA)
+axes[1].set_title('Z-Score do Spread (sinais de trading)', fontweight='bold')
+
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-tip}
+## Dicas para o Projeto Final
+- Comece simples e vá adicionando complexidade
+- Priorize a **interpretação** sobre a quantidade de modelos
+- Inclua uma seção de **limitações** — demonstra maturidade analítica
+- Pense em quem vai ler: um gestor, não um estatístico
+:::
