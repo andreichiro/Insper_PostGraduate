@@ -12,6 +12,14 @@ cleaned_data:
   type: pandas.ParquetDataset
   filepath: data/02_intermediate/cleaned_data.parquet
 
+imputed_data:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/imputed_data.parquet
+
+capped_data:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/capped_data.parquet
+
 featured_data:
   type: pandas.ParquetDataset
   filepath: data/02_intermediate/featured_data.parquet
@@ -19,6 +27,14 @@ featured_data:
 cleaned_inference:
   type: pandas.ParquetDataset
   filepath: data/02_intermediate/cleaned_inference.parquet
+
+imputed_inference:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/imputed_inference.parquet
+
+capped_inference:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/capped_inference.parquet
 
 featured_inference:
   type: pandas.ParquetDataset
@@ -32,6 +48,18 @@ split_data:
 encoded_data:
   type: pandas.ParquetDataset
   filepath: data/03_primary/encoded_data.parquet
+
+production_imputed_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/production_imputed_data.parquet
+
+production_capped_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/production_capped_data.parquet
+
+production_featured_data:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/production_featured_data.parquet
 
 production_encoded_data:
   type: pandas.ParquetDataset
@@ -59,6 +87,14 @@ encoders:
   type: pickle.PickleDataset
   filepath: data/06_models/encoders.pkl
 
+imputers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/imputers.pkl
+
+outlier_cappers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/outlier_cappers.pkl
+
 scalers:
   type: pickle.PickleDataset
   filepath: data/06_models/scalers.pkl
@@ -78,12 +114,18 @@ xgboost_model:
 production_encoders:
   type: pickle.PickleDataset
   filepath: data/06_models/production_encoders.pkl
-  versioned: true
+
+production_imputers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/production_imputers.pkl
+
+production_outlier_cappers:
+  type: pickle.PickleDataset
+  filepath: data/06_models/production_outlier_cappers.pkl
 
 production_scalers:
   type: pickle.PickleDataset
   filepath: data/06_models/production_scalers.pkl
-  versioned: true
 
 raw_production_model:
   type: pickle.PickleDataset
@@ -92,7 +134,6 @@ raw_production_model:
 production_model:
   type: pickle.PickleDataset
   filepath: data/06_models/production_model.pkl
-  versioned: true
 
 # ── Model Output ─────────────────────────────────────────────────────
 baseline_metrics:
@@ -111,12 +152,119 @@ best_model_config:
   type: pickle.PickleDataset
   filepath: data/07_model_output/best_model_config.pkl
 
+selected_feature_columns:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/selected_feature_columns.pkl
+
+feature_selection_frontier:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/feature_selection_frontier.parquet
+
+feature_selection_stability:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/feature_selection_stability.parquet
+
+feature_selection_manifest:
+  type: json.JSONDataset
+  filepath: data/07_model_output/feature_selection_manifest.json
+
 test_report:
   type: pickle.PickleDataset
   filepath: data/07_model_output/test_report.pkl
-  versioned: true
+
+model_frontier:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/model_frontier.parquet
+
+model_selection_scorecard:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/model_selection_scorecard.parquet
+
+cv_fold_metrics:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/cv_fold_metrics.parquet
+
+cv_metric_summary:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/cv_metric_summary.parquet
+
+bootstrap_metric_intervals:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/bootstrap_metric_intervals.parquet
+
+permutation_feature_importance:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/permutation_feature_importance.parquet
+
+perturbation_sensitivity_audit:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/perturbation_sensitivity_audit.parquet
+
+perturbation_sensitivity_summary:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/perturbation_sensitivity_summary.parquet
+
+threshold_metrics:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/threshold_metrics.parquet
+
+split_comparison_report:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/split_comparison_report.parquet
+
+nested_cv_audit:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/nested_cv_audit.parquet
+
+modelling_design_audit:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/modelling_design_audit.parquet
+
+selected_deployment_policy:
+  type: pickle.PickleDataset
+  filepath: data/07_model_output/selected_deployment_policy.pkl
 
 predictions:
   type: pandas.ParquetDataset
   filepath: data/07_model_output/predictions.parquet
-  versioned: true
+
+risk_report:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/risk_report.parquet
+
+# ── Ops / Governance ─────────────────────────────────────────────────
+data_contract_report:
+  type: pandas.ParquetDataset
+  filepath: data/09_ops/data_contract_report.parquet
+
+data_freshness_report:
+  type: pandas.ParquetDataset
+  filepath: data/09_ops/data_freshness_report.parquet
+
+data_drift_report:
+  type: pandas.ParquetDataset
+  filepath: data/09_ops/data_drift_report.parquet
+
+split_strategy_report:
+  type: pandas.ParquetDataset
+  filepath: data/09_ops/split_strategy_report.parquet
+
+latest_experiment_run:
+  type: pickle.PickleDataset
+  filepath: data/09_ops/latest_experiment_run.pkl
+
+latest_model_registry_entry:
+  type: pickle.PickleDataset
+  filepath: data/09_ops/latest_model_registry_entry.pkl
+
+latest_training_run_manifest:
+  type: json.JSONDataset
+  filepath: data/09_ops/latest_training_run_manifest.json
+
+latest_serving_manifest:
+  type: json.JSONDataset
+  filepath: data/09_ops/latest_serving_manifest.json
+
+latest_inference_contract:
+  type: json.JSONDataset
+  filepath: data/09_ops/latest_inference_contract.json

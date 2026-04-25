@@ -12,10 +12,12 @@ from insper_deploy_kedro.pipelines.data_engineering.nodes import (
     add_features,
     clean_data,
     transform_encoders,
+    transform_outlier_cappers,
     transform_scalers,
+    transform_zero_imputers,
 )
 
-from .nodes import predict
+from .nodes import build_risk_report, predict
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
@@ -30,8 +32,22 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 tags=["inference", "cleaning"],
             ),
             node(
+                func=transform_zero_imputers,
+                inputs=["cleaned_inference", "production_imputers"],
+                outputs="imputed_inference",
+                name="impute_inference_node",
+                tags=["inference", "imputation"],
+            ),
+            node(
+                func=transform_outlier_cappers,
+                inputs=["imputed_inference", "production_outlier_cappers"],
+                outputs="capped_inference",
+                name="cap_outliers_inference_node",
+                tags=["inference", "outlier_capping"],
+            ),
+            node(
                 func=add_features,
-                inputs=["cleaned_inference"],
+                inputs=["capped_inference"],
                 outputs="featured_inference",
                 name="add_features_inference_node",
                 tags=["inference", "feature_engineering"],
@@ -56,6 +72,13 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 outputs="predictions",
                 name="predict_node",
                 tags=["inference", "prediction"],
+            ),
+            node(
+                func=build_risk_report,
+                inputs=["featured_inference", "predictions", "production_model"],
+                outputs="risk_report",
+                name="build_risk_report_node",
+                tags=["inference", "reporting"],
             ),
         ]
     )

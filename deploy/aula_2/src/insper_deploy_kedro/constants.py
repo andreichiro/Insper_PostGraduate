@@ -20,3 +20,10 @@ class ModelArtifact(TypedDict, total=False):
     init_args: dict[str, Any]
     best_params: dict[str, Any]
     best_cv_score: float
+    cv_folds: int
+    train_splits: list[str]
+    decision_threshold: float
+    decision_policy_name: str
+    decision_policy_description: str
+    policy_catalog: list[dict[str, Any]]
+    risk_bands: list[dict[str, Any]]

@@ -1,131 +1,333 @@
-# Predição de Diabetes: Pipeline ML
+# Deploy de Predição de Diabetes
+
+Trabalho individual: André Ichiro Katsurada
 
 [![Powered by Kedro](https://img.shields.io/badge/powered_by-kedro-ffc900?logo=kedro)](https://kedro.org)
 
-Projeto ML que prevê diabetes usando um pipeline Kedro
-e serve predições via FastAPI + dashboard Streamlit
+Repositório standalone de deploy da aplicação de predição de diabetes. Ele reúne o projeto Kedro pronto para produção, a API FastAPI, o dashboard Streamlit, a configuração declarativa em YAML, as dependências travadas com `uv`, o setup Docker e os artefatos necessários para subir a stack imediatamente.
 
-## Início 
+## TLDR
+
+### Local
 
 ```bash
-# 1 Instalar dependências (Python 3.13+ e uv)
 uv sync
-
-# 2 Treinar o pipeline data engineering -> modelagem -> refit
 uv run kedro run
-
-# 3 Dashboard Streamlit (métricas + inferência)
-uv run streamlit run src/insper_deploy_kedro/dashboard.py
-
-# 4 Subir o server da API
 uv run uvicorn insper_deploy_kedro.api:app --host 0.0.0.0 --port 8000
-
-# 5 Abrir doc swagger
-open http://localhost:8000/docs
+uv run streamlit run src/insper_deploy_kedro/dashboard.py
+uv run --extra dev pytest
 ```
 
-### Docker (1 comando, tudo sobe)
+### Docker
 
 ```bash
 docker compose up --build
 ```
 
-Sobe dois serviços:
-- **api** (porta 8000) — treina o modelo se necessário + FastAPI
-- **dashboard** (porta 8501) — Streamlit com métricas e inferência ao vivo
+Endpoints principais:
 
-## CI/CD — Um Comando e Pronto
+- API: <http://localhost:8000>
+- Swagger: <http://localhost:8000/docs>
+- Health da API: <http://localhost:8000/health>
+- Dashboard: <http://localhost:8501>
+- Health do Streamlit: <http://localhost:8501/_stcore/health>
 
-O workflow do GitHub Actions roda tudo de ponta a ponta: lint, testes, treino,
-quality gate, deploy da API **e** do dashboard.
+## Resumo rápido do que foi implementado
+
+### Modelo
+
+- seleção de features orientada por blocos, usando apenas treino, CV interna e regra de 1 erro-padrão
+- otimização de hiperparâmetros com Optuna para Logistic Regression, CatBoost e XGBoost
+- comparação entre políticas clínicas de falso positivo vs falso negativo
+- artefatos de robustez: métricas por fold, resumo de variação, bootstrap, permutation importance e auditoria de sensibilidade a perturbações
+- saída de inferência transformada em relatório de risco com `prediction`, `prediction_proba`, `risk_score` e `risk_band`
+
+### Pipelines Kedro
+
+- `data_engineering`: limpeza, validação, feature engineering, split, encoding e scaling
+- `modelling`: seleção de features, tuning, avaliação, escolha do melhor modelo, políticas, robustez e manifestos
+- `refit`: retreino do bundle de produção com todos os dados
+- `inference`: caminho real de inferência usado tanto pela API quanto pelo Streamlit
+
+### FastAPI
+
+- endpoints de health/readiness
+- inferência online via o caminho real do Kedro
+- validação de request/response com Pydantic
+- jobs em background com persistência local e rastreio de erro/log
+
+### Streamlit
+
+- visão geral do bundle atual
+- comparação de modelos
+- robustez, políticas clínicas e relatórios de risco
+- manifestos e contrato de inferência
+- inferência ao vivo usando os mesmos artefatos de produção da API
+
+### Configuração declarativa
+
+- classes, funções, hiperparâmetros, CV, métricas, thresholds, políticas e validações são dirigidos por YAML
+- o código instancia tudo via `class_path` / `function_path` quando aplicável
+
+### Validação e qualidade
+
+- Great Expectations no pós-limpeza e pós-split
+- contratos simples de dados, frescor e drift materializados em artefatos
+- suíte de testes em `tests/`
+
+### Reprodutibilidade com Docker
+
+- imagem com o código completo, `pyproject.toml`, `uv.lock`, configuração Kedro base e scripts de entrypoint
+- bundle atual de produção e artefatos versionados dentro do repositório
+- seed automático dos CSVs raw quando o volume persistente está vazio
+- suporte a runtime e workspace de desenvolvimento
+
+## O que existe neste repositório
+
+- código da aplicação em `src/`
+- configuração compartilhada do Kedro em `conf/base/`
+- configuração de CI/testes em `conf/ci/`
+- arquivos raw em `data/01_raw/`
+- artefatos e outputs atuais em `data/`
+- testes em `tests/`
+- documentação em `docs/`
+- setup reprodutível com `Dockerfile`, `docker-compose.yml`, `entrypoint.sh` e `dashboard-entrypoint.sh`
+- dependências travadas via `pyproject.toml` e `uv.lock`
+
+## Como subir localmente
+
+### 1. Instalar dependências
 
 ```bash
-# rodar tudo c/ 1 comando (API + dashboard deployados)
-gh workflow run aula-2-ci.yml
-
-# só treinar sem deployar
-gh workflow run aula-2-ci.yml -f deploy=false
-
-# rodar só o refit (sem retreinar tudo do zero)
-gh workflow run aula-2-ci.yml -f pipeline=refit
-
-# ex c/ thresholds customizados
-gh workflow run aula-2-ci.yml -f min_roc_auc=0.80 -f min_f1=0.60
+uv sync
 ```
 
-O que acontece por baixo:
-1. `ruff check` + `pytest` (lint e testes)
-2. Pipeline Kedro completo + quality gate (roc_auc ≥ 0.75, f1 ≥ 0.50, mape ≤ 150%)
-3. Upload artefatos pro GCS
-4. Deploy da **API** + **Dashboard** pro Cloud Run
+### 2. Materializar os artefatos principais
 
-Secrets necessários no GitHub:
-`GCP_SA_KEY`, `GCP_PROJECT`, `GCS_BUCKET`, `API_KEY`
-
-## Validação de Dados (Great Expectations)
-
-O pipeline DE roda validações automáticas com Great Expectations em 2 pontos críticos:
-
-1. **Pós-limpeza** — verifica schema, ausência de NaN, ranges médicos (ex: Glicose 0-300, IMC 0-80)
-2. **Pós-split** — verifica que cada split tem amostras suficientes e balanço de classes aceitável
-
-Se uma validação crítica falha, o pipeline para. Warnings são logados mas não bloqueiam.
-
-## Config declarativa (sklearn, XGBoost, CatBoost, Optuna)
-
-Quase tudo que é “classe + hiperparâmetro” vem do YAML — mesmo padrão do `class_path` / `init_args` da modelagem:
-
-| Arquivo | O que controla |
-|---------|----------------|
-| `parameters/data_engineering.yml` → `preprocessing` | `train_test_split`, `OrdinalEncoder`, `StandardScaler`, limiar de estratificação |
-| `parameters/modelling.yml` → `ml_runtime` | `LabelEncoder`, `StratifiedKFold`, sampler/study do Optuna |
-| `parameters/modelling.yml` → `evaluation` | funções de métrica (`sklearn.metrics.*`), matriz de confusão, derivados (r2, mape) |
-| `parameters/modelling.yml` → `baseline` / `optimization` / `xgboost` | modelos e grids Optuna (já existia) |
-| `parameters/refit.yml` → `calibration` | `CalibratedClassifierCV` + `init_args` |
-| `parameters/data_quality.yml` | classes GX + ranges (já documentado acima) |
-
-O código só instancia via `insper_deploy_kedro.class_loading` (`load_class` / `load_callable`).
-
-## Estrutura do Projeto
-
+```bash
+uv run kedro run
 ```
-├── conf/
-│   ├── base/               # Config compartilhada 
-│   │   ├── catalog.yml      # Data Catalog 
-│   │   └── parameters/      # Parâmetros dos pipelines
-│   └── local/               # Config local (gitignored)
-│       └── credentials.yml  # Secrets
-├── data/
-│   └── 01_raw/              # CSVs de entrada
-├── src/insper_deploy_kedro/
-│   ├── api.py               # Camada serving FastAPI
-│   ├── class_loading.py     # load_class / load_callable (YAML → objeto)
-│   ├── dashboard.py         # Dashboard Streamlit (métricas + inferência)
-│   ├── constants.py         # Constantes e tipos compartilhados
-│   └── pipelines/
-│       ├── data_engineering/ # limpar -> validar(GE) -> features -> split -> validar(GE) -> encode -> scale
-│       ├── modelling/        # treinar -> avaliar -> otimizar
-│       ├── inference/        # só transform -> predição
-│       └── refit/            # retreinar c/ todos os dados pra produção
-├── tests/                   # Testes unitários, integração e e2e
-├── Dockerfile
-├── docker-compose.yml       # API (8000) + Dashboard (8501)
-└── pyproject.toml           # Dependências + config
+
+### 3. Subir a API
+
+```bash
+uv run uvicorn insper_deploy_kedro.api:app --host 0.0.0.0 --port 8000
+```
+
+### 4. Subir o dashboard
+
+```bash
+uv run streamlit run src/insper_deploy_kedro/dashboard.py
+```
+
+### 5. Rodar os testes
+
+```bash
+uv run --extra dev pytest
+```
+
+## Como subir com Docker
+
+```bash
+docker compose up --build
+```
+
+Isso sobe:
+
+- `api` em `http://localhost:8000`
+- `dashboard` em `http://localhost:8501`
+
+A imagem já carrega:
+
+- o código completo do runtime
+- o conjunto travado de dependências
+- a configuração base do Kedro
+- os CSVs raw usados para seed/bootstrap
+- o bundle atual de produção
+- os artefatos de reporting materializados
+
+Se o volume persistente estiver vazio, o bootstrap copia automaticamente os raw CSVs antes da aplicação começar a servir.
+
+Também existe um profile de desenvolvimento:
+
+```bash
+docker compose --profile dev up --build workspace
+```
+
+Esse profile monta o código em `/workspace`, instala as dependências de desenvolvimento e compartilha o volume `app-data`.
+
+## Estado atual do bundle de produção versionado
+
+Os manifestos atuais apontam para:
+
+- família do modelo: `catboost.CatBoostClassifier`
+- política de deploy: `prioritize_recall`
+- threshold de decisão: `0.15`
+- splits usados no bundle final: `train`, `validation`, `test`
+- features selecionadas no último treino: `Glucose`, `BMI`, `DiabetesPedigreeFunction`, `Age`
+- número de combinações de features avaliadas: `957`
+
+Esses valores estão materializados em:
+
+- `data/09_ops/latest_training_run_manifest.json`
+- `data/09_ops/latest_serving_manifest.json`
+- `data/09_ops/latest_inference_contract.json`
+
+## Pipelines Kedro
+
+### `data_engineering`
+
+- `clean_data`
+- `add_features`
+- validação com Great Expectations
+- `add_split_column`
+- nova validação pós-split
+- `fit_encoders` / `transform_encoders`
+- `fit_scalers` / `transform_scalers`
+
+### `modelling`
+
+- seleção de features
+- treino e tuning dos candidatos
+- avaliação de validação
+- scorecard de seleção do melhor modelo
+- comparação de políticas clínicas
+- robustez, bootstrap, importance e sensibilidade
+- manifestos e registry local
+- avaliação em teste
+
+### `refit`
+
+- retreino do bundle de produção com todos os dados
+- calibração quando configurada
+- geração dos artefatos `production_*`
+
+### `inference`
+
+- limpeza
+- features
+- encoding
+- scaling
+- predição
+- geração do relatório de risco
+
+## FastAPI
+
+A API usa Pydantic para schemas e validação de entrada/saída. O caminho de inferência online chama a pipeline real do Kedro, sem duplicar manualmente o fluxo de transformação.
+
+Principais pontos:
+
+- `/health` só fica pronto quando o bundle completo está disponível:
+  - `production_encoders.pkl`
+  - `production_scalers.pkl`
+  - `production_model.pkl`
+- `/inference` recebe lotes e devolve score/risk report
+- jobs longos podem rodar em background
+- logs e tracebacks usam a configuração central do projeto
+
+Exemplo de request:
+
+```bash
+curl -X POST http://localhost:8000/inference \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "instances": [
+      {
+        "Pregnancies": 6,
+        "Glucose": 98,
+        "BloodPressure": 58,
+        "SkinThickness": 33,
+        "Insulin": 190,
+        "BMI": 34,
+        "DiabetesPedigreeFunction": 0.43,
+        "Age": 43
+      }
+    ]
+  }'
 ```
 
 ## Dashboard Streamlit
 
-O dashboard mostra métricas comparativas dos 3 modelos, confusion matrix 
-e tem uma aba de predição:
+O dashboard cobre:
 
-```bash
-# local
-uv run streamlit run src/insper_deploy_kedro/dashboard.py
+- visão geral do estado atual do bundle
+- comparação de modelos
+- leitura de robustez e estabilidade
+- políticas clínicas de FP vs FN
+- manifestos e contrato de inferência
+- predição ao vivo
+- score/risk report materializado a partir da inferência batch
 
-# via Docker (sobe junto com a API)
-docker compose up --build
-# → API: http://localhost:8000
-# → Dashboard: http://localhost:8501
+## Configuração YAML driven
+
+Arquivos centrais:
+
+- `conf/base/catalog.yml`
+- `conf/base/parameters/data_engineering.yml`
+- `conf/base/parameters/modelling.yml`
+- `conf/base/parameters/refit.yml`
+- `conf/base/parameters/data_quality.yml`
+
+O que está declarativo:
+
+- encoder/scaler
+- split e preprocessing
+- runtime de CV
+- objetivos e search spaces do Optuna
+- métricas de avaliação
+- políticas clínicas e thresholds
+- calibração
+- Great Expectations
+
+## Great Expectations
+
+Great Expectations roda em dois momentos:
+
+1. pós-limpeza
+2. pós-split
+
+Se uma validação crítica falhar, o pipeline para. Isso ajuda a impedir que o modelo avance com schema quebrado, ranges absurdos ou splits problemáticos.
+
+## Estrutura do projeto
+
+```text
+deploy/aula_2
+├── conf/
+│   ├── base/
+│   └── ci/
+├── data/
+├── docs/
+├── src/insper_deploy_kedro/
+│   ├── api.py
+│   ├── dashboard.py
+│   ├── registry.py
+│   ├── serving_runtime.py
+│   └── pipelines/
+│       ├── data_engineering/
+│       ├── modelling/
+│       ├── inference/
+│       └── refit/
+├── tests/
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+└── uv.lock
 ```
 
-Precisa ter rodado `uv run kedro run` antes (ou usar Docker, que treina automaticamente).
+## Arquivos que devem ficar locais
+
+Não versionar:
+
+- `conf/local/credentials.yml`
+- `.env`
+- ambientes virtuais locais
+- caches locais
+- outputs locais de `catboost_info/`
+- artefatos efêmeros gerados fora do conjunto que você decidiu versionar
+
+## Observações operacionais
+
+- API e Streamlit chamam o mesmo caminho de inferência do Kedro
+- o repositório inclui artefatos atuais de produção para servir imediatamente
+- rodar novamente o pipeline de treino atualiza arquivos em `data/`
+- os manifestos versionados não dependem de um nome de usuário hardcoded de deploy

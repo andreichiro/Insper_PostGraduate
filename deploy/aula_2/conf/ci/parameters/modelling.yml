@@ -1,3 +1,5 @@
+random_state: 42
+
 baseline:
   class_path: sklearn.linear_model.LogisticRegression
   random_state: ${random_state}
@@ -53,7 +55,7 @@ baseline:
     fit_intercept:
       type: categorical
       choices: [true, false]
-  n_trials: 60
+  n_trials: 6
   cv: 5
   optimization_objective: composite_probability_policy_score
 
@@ -104,7 +106,7 @@ optimization:
       type: int
       low: 32
       high: 255
-  n_trials: 60
+  n_trials: 6
   cv: 5
   optimization_objective: composite_probability_policy_score
 
@@ -165,73 +167,47 @@ xgboost:
       type: float
       low: 0.0
       high: 5.0
-  n_trials: 60
+  n_trials: 6
   cv: 5
   optimization_objective: composite_probability_policy_score
 
-# Runtime compartilhado (target encoder, CV, Optuna) — troca de classe sem código.
-ml_runtime:
-  target_encoder:
-    class_path: sklearn.preprocessing.LabelEncoder
-    init_args: {}
-  cross_validation:
-    class_path: sklearn.model_selection.StratifiedKFold
-    init_args:
-      shuffle: true
-      random_state: ${random_state}
-  optuna_study:
-    direction: maximize
-  optuna_sampler:
-    class_path: optuna.samplers.TPESampler
-    init_args:
-      seed: ${random_state}
+nested_cv_audit:
+  enabled: false
+  development_splits:
+    - train
+    - validation
+  outer_folds: 3
+  validation_fraction: 0.25
+  random_state: ${random_state}
+  trial_scaling: 0.20
+  min_trials: 3
 
-evaluation:
+sensitivity_audit:
   split: validation
-  confusion_matrix:
-    function_path: sklearn.metrics.confusion_matrix
-    kwargs: {}
+  sample_size: 32
+  random_state: ${random_state}
+  perturbation_percents: [0.05, 0.10, 0.20]
+  min_baseline_abs: 1.0
+  insensitive_max_ratio: 0.10
+  overreactive_min_ratio: 1.00
+
+bootstrap_confidence_intervals:
+  split: validation
+  iterations: 48
+  random_state: ${random_state}
+  confidence_level: 0.95
   metrics:
-    - key: accuracy
-      function_path: sklearn.metrics.accuracy_score
-      prediction_input: y_pred
-      kwargs: {}
-    - key: precision
-      function_path: sklearn.metrics.precision_score
-      prediction_input: y_pred
-      kwargs:
-        zero_division: 0
-    - key: recall
-      function_path: sklearn.metrics.recall_score
-      prediction_input: y_pred
-      kwargs:
-        zero_division: 0
-    - key: f1
-      function_path: sklearn.metrics.f1_score
-      prediction_input: y_pred
-      kwargs:
-        zero_division: 0
-    - key: roc_auc
-      function_path: sklearn.metrics.roc_auc_score
-      prediction_input: y_proba
-      kwargs: {}
-    - key: brier
-      function_path: sklearn.metrics.brier_score_loss
-      prediction_input: y_proba
-      kwargs: {}
-    - key: log_loss
-      function_path: sklearn.metrics.log_loss
-      prediction_input: y_proba
-      kwargs:
-        labels: [0, 1]
-  derived:
-    r2:
-      function_path: sklearn.metrics.r2_score
-      prediction_input: y_proba
-    mape:
-      type: mae_as_percent_of_mean_label
-    calibration:
-      enabled: true
+    - roc_auc
+    - brier
+    - log_loss
+    - recall
+    - precision
+    - f1
+    - false_negative_rate
+    - false_positive_rate
+    - expected_cost
+    - calibration_slope_error
+    - calibration_intercept_abs
 
 feature_selection:
   enabled: true
@@ -239,7 +215,7 @@ feature_selection:
     - train
   selector_source: candidate_model
   cv:
-    n_splits: 5
+    n_splits: 2
   primary_metric: brier
   secondary_metrics:
     - roc_auc
@@ -248,16 +224,12 @@ feature_selection:
     - calibration_intercept_abs
   prefer_fewer_features: true
   min_blocks: 1
-  max_blocks: 10
-  max_candidates: 1024
+  max_blocks: 4
+  max_candidates: 32
   feature_blocks:
     pregnancies: [Pregnancies]
     glucose_axis: [Glucose]
-    blood_pressure_axis: [BloodPressure]
-    skin_thickness_axis: [SkinThickness]
-    insulin_axis: [Insulin]
     bmi_axis: [BMI]
-    pedigree_axis: [DiabetesPedigreeFunction]
     age_axis: [Age]
     engineered_continuous_signals:
       - glucose_bmi_interaction
@@ -289,166 +261,14 @@ feature_selection:
     engineered_continuous_signals:
       - glucose_axis
       - bmi_axis
-      - insulin_axis
-      - pregnancies
     clinical_categorical_signals:
       - glucose_axis
       - bmi_axis
-      - insulin_axis
       - age_axis
-
-decision_policies:
-  development_splits:
-    - train
-    - validation
-  policy_selection_split: validation
-  cv_folds: 4
-  candidate_thresholds:
-    start: 0.10
-    stop: 0.90
-    step: 0.05
-  deployment_policy: prioritize_recall
-  risk_bands:
-    - name: low
-      label: Baixo risco
-      min_probability: 0.00
-      max_probability: 0.30
-    - name: moderate
-      label: Risco moderado
-      min_probability: 0.30
-      max_probability: 0.55
-    - name: high
-      label: Alto risco
-      min_probability: 0.55
-      max_probability: 0.75
-    - name: critical
-      label: Risco critico
-      min_probability: 0.75
-      max_probability: 1.01
-  policies:
-    default_050:
-      strategy: fixed_threshold
-      threshold: 0.50
-      label: Threshold 0.50
-      description: Classificação padrão com cutoff de 50%.
-    prioritize_recall:
-      strategy: min_expected_cost
-      false_negative_cost: 8.0
-      false_positive_cost: 1.0
-      min_recall: 0.85
-      label: Priorizar recall
-      description: Política clínica que reduz falsos negativos mesmo aceitando mais falsos positivos.
-    prioritize_precision:
-      strategy: min_expected_cost
-      false_negative_cost: 1.0
-      false_positive_cost: 6.0
-      min_precision: 0.75
-      label: Priorizar precision
-      description: Política conservadora que reduz alertas falsos, aceitando mais risco de falso negativo.
-
-model_selection:
-  metric: composite_probability_policy_score
-  split_comparison_splits:
-    - train
-    - validation
-    - test
-  score_components:
-    - metric: brier
-      source: validation
-      direction: minimize
-      weight: 0.22
-      label: Validation Brier
-    - metric: log_loss
-      source: validation
-      direction: minimize
-      weight: 0.15
-      label: Validation Log loss
-    - metric: calibration_slope_error
-      source: validation
-      direction: minimize
-      weight: 0.08
-      label: Validation calibration slope error
-    - metric: calibration_intercept_abs
-      source: validation
-      direction: minimize
-      weight: 0.05
-      label: Validation calibration intercept abs
-    - metric: roc_auc
-      source: validation
-      direction: maximize
-      weight: 0.05
-      label: Validation ROC AUC
-    - metric: recall
-      source: policy
-      direction: maximize
-      weight: 0.16
-      label: Deployment-policy recall
-    - metric: false_negative_rate
-      source: policy
-      direction: minimize
-      weight: 0.10
-      label: Deployment-policy FNR
-    - metric: precision
-      source: policy
-      direction: maximize
-      weight: 0.04
-      label: Deployment-policy precision
-    - metric: false_positive_rate
-      source: policy
-      direction: minimize
-      weight: 0.02
-      label: Deployment-policy FPR
-    - metric: expected_cost_per_sample
-      source: policy
-      direction: minimize
-      weight: 0.05
-      label: Deployment-policy expected cost per sample
-  refit_train_splits:
-    - train
-    - validation
-    - test
-
-nested_cv_audit:
-  enabled: true
-  development_splits:
-    - train
-    - validation
-  outer_folds: 3
-  validation_fraction: 0.25
-  random_state: ${random_state}
-  trial_scaling: 0.20
-  min_trials: 3
-
-sensitivity_audit:
-  split: validation
-  sample_size: 128
-  random_state: ${random_state}
-  perturbation_percents: [0.05, 0.10, 0.20]
-  min_baseline_abs: 1.0
-  insensitive_max_ratio: 0.10
-  overreactive_min_ratio: 1.00
-
-bootstrap_confidence_intervals:
-  split: validation
-  iterations: 250
-  random_state: ${random_state}
-  confidence_level: 0.95
-  metrics:
-    - roc_auc
-    - brier
-    - log_loss
-    - recall
-    - precision
-    - f1
-    - false_negative_rate
-    - false_positive_rate
-    - expected_cost
-    - calibration_slope_error
-    - calibration_intercept_abs
 
 permutation_importance:
   split: validation
-  repeats: 12
+  repeats: 4
   random_state: ${random_state}
   metrics:
     - roc_auc
