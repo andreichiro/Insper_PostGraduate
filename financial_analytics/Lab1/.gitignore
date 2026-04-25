@@ -1,0 +1,7 @@
+# Saídas geradas pelo script
+figs/
+
+# uv / venv
+.venv/
+__pycache__/
+*.pyc
