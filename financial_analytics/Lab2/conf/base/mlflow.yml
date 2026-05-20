@@ -1,0 +1,11 @@
+server:
+  mlflow_tracking_uri: mlruns
+
+tracking:
+  experiment:
+    name: pads_forecasting_lab2
+  run:
+    name: lab2_main
+    nested: true
+  disable_tracking:
+    pipelines: []

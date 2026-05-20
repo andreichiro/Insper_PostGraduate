@@ -1,0 +1,10 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+.telemetry
+.viz/
+__pycache__/
+*.py[cod]
+
+data/99_qa/
+mlruns_qa/

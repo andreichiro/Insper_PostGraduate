@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PADS Forecasting - Decisoes MASE 2024</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; color: #1c2430; background: #f7f8fa; }
+    header { background: #102a43; color: white; padding: 30px 44px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 28px 22px 52px; }
+    section { background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 22px; margin: 18px 0; }
+    h1, h2, h3 { margin-top: 0; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .kpi { border: 1px solid #d9e2ec; border-radius: 6px; padding: 12px; background: #fbfcfd; }
+    .kpi strong { display: block; font-size: 1.3rem; color: #102a43; }
+    .data-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    .data-table th, .data-table td { border-bottom: 1px solid #e5e9f0; padding: 7px 8px; text-align: left; vertical-align: top; }
+    .data-table th { background: #eef2f7; color: #243b53; }
+    figure { margin: 12px 0; }
+    img { max-width: 100%; border: 1px solid #d9e2ec; border-radius: 6px; background: white; }
+    figcaption { font-size: 0.85rem; color: #52606d; margin-top: 4px; }
+    code { background: #eef2f7; padding: 2px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>PADS Forecasting - Decisoes para MASE 2024</h1>
+  <p>Run <code>lab2_main</code>. HTML 1: escolhas, evidencias, descartes e controles de robustez.</p>
+</header>
+<main>
+  <section>
+    <h2>Decisao Principal</h2>
+    <div class="kpis">
+      <div class="kpi">Modelo final<strong>ets_damped</strong></div>
+      <div class="kpi">Tratamento final<strong>calibrated_alpha</strong></div>
+      <div class="kpi">Alpha final<strong>1.0</strong></div>
+      <div class="kpi">MASE normal<strong>0.506</strong></div>
+      <div class="kpi">MASE all-fold<strong>0.961</strong></div>
+      <div class="kpi">Ganho pre-merge vs post_only<strong>25.6</strong></div>
+    </div>
+    <p><strong>Qual era a escolha?</strong> Decidir se os dados pre-merge deveriam entrar no treinamento para reduzir a MASE esperada dos 12 meses ocultos de 2024, sem quebrar robustez, validacao temporal, diagnostico residual ou protecao contra vazamento.</p>
+    <p><strong>Escolha final:</strong> usar o historico pre-merge reconstruido como pro-forma simples. O candidato aparece como <code>calibrated_alpha</code>, mas o alpha final e <code>1.0</code>, entao a representacao final equivale a <code>B_t + A_t</code> antes de 2019-07 e <code>C_t</code> observado depois.</p>
+  </section>
+
+  <section>
+    <h2>O que decidiu esse caminho?</h2>
+    <figure><img src="figures/target_reconstruction_overlay.png" alt="Reconstrucoes de alvo antes/depois da aquisicao"><figcaption>Reconstrucoes de alvo antes/depois da aquisicao</figcaption></figure>
+    <figure><img src="figures/cv_metric_comparison.png" alt="Comparacao MASE/MAE/RMSE por modelo"><figcaption>Comparacao MASE/MAE/RMSE por modelo</figcaption></figure>
+    <figure><img src="figures/fold_mase_stability.png" alt="Variacao de MASE por fold"><figcaption>Variacao de MASE por fold</figcaption></figure>
+    <p>A evidencia critica e a validacao temporal com <code>common_mase</code>, que usa denominador fixo por fold. O melhor candidato com pre-merge reconstruido tem MASE normal <strong>0.506</strong>. O melhor <code>post_only</code> tem MASE normal <strong>0.679</strong>. Isso representa melhora de aproximadamente <strong>25.6%</strong> no proxy mais proximo do alvo oculto de 2024.</p>
+    <p>Os controles tambem passam: o modelo final bate o SeasonalNaive, tem validacao completa, nao usa 2024, compara validacao contra <code>C_t</code> observado, passa o gate de overfit e tambem vence no diagnostico de robustez por origens rolantes extras: <strong>sim</strong>.</p>
+    <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>target_strategy</th>
+      <th>model_family</th>
+      <th>model_id</th>
+      <th>covid_mode</th>
+      <th>normal_mean_common_mase</th>
+      <th>mean_common_mase</th>
+      <th>mean_mae</th>
+      <th>mean_rmse</th>
+      <th>mean_relative_mae_vs_seasonal_naive</th>
+      <th>stability_reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>ets</td>
+      <td>ets_damped</td>
+      <td>none</td>
+      <td>0.505713</td>
+      <td>0.961360</td>
+      <td>25.924794</td>
+      <td>30.127509</td>
+      <td>0.672419</td>
+      <td>stability within robust candidate-pool fences</td>
+    </tr>
+    <tr>
+      <td>proforma_sum</td>
+      <td>ets</td>
+      <td>ets_damped</td>
+      <td>none</td>
+      <td>0.505713</td>
+      <td>0.961360</td>
+      <td>25.924794</td>
+      <td>30.127509</td>
+      <td>0.672419</td>
+      <td>stability within robust candidate-pool fences</td>
+    </tr>
+    <tr>
+      <td>post_only</td>
+      <td>ets</td>
+      <td>ets_damped</td>
+      <td>none</td>
+      <td>0.679395</td>
+      <td>1.265749</td>
+      <td>34.010528</td>
+      <td>39.560326</td>
+      <td>0.861462</td>
+      <td>ineligible: cv_mase is a high fold-variation outlier under Tukey IQR candidate-pool screening</td>
+    </tr>
+  </tbody>
+</table>
+  </section>
+
+  <section>
+    <h2>O que foi descartado e por que?</h2>
+    <h3>Descartado: usar apenas post-merge</h3>
+    <p><code>post_only</code> foi mantido como comparacao obrigatoria, mas ficou pior no objetivo principal. Ele evita qualquer reconstrucao historica, porem perdeu MASE contra o pro-forma reconstruido.</p>
+    <h3>Descartado: alpha diferente de 1 no forecast final</h3>
+    <p>Alpha foi explorado de forma regularizada e fold-local. Para ETS, alpha diferente de 1 nao gerou ganho preditivo: o delta normal de common MASE contra alpha 1 ficou positivo, entao piorou levemente. Por isso o forecast final volta para alpha 1.</p>
+    <h3>Descartado: ajuste COVID como modo final</h3>
+    <p>COVID foi tratado como opcao justa para todas as familias com <code>none</code> versus <code>adjusted_target</code>. Para a familia selecionada, <code>none</code> teve MASE normal <strong>0.506</strong>, enquanto <code>adjusted_target</code> teve <strong>0.940</strong>. Portanto o ajuste COVID piorou a MASE e nao foi usado no forecast final.</p>
+    <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>target_strategy</th>
+      <th>model_family</th>
+      <th>best_none_model_id</th>
+      <th>none_normal_mean_common_mase</th>
+      <th>best_adjusted_target_model_id</th>
+      <th>adjusted_target_normal_mean_common_mase</th>
+      <th>adjusted_minus_none_normal_common_mase</th>
+      <th>adjusted_target_beats_none</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>bvar</td>
+      <td>bvar_l2_lambda0.5_cross0.1_none_draws1000_tune1000</td>
+      <td>0.712930</td>
+      <td>bvar_l2_lambda0.1_cross0.05_adjusted_target_draws1000_tune1000</td>
+      <td>0.837350</td>
+      <td>0.124421</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>elasticnet</td>
+      <td>elasticnet_lags_alpha_10.0_l1_0.8_none</td>
+      <td>0.647759</td>
+      <td>elasticnet_lags_alpha_10.0_l1_0.8_adjusted_target</td>
+      <td>1.106354</td>
+      <td>0.458595</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>ets</td>
+      <td>ets_damped</td>
+      <td>0.505713</td>
+      <td>ets_add_boxcox_adjusted_target</td>
+      <td>0.940326</td>
+      <td>0.434612</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>lightgbm</td>
+      <td>lightgbm_d3_l4_n50_lr0.1_leaf18_l10.1_l20.0_none</td>
+      <td>0.577126</td>
+      <td>lightgbm_d3_l15_n25_lr0.05_leaf12_l10.1_l20.0_adjusted_target</td>
+      <td>0.712100</td>
+      <td>0.134974</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>prophet</td>
+      <td>prophet_y8_multiplicative_cp0.05_sp1.0_none</td>
+      <td>0.572573</td>
+      <td>prophet_y3_additive_cp0.05_sp10.0_adjusted_target</td>
+      <td>1.171972</td>
+      <td>0.599399</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>ridge</td>
+      <td>ridge_lags_alpha_100.0_none</td>
+      <td>0.711655</td>
+      <td>ridge_lags_alpha_100.0_adjusted_target</td>
+      <td>1.256863</td>
+      <td>0.545208</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>sarimax</td>
+      <td>sarimax_(1, 0, 2)_(1, 1, 1, 12)_n_none</td>
+      <td>0.568635</td>
+      <td>sarimax_(0, 0, 1)_(1, 1, 1, 12)_n_adjusted_target</td>
+      <td>0.772347</td>
+      <td>0.203712</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>calibrated_alpha</td>
+      <td>seasonal_naive</td>
+      <td>seasonal_naive</td>
+      <td>0.863840</td>
+      <td>seasonal_naive_adjusted_target</td>
+      <td>1.023800</td>
+      <td>0.159959</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>post_only</td>
+      <td>bvar</td>
+      <td>bvar_l2_lambda0.5_cross0.05_none_draws1000_tune1000</td>
+      <td>0.757844</td>
+      <td>bvar_l2_lambda0.1_cross0.05_adjusted_target_draws1000_tune1000</td>
+      <td>1.143678</td>
+      <td>0.385835</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>post_only</td>
+      <td>elasticnet</td>
+      <td>elasticnet_lags_alpha_10.0_l1_0.8_none</td>
+      <td>0.738614</td>
+      <td>elasticnet_lags_alpha_10.0_l1_0.8_adjusted_target</td>
+      <td>1.325553</td>
+      <td>0.586939</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>post_only</td>
+      <td>ets</td>
+      <td>ets_damped</td>
+      <td>0.679395</td>
+      <td>ets_damped_boxcox_adjusted_target</td>
+      <td>1.190649</td>
+      <td>0.511255</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>post_only</td>
+      <td>lightgbm</td>
+      <td>lightgbm_d2_l15_n50_lr0.05_leaf12_l10.0_l20.0_none</td>
+      <td>0.702476</td>
+      <td>lightgbm_d2_l15_n100_lr0.1_leaf12_l10.0_l21.0_adjusted_target</td>
+      <td>0.793825</td>
+      <td>0.091349</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+  </section>
+
+  <section>
+    <h2>Robustez e Diagnosticos</h2>
+    <div class="kpis">
+      <div class="kpi">Robustez normal MASE<strong>0.816</strong></div>
+      <div class="kpi">Robustez all-fold MASE<strong>1.147</strong></div>
+      <div class="kpi">CV common MASE<strong>0.671</strong></div>
+      <div class="kpi">Train/valid ratio<strong>1.712</strong></div>
+      <div class="kpi">Ljung-Box p lag 12<strong>0.437</strong></div>
+      <div class="kpi">Ljung-Box p lag 24<strong>0.359</strong></div>
+    </div>
+    <figure><img src="figures/residual_acf.png" alt="ACF dos residuos do modelo escolhido"><figcaption>ACF dos residuos do modelo escolhido</figcaption></figure>
+    <figure><img src="figures/final_forecast_intervals.png" alt="Previsao final com intervalos de 80% e 95%"><figcaption>Previsao final com intervalos de 80% e 95%</figcaption></figure>
+    <p>Os intervalos de 80% e 95% estao materializados em <code>forecast_intervals.parquet</code> nas colunas <code>lo_80</code>, <code>hi_80</code>, <code>lo_95</code> e <code>hi_95</code>, e visualizados no grafico final.</p>
+    <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>data</th>
+      <th>previsao</th>
+      <th>lo_80</th>
+      <th>hi_80</th>
+      <th>lo_95</th>
+      <th>hi_95</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2024-01-01</td>
+      <td>403.215806</td>
+      <td>376.508052</td>
+      <td>426.562740</td>
+      <td>361.936681</td>
+      <td>439.998068</td>
+    </tr>
+    <tr>
+      <td>2024-02-01</td>
+      <td>419.228581</td>
+      <td>392.520826</td>
+      <td>442.575515</td>
+      <td>377.949455</td>
+      <td>456.010842</td>
+    </tr>
+    <tr>
+      <td>2024-03-01</td>
+      <td>399.357933</td>
+      <td>372.650179</td>
+      <td>422.704867</td>
+      <td>358.078808</td>
+      <td>436.140195</td>
+    </tr>
+    <tr>
+      <td>2024-04-01</td>
+      <td>397.084323</td>
+      <td>370.376569</td>
+      <td>420.431257</td>
+      <td>355.805197</td>
+      <td>433.866584</td>
+    </tr>
+    <tr>
+      <td>2024-05-01</td>
+      <td>390.171446</td>
+      <td>363.463692</td>
+      <td>413.518380</td>
+      <td>348.892321</td>
+      <td>426.953708</td>
+    </tr>
+    <tr>
+      <td>2024-06-01</td>
+      <td>397.393594</td>
+      <td>370.685840</td>
+      <td>420.740528</td>
+      <td>356.114468</td>
+      <td>434.175856</td>
+    </tr>
+    <tr>
+      <td>2024-07-01</td>
+      <td>399.633328</td>
+      <td>372.925574</td>
+      <td>422.980262</td>
+      <td>358.354202</td>
+      <td>436.415589</td>
+    </tr>
+    <tr>
+      <td>2024-08-01</td>
+      <td>412.658721</td>
+      <td>385.950966</td>
+      <td>436.005655</td>
+      <td>371.379595</td>
+      <td>449.440982</td>
+    </tr>
+    <tr>
+      <td>2024-09-01</td>
+      <td>420.692925</td>
+      <td>393.985171</td>
+      <td>444.039859</td>
+      <td>379.413799</td>
+      <td>457.475187</td>
+    </tr>
+    <tr>
+      <td>2024-10-01</td>
+      <td>421.325245</td>
+      <td>394.617491</td>
+      <td>444.672179</td>
+      <td>380.046119</td>
+      <td>458.107507</td>
+    </tr>
+    <tr>
+      <td>2024-11-01</td>
+      <td>418.688488</td>
+      <td>391.980734</td>
+      <td>442.035422</td>
+      <td>377.409363</td>
+      <td>455.470750</td>
+    </tr>
+    <tr>
+      <td>2024-12-01</td>
+      <td>458.021250</td>
+      <td>431.313496</td>
+      <td>481.368184</td>
+      <td>416.742124</td>
+      <td>494.803511</td>
+    </tr>
+  </tbody>
+</table>
+  </section>
+</main>
+</body>
+</html>

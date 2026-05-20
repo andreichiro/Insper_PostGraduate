@@ -1,0 +1,11 @@
+server:
+  mlflow_tracking_uri: mlruns_qa
+
+tracking:
+  experiment:
+    name: pads_forecasting_lab2_qa
+  run:
+    name: lab2_phase10_qa
+    nested: true
+  disable_tracking:
+    pipelines: []

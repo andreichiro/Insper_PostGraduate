@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/akatsurada/Documents/INSPER/financial_analytics/Lab2/mlruns/828281902939661843/31f54112f17c4e7999816c4251c01cfa/artifacts
+end_time: 1779307829497
+entry_point_name: ''
+experiment_id: '828281902939661843'
+lifecycle_stage: active
+run_id: 31f54112f17c4e7999816c4251c01cfa
+run_name: calibrated_alpha__ets_add
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1779307829485
+status: 3
+tags: []
+user_id: akatsurada

@@ -1,0 +1,1 @@
+kedro run --from-nodes=build_assignment_checklist --pipeline=full

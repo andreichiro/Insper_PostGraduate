@@ -1,0 +1,100 @@
+"""Reporting pipeline definition."""
+
+from kedro.pipeline import node, pipeline
+
+from pads_forecasting.pipelines.reporting.nodes import (
+    build_assignment_checklist,
+    build_html_report,
+    build_shap_explainability,
+)
+
+
+def create_pipeline(**kwargs):
+    return pipeline(
+        [
+            node(
+                func=build_shap_explainability,
+                inputs=[
+                    "target_strategies",
+                    "model_selection",
+                    "params:project",
+                    "params:models",
+                    "params:outputs",
+                ],
+                outputs=["shap_feature_importance", "shap_values_sample"],
+                name="build_shap_explainability",
+            ),
+            node(
+                func=build_html_report,
+                inputs=[
+                    "data_validation",
+                    "eda_summary",
+                    "stationarity_tests",
+                    "target_strategy_summary",
+                    "old_data_gate",
+                    "cv_summary",
+                    "model_selection",
+                    "train_valid_gap",
+                    "horizon_summary",
+                    "mase_uncertainty",
+                    "nested_selection_audit",
+                    "nested_cv_results",
+                    "nested_cv_summary",
+                    "rolling_origin_robustness",
+                    "robust_alpha_results",
+                    "robust_alpha_summary",
+                    "selection_objective_audit",
+                    "covid_adjustment_coefficients",
+                    "covid_adjustment_audit",
+                    "covid_mode_comparison",
+                    "residual_diagnostics",
+                    "interval_coverage_proxy",
+                    "forecast_intervals",
+                    "final_model_metadata",
+                    "shap_feature_importance",
+                    "params:project",
+                    "params:outputs",
+                ],
+                outputs=["decision_html_report", "html_report"],
+                name="build_html_report",
+            ),
+            node(
+                func=build_assignment_checklist,
+                inputs=[
+                    "data_validation",
+                    "eda_summary",
+                    "stationarity_tests",
+                    "old_data_gate",
+                    "cv_summary",
+                    "horizon_metrics",
+                    "horizon_summary",
+                    "mase_uncertainty",
+                    "nested_selection_audit",
+                    "nested_cv_results",
+                    "nested_cv_summary",
+                    "rolling_origin_robustness",
+                    "robust_alpha_results",
+                    "robust_alpha_summary",
+                    "selection_objective_audit",
+                    "covid_adjustment_coefficients",
+                    "covid_adjustment_audit",
+                    "covid_mode_comparison",
+                    "residual_diagnostics",
+                    "interval_coverage_proxy",
+                    "interval_validation_predictions",
+                    "forecast_intervals",
+                    "challenger_forecasts",
+                    "final_model_metadata",
+                    "shap_feature_importance",
+                    "shap_values_sample",
+                    "decision_html_report",
+                    "html_report",
+                    "previsao",
+                    "params:project",
+                    "params:outputs",
+                ],
+                outputs="assignment_checklist",
+                name="build_assignment_checklist",
+            ),
+        ]
+    )

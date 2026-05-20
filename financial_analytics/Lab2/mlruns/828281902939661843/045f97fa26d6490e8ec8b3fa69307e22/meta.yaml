@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/akatsurada/Documents/INSPER/financial_analytics/Lab2/mlruns/828281902939661843/045f97fa26d6490e8ec8b3fa69307e22/artifacts
+end_time: 1779303424166
+entry_point_name: ''
+experiment_id: '828281902939661843'
+lifecycle_stage: active
+run_id: 045f97fa26d6490e8ec8b3fa69307e22
+run_name: calibrated_alpha__sarimax_(1, 0, 1)_(1, 1, 1, 12)_n_covid
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1779303424148
+status: 3
+tags: []
+user_id: akatsurada

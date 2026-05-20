@@ -1,0 +1,8 @@
+outputs:
+  reporting_dir: data/99_qa/reporting
+  figures_dir: data/99_qa/reporting/figures
+  previsao_path: outputs/previsao_qa.csv
+  forecast_intervals_path: data/99_qa/reporting/forecast_intervals.parquet
+  mlruns_dir: mlruns_qa
+  html_report_path: data/99_qa/reporting/pads_forecasting_report.html
+  decision_html_report_path: data/99_qa/reporting/pads_decision_report.html

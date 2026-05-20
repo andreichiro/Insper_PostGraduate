@@ -1,0 +1,1 @@
+{'reporting_dir': 'data/08_reporting', 'figures_dir': 'data/08_reporting/figures', 'previsao_path': 'outputs/previsao.csv', 'forecast_intervals_path': 'data/08_reporting/forecast_intervals.parquet', 'mlruns_dir': 'mlruns', 'html_report_path': 'data/08_reporting/pads_forecasting_report.html'}

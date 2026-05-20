@@ -1,0 +1,324 @@
+project:
+  name: pads_forecasting_lab2
+  run_id: lab2_main
+  seed: 42
+data:
+  date_col: data
+  value_col: valor
+  freq: MS
+  acquisition_date: '2019-07-01'
+  final_forecast_start: '2024-01-01'
+  horizon: 12
+  expected_main_start: '2014-01-01'
+  expected_main_end: '2023-12-01'
+  expected_main_rows: 120
+  expected_acquired_start: '2014-01-01'
+  expected_acquired_end: '2019-06-01'
+  expected_acquired_rows: 66
+interventions:
+  covid:
+    enabled: true
+    shock_window:
+    - '2020-03-01'
+    - '2020-06-01'
+    recovery_window:
+    - '2020-07-01'
+    - '2020-12-01'
+    aftershock_window:
+    - '2021-01-01'
+    - '2021-12-01'
+    future_value: 0
+reconstruction:
+  alpha_grid:
+  - 0.0
+  - 0.5
+  - 0.75
+  - 0.9
+  - 1.0
+  - 1.05
+  - 1.1
+  - 1.15
+  - 1.2
+  - 1.25
+  - 1.5
+  - 1.75
+  - 2.0
+  alpha_penalty_lambda: 0.02
+  alpha_prefer_one_margin_pct: 0.0
+  beta_grid:
+  - 0.9
+  - 1.0
+  - 1.1
+validation:
+  horizon: 12
+  season_length: 12
+  common_mase_reference_strategy: observed_post_merger
+  mase_uncertainty_bootstrap_samples: 1000
+  robust_alpha:
+    enabled: true
+    top_specs_per_family: 1
+    shrinkage_lambda: 0.02
+    stress_downweight: 0.5
+  covid_adjustment:
+    enabled: true
+    estimator: unobserved_components
+    level: local_linear_trend
+    seasonal: 12
+    maxiter: 120
+    dummies:
+    - covid_shock
+    - covid_recovery
+    - covid_aftershock_2021
+    future_value: 0
+    primary_modes:
+    - none
+    - adjusted_target
+    sensitivity_modes:
+    - covid
+    - regressors
+    - features
+    - exog
+  robustness_top_n: 3
+  robustness_rolling_origins:
+    enabled: true
+    first_train_end: '2021-03-01'
+    last_train_end: '2022-09-01'
+    step_months: 3
+    normal_valid_start: '2022-01-01'
+  folds:
+  - name: fold_2021_stress
+    train_end: '2020-12-01'
+    valid_start: '2021-01-01'
+    valid_end: '2021-12-01'
+    role: stress
+  - name: fold_2022_normal
+    train_end: '2021-12-01'
+    valid_start: '2022-01-01'
+    valid_end: '2022-12-01'
+    role: normal
+  - name: fold_2023_normal
+    train_end: '2022-12-01'
+    valid_start: '2023-01-01'
+    valid_end: '2023-12-01'
+    role: normal
+selection:
+  primary_metric: normal_mean_common_mase
+  normal_fold_roles:
+  - normal
+  old_data_min_improvement_pct: 0.0
+  train_valid_ratio_warning: 2.5
+  train_valid_ratio_reject: 3.0
+  residual_diagnostics_max_ratio: 1.25
+  stability_iqr_multiplier: 1.5
+  stability_min_fold_variation_epsilon: 1.0e-12
+outputs:
+  reporting_dir: data/08_reporting
+  figures_dir: data/08_reporting/figures
+  previsao_path: outputs/previsao.csv
+  forecast_intervals_path: data/08_reporting/forecast_intervals.parquet
+  mlruns_dir: mlruns
+  html_report_path: data/08_reporting/pads_forecasting_report.html
+models:
+  seasonal_naive:
+    enabled: true
+    season_length: 12
+    covid_modes:
+    - none
+    - adjusted_target
+  ets:
+    enabled: true
+    grid:
+      trend:
+      - add
+      seasonal:
+      - add
+      damped_trend:
+      - false
+      - true
+      use_boxcox:
+      - false
+      - true
+    covid_modes:
+    - none
+    - adjusted_target
+  sarimax:
+    enabled: true
+    grid:
+      p:
+      - 0
+      - 1
+      - 2
+      d:
+      - 0
+      - 1
+      q:
+      - 0
+      - 1
+      - 2
+      P:
+      - 0
+      - 1
+      D:
+      - 1
+      Q:
+      - 0
+      - 1
+      m:
+      - 12
+      trend:
+      - n
+      - c
+    covid_modes:
+    - none
+    - adjusted_target
+    - covid
+  prophet:
+    enabled: true
+    optional: true
+    grid:
+      yearly_seasonality:
+      - 3
+      - 5
+      - 8
+      seasonality_mode:
+      - additive
+      - multiplicative
+      changepoint_prior_scale:
+      - 0.01
+      - 0.05
+      - 0.1
+      seasonality_prior_scale:
+      - 1.0
+      - 5.0
+      - 10.0
+      covid_regressors:
+      - false
+      - true
+    covid_modes:
+    - none
+    - adjusted_target
+    - regressors
+  lightgbm:
+    enabled: true
+    covid_modes:
+    - none
+    - adjusted_target
+    - features
+    grid:
+      lags:
+      - - 1
+        - 2
+        - 3
+        - 6
+        - 12
+        - 13
+      rolling_windows:
+      - - 3
+        - 6
+        - 12
+      max_depth:
+      - 2
+      - 3
+      num_leaves:
+      - 4
+      - 7
+      - 15
+      n_estimators:
+      - 25
+      - 50
+      - 100
+      learning_rate:
+      - 0.03
+      - 0.05
+      - 0.1
+      min_data_in_leaf:
+      - 8
+      - 12
+      - 18
+      lambda_l1:
+      - 0.0
+      - 0.1
+      lambda_l2:
+      - 0.0
+      - 0.5
+      - 1.0
+      forecast_strategy:
+      - recursive
+  ridge:
+    enabled: true
+    covid_modes:
+    - none
+    - adjusted_target
+    - features
+    alpha_grid:
+    - 0.1
+    - 1.0
+    - 10.0
+    - 100.0
+    lags:
+    - 1
+    - 2
+    - 3
+    - 6
+    - 12
+    - 13
+  elasticnet:
+    enabled: true
+    covid_modes:
+    - none
+    - adjusted_target
+    - features
+    alpha_grid:
+    - 0.1
+    - 1.0
+    - 10.0
+    l1_ratio_grid:
+    - 0.2
+    - 0.5
+    - 0.8
+    lags:
+    - 1
+    - 2
+    - 3
+    - 6
+    - 12
+    - 13
+  bvar:
+    enabled: true
+    optional: true
+    cv_draw_cap: 100
+    cv_tune_cap: 100
+    grid:
+      lags:
+      - 1
+      - 2
+      minnesota_lambda:
+      - 0.1
+      - 0.2
+      - 0.5
+      cross_lag_shrinkage:
+      - 0.05
+      - 0.1
+      covid_exog:
+      - true
+      draws:
+      - 1000
+      tune:
+      - 1000
+    covid_modes:
+    - none
+    - adjusted_target
+    - exog
+hpo:
+  enabled: true
+  optimizer: grid
+  objective: leakage_safe_penalized_mase
+metrics:
+  primary: common_mase
+  reported:
+  - mae
+  - rmse
+  - mase
+  - common_mase
+  - bias
+  - relative_mae_vs_seasonal_naive

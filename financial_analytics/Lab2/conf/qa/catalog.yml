@@ -1,0 +1,239 @@
+main_raw:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/distribr_serie.txt
+  load_args:
+    parse_dates: ["data"]
+
+acquired_raw:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/distribr_adquirida.txt
+  load_args:
+    parse_dates: ["data"]
+
+canonical_panel:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/03_primary/canonical_panel.parquet
+  save_args:
+    index: false
+
+data_validation:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/data_validation.parquet
+  save_args:
+    index: false
+
+eda_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/eda_summary.parquet
+  save_args:
+    index: false
+
+stationarity_tests:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/stationarity_tests.parquet
+  save_args:
+    index: false
+
+target_strategies:
+  type: pickle.PickleDataset
+  filepath: data/99_qa/04_feature/target_strategies.pkl
+
+target_strategy_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/target_strategy_summary.parquet
+  save_args:
+    index: false
+
+alpha_sensitivity:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/alpha_sensitivity.parquet
+  save_args:
+    index: false
+
+leave_one_fold_alpha:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/leave_one_fold_alpha.parquet
+  save_args:
+    index: false
+
+folds_metadata:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/04_feature/folds_metadata.parquet
+  save_args:
+    index: false
+
+old_data_gate:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/old_data_gate.parquet
+  save_args:
+    index: false
+
+cv_fold_results:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/cv_fold_results.parquet
+  save_args:
+    index: false
+
+cv_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/cv_summary.parquet
+  save_args:
+    index: false
+
+train_valid_gap:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/train_valid_gap.parquet
+  save_args:
+    index: false
+
+model_selection:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/model_selection.parquet
+  save_args:
+    index: false
+
+horizon_metrics:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/horizon_metrics.parquet
+  save_args:
+    index: false
+
+horizon_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/horizon_summary.parquet
+  save_args:
+    index: false
+
+mase_uncertainty:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/mase_uncertainty.parquet
+  save_args:
+    index: false
+
+nested_selection_audit:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/nested_selection_audit.parquet
+  save_args:
+    index: false
+
+nested_cv_results:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/nested_cv_results.parquet
+  save_args:
+    index: false
+
+nested_cv_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/nested_cv_summary.parquet
+  save_args:
+    index: false
+
+rolling_origin_robustness:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/rolling_origin_robustness.parquet
+  save_args:
+    index: false
+
+robust_alpha_results:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/robust_alpha_results.parquet
+  save_args:
+    index: false
+
+robust_alpha_summary:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/robust_alpha_summary.parquet
+  save_args:
+    index: false
+
+selection_objective_audit:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/selection_objective_audit.parquet
+  save_args:
+    index: false
+
+covid_adjustment_coefficients:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/covid_adjustment_coefficients.parquet
+  save_args:
+    index: false
+
+covid_adjustment_audit:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/covid_adjustment_audit.parquet
+  save_args:
+    index: false
+
+covid_mode_comparison:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/covid_mode_comparison.parquet
+  save_args:
+    index: false
+
+residual_diagnostics:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/residual_diagnostics.parquet
+  save_args:
+    index: false
+
+interval_coverage_proxy:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/interval_coverage_proxy.parquet
+  save_args:
+    index: false
+
+interval_validation_predictions:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/interval_validation_predictions.parquet
+  save_args:
+    index: false
+
+forecast_intervals:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/forecast_intervals.parquet
+  save_args:
+    index: false
+
+challenger_forecasts:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/challenger_forecasts.parquet
+  save_args:
+    index: false
+
+final_model_metadata:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/final_model_metadata.parquet
+  save_args:
+    index: false
+
+previsao:
+  type: pandas.CSVDataset
+  filepath: outputs/previsao_qa.csv
+  save_args:
+    index: false
+
+assignment_checklist:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/assignment_checklist.parquet
+  save_args:
+    index: false
+
+shap_feature_importance:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/shap_feature_importance.parquet
+  save_args:
+    index: false
+
+shap_values_sample:
+  type: pandas.ParquetDataset
+  filepath: data/99_qa/reporting/shap_values_sample.parquet
+  save_args:
+    index: false
+
+html_report:
+  type: text.TextDataset
+  filepath: data/99_qa/reporting/pads_forecasting_report.html
+
+decision_html_report:
+  type: text.TextDataset
+  filepath: data/99_qa/reporting/pads_decision_report.html

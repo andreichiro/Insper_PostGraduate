@@ -1,0 +1,32 @@
+project:
+  name: pads_forecasting_lab2
+  run_id: lab2_main
+  seed: 42
+
+data:
+  date_col: data
+  value_col: valor
+  freq: MS
+  acquisition_date: "2019-07-01"
+  final_forecast_start: "2024-01-01"
+  horizon: 12
+  expected_main_start: "2014-01-01"
+  expected_main_end: "2023-12-01"
+  expected_main_rows: 120
+  expected_acquired_start: "2014-01-01"
+  expected_acquired_end: "2019-06-01"
+  expected_acquired_rows: 66
+
+interventions:
+  covid:
+    enabled: true
+    shock_window: ["2020-03-01", "2020-06-01"]
+    recovery_window: ["2020-07-01", "2020-12-01"]
+    aftershock_window: ["2021-01-01", "2021-12-01"]
+    future_value: 0
+
+reconstruction:
+  alpha_grid: [0.0, 0.5, 0.75, 0.9, 1.0, 1.05, 1.10, 1.15, 1.20, 1.25, 1.5, 1.75, 2.0]
+  alpha_penalty_lambda: 0.02
+  alpha_prefer_one_margin_pct: 0.0
+  beta_grid: [0.9, 1.0, 1.1]

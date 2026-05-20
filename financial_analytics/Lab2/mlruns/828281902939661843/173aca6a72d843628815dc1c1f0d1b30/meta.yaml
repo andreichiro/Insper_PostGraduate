@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/akatsurada/Documents/INSPER/financial_analytics/Lab2/mlruns/828281902939661843/173aca6a72d843628815dc1c1f0d1b30/artifacts
+end_time: 1779303424102
+entry_point_name: ''
+experiment_id: '828281902939661843'
+lifecycle_stage: active
+run_id: 173aca6a72d843628815dc1c1f0d1b30
+run_name: proforma_sum__ets_damped_boxcox
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1779303424080
+status: 3
+tags: []
+user_id: akatsurada

@@ -1,0 +1,73 @@
+models:
+  seasonal_naive:
+    enabled: true
+    season_length: 12
+    covid_modes: [none]
+  ets:
+    enabled: true
+    grid:
+      trend: [add]
+      seasonal: [add]
+      damped_trend: [false, true]
+      use_boxcox: [false]
+    covid_modes: [none]
+  sarimax:
+    enabled: true
+    grid:
+      p: [0]
+      d: [1]
+      q: [1]
+      P: [0]
+      D: [1]
+      Q: [1]
+      m: [12]
+      trend: [n]
+    covid_modes: [none]
+  prophet:
+    enabled: true
+    optional: true
+    grid:
+      yearly_seasonality: [3]
+      seasonality_mode: [additive]
+      changepoint_prior_scale: [0.05]
+      seasonality_prior_scale: [5.0]
+      covid_regressors: [false]
+  lightgbm:
+    enabled: true
+    grid:
+      lags: [[1, 2, 12]]
+      rolling_windows: [[3]]
+      max_depth: [2]
+      num_leaves: [4]
+      n_estimators: [25]
+      learning_rate: [0.05]
+      min_data_in_leaf: [8]
+      lambda_l1: [0.0]
+      lambda_l2: [0.0]
+      forecast_strategy: [recursive]
+  ridge:
+    enabled: true
+    alpha_grid: [1.0]
+    lags: [1, 2, 12]
+  elasticnet:
+    enabled: true
+    alpha_grid: [0.1]
+    l1_ratio_grid: [0.5]
+    lags: [1, 2, 12]
+  bvar:
+    enabled: true
+    optional: true
+    cv_draw_cap: 8
+    cv_tune_cap: 8
+    grid:
+      lags: [1]
+      minnesota_lambda: [0.2]
+      cross_lag_shrinkage: [0.1]
+      covid_exog: [true]
+      draws: [8]
+      tune: [8]
+
+hpo:
+  enabled: true
+  optimizer: grid
+  objective: leakage_safe_penalized_mase

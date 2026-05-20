@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/akatsurada/Documents/INSPER/financial_analytics/Lab2/mlruns/828281902939661843/0f291843a54c407f9884241e5df1bc28/artifacts
+end_time: 1779307005849
+entry_point_name: ''
+experiment_id: '828281902939661843'
+lifecycle_stage: active
+run_id: 0f291843a54c407f9884241e5df1bc28
+run_name: proforma_sum__sarimax_(1, 0, 1)_(1, 1, 1, 12)_n_covid
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1779307005831
+status: 3
+tags: []
+user_id: akatsurada

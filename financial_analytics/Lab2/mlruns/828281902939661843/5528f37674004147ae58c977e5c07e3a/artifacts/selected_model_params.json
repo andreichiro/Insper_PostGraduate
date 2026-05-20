@@ -1,0 +1,9 @@
+{
+  "model_family": "ets",
+  "trend": "add",
+  "seasonal": "add",
+  "damped_trend": true,
+  "use_boxcox": false,
+  "season_length": 12,
+  "fitted_engine": "statsmodels"
+}

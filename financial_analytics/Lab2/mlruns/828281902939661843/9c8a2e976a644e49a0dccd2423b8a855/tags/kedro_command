@@ -1,0 +1,1 @@
+kedro run --node=build_html_report --pipeline=__default__

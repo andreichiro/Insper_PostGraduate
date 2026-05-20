@@ -1,0 +1,1 @@
+{'date_col': 'data', 'value_col': 'valor', 'freq': 'MS', 'acquisition_date': '2019-07-01', 'final_forecast_start': '2024-01-01', 'horizon': 12, 'expected_main_start': '2014-01-01', 'expected_main_end': '2023-12-01', 'expected_main_rows': 120, 'expected_acquired_start': '2014-01-01', 'expected_acquired_end': '2019-06-01', 'expected_acquired_rows': 66}

@@ -1,0 +1,1 @@
+{'covid': {'enabled': True, 'shock_window': ['2020-03-01', '2020-06-01'], 'recovery_window': ['2020-07-01', '2020-12-01'], 'aftershock_window': ['2021-01-01', '2021-12-01'], 'future_value': 0}}

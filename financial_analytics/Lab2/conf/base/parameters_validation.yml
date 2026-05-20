@@ -1,0 +1,57 @@
+validation:
+  horizon: 12
+  season_length: 12
+  common_mase_reference_strategy: observed_post_merger
+  mase_uncertainty_bootstrap_samples: 1000
+  robust_alpha:
+    enabled: true
+    top_specs_per_family: 1
+    shrinkage_lambda: 0.02
+    stress_downweight: 0.5
+  covid_adjustment:
+    enabled: true
+    estimator: unobserved_components
+    level: local_linear_trend
+    seasonal: 12
+    maxiter: 120
+    dummies: [covid_shock, covid_recovery, covid_aftershock_2021]
+    future_value: 0
+    primary_modes: [none, adjusted_target]
+    sensitivity_modes: [covid, regressors, features, exog]
+  robustness_top_n: 3
+  robustness_rolling_origins:
+    enabled: true
+    first_train_end: "2021-03-01"
+    last_train_end: "2022-09-01"
+    step_months: 3
+    normal_valid_start: "2022-01-01"
+  folds:
+    - name: fold_2021_stress
+      train_end: "2020-12-01"
+      valid_start: "2021-01-01"
+      valid_end: "2021-12-01"
+      role: stress
+    - name: fold_2022_normal
+      train_end: "2021-12-01"
+      valid_start: "2022-01-01"
+      valid_end: "2022-12-01"
+      role: normal
+    - name: fold_2023_normal
+      train_end: "2022-12-01"
+      valid_start: "2023-01-01"
+      valid_end: "2023-12-01"
+      role: normal
+
+metrics:
+  primary: common_mase
+  reported: [mae, rmse, mase, common_mase, bias, relative_mae_vs_seasonal_naive]
+
+selection:
+  primary_metric: normal_mean_common_mase
+  normal_fold_roles: [normal]
+  old_data_min_improvement_pct: 0.0
+  train_valid_ratio_warning: 2.5
+  train_valid_ratio_reject: 3.0
+  residual_diagnostics_max_ratio: 1.25
+  stability_iqr_multiplier: 1.5
+  stability_min_fold_variation_epsilon: 1.0e-12
